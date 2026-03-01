@@ -102,6 +102,7 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
   const [nom, setNom] = useState("")
   const [avatarUrl, setAvatarUrl] = useState("")
   const [profileColor, setProfileColor] = useState("#d97706")
+  const [adresseDepart, setAdresseDepart] = useState("")
   const [activeSection, setActiveSection] = useState("profil")
   const [sidebarOpen, setNavOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -156,14 +157,14 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
   // Load profile info (settings already loaded via context)
   useEffect(() => {
     const loadProfile = async () => {
-      const { data: p } = await supabase.from("profiles").select("nom, avatar_url, color").eq("id", profile.id).single()
-      if (p) { setNom(p.nom || ""); setAvatarUrl(p.avatar_url || ""); setProfileColor(p.color || "#d97706") }
+      const { data: p } = await supabase.from("profiles").select("nom, avatar_url, color, adresse_depart").eq("id", profile.id).single()
+      if (p) { setNom(p.nom || ""); setAvatarUrl(p.avatar_url || ""); setProfileColor(p.color || "#d97706"); setAdresseDepart(p.adresse_depart || "") }
     }
     loadProfile()
   }, [profile])
 
   const save = async () => {
-    await supabase.from("profiles").update({ nom, color: profileColor }).eq("id", profile.id)
+    await supabase.from("profiles").update({ nom, color: profileColor, adresse_depart: adresseDepart }).eq("id", profile.id)
     await saveSettings()
   }
 
@@ -227,6 +228,13 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
               <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Badge / Statut texte</label>
               <input value={us.user_badge} onChange={e => set("user_badge", e.target.value)} placeholder="Ex: 🔥 Top vendeur"
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">📍 Adresse de départ (tournées)</label>
+              <input value={adresseDepart} onChange={e => setAdresseDepart(e.target.value)}
+                placeholder="Ex: 12 rue de la Paix, 75001 Paris"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+              <p className="text-zinc-600 text-[10px] mt-1">Utilisée comme point de départ lors de la planification de vos tournées</p>
             </div>
           </div>
         </div>

@@ -46,6 +46,10 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
   const [tourSelection, setTourSelection] = useState<Set<string>>(new Set())
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(false)
+  const [homeAddress, setHomeAddress] = useState("")
+  const [homeCoords, setHomeCoords] = useState<[number, number] | null>(null)
+  const [geocodingHome, setGeocodingHome] = useState(false)
+  const homeMarkerRef = useRef<any>(null)
 
   // Load Leaflet dynamically (no SSR issues)
   useEffect(() => {
@@ -62,7 +66,32 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
     return () => {}
   }, [])
 
-  useEffect(() => { load() }, [activeSociety])
+  useEffect(() => { load(); loadHomeAddress() }, [activeSociety])
+
+  const loadHomeAddress = async () => {
+    const { data } = await supabase.from("profiles")
+      .select("adresse_depart").eq("id", profile.id).single()
+    if (data?.adresse_depart) {
+      setHomeAddress(data.adresse_depart)
+      geocodeHome(data.adresse_depart)
+    }
+  }
+
+  const geocodeHome = async (address: string) => {
+    if (!address.trim()) return
+    setGeocodingHome(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`)
+      const data = await res.json()
+      if (data?.[0]) setHomeCoords([parseFloat(data[0].lat), parseFloat(data[0].lon)])
+    } catch {}
+    setGeocodingHome(false)
+  }
+
+  const saveHomeAddress = async () => {
+    await supabase.from("profiles").update({ adresse_depart: homeAddress }).eq("id", profile.id)
+    geocodeHome(homeAddress)
+  }
 
   const load = async () => {
     const { data } = await supabase.from("prospects")
@@ -143,13 +172,27 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
       markersRef.current[p.id] = marker
     })
 
+    // Home marker
+    if (homeMarkerRef.current) map.removeLayer(homeMarkerRef.current)
+    if (homeCoords) {
+      const homeIcon = L.divIcon({
+        html: `<div style="background:#22c55e;border:3px solid white;border-radius:50%;width:16px;height:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
+        className: "",
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      })
+      homeMarkerRef.current = L.marker(homeCoords, { icon: homeIcon, zIndexOffset: 2000 })
+        .bindPopup("<b>🏠 Mon point de départ</b>")
+        .addTo(map)
+    }
+
     // Auto-fit bounds if prospects
     if (visible.length > 0 && !focusProspect) {
       const coords = visible.filter(p => p.latitude).map(p => [p.latitude!, p.longitude!])
       if (coords.length > 1) map.fitBounds(coords, { padding: [40, 40], maxZoom: 13 })
       else if (coords.length === 1) map.setView(coords[0] as any, 13)
     }
-  }, [prospects, filterStatut, leafletLoaded, tourMode, tourSelection])
+  }, [prospects, filterStatut, leafletLoaded, tourMode, tourSelection, homeCoords])
 
   // Focus on specific prospect
   useEffect(() => {
@@ -179,23 +222,38 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
       .map(id => prospects.find(p => p.id === id))
       .filter(Boolean) as Prospect[]
 
-    // Simple nearest-neighbor optimization
+    // Simple nearest-neighbor optimization (starting from home if available)
     const optimized: Prospect[] = []
     const remaining = [...stops]
-    let current = remaining.shift()!
-    optimized.push(current)
+    
+    // Start from home or first stop
+    let startLat = homeCoords ? homeCoords[0] : remaining[0]?.latitude!
+    let startLng = homeCoords ? homeCoords[1] : remaining[0]?.longitude!
+    if (!homeCoords) { optimized.push(remaining.shift()!) }
+    
+    let currentLat = startLat
+    let currentLng = startLng
     while (remaining.length > 0) {
       let nearest = 0
       let minDist = Infinity
       remaining.forEach((p, i) => {
-        const d = Math.hypot((p.latitude! - current.latitude!), (p.longitude! - current.longitude!))
+        const d = Math.hypot((p.latitude! - currentLat), (p.longitude! - currentLng))
         if (d < minDist) { minDist = d; nearest = i }
       })
-      current = remaining.splice(nearest, 1)[0]
-      optimized.push(current)
+      const next = remaining.splice(nearest, 1)[0]
+      optimized.push(next)
+      currentLat = next.latitude!
+      currentLng = next.longitude!
     }
+    
+    // Dummy for compat
+    let current = optimized[0]
 
-    const coords = optimized.map(p => [p.latitude!, p.longitude!])
+
+    const coords = [
+      ...(homeCoords ? [homeCoords] : []),
+      ...optimized.map(p => [p.latitude!, p.longitude!] as [number, number])
+    ]
 
     // Draw route line
     routeLayerRef.current = L.polyline(coords, {
@@ -274,6 +332,23 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700 transition-colors">
             <Navigation size={12} /> Ma position
           </button>
+          {/* Adresse de départ */}
+          <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5">
+            <span className="text-green-400 text-xs">🏠</span>
+            <input
+              value={homeAddress}
+              onChange={e => setHomeAddress(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveHomeAddress()}
+              placeholder="Mon adresse de départ..."
+              className="bg-transparent text-xs text-white placeholder-zinc-600 focus:outline-none w-48"
+            />
+            <button onClick={saveHomeAddress} disabled={geocodingHome}
+              className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-colors"
+              style={{ backgroundColor: "#22c55e20", color: "#22c55e" }}>
+              {geocodingHome ? "..." : "OK"}
+            </button>
+            {homeCoords && <span className="text-green-400 text-[10px]">✓</span>}
+          </div>
           <button onClick={() => { setTourMode(!tourMode); setTourSelection(new Set()); setRouteInfo(null) }}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-semibold transition-all"
             style={tourMode
