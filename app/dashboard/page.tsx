@@ -283,24 +283,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   return (
     <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
       {/* ═══════════ SIDEBAR ═══════════ */}
-      {/* Overlay sombre quand sidebar ouverte sur mobile */}
+      {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside
-        className={[
-          "flex flex-col shrink-0 border-r border-zinc-900 transition-all duration-300",
-          // Desktop : toujours visible, largeur fixe
-          "md:w-56 md:relative md:translate-x-0",
-          // Mobile : position fixe, glisse depuis la gauche
-          "fixed top-0 left-0 h-full z-50 w-72",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-        ].join(" ")}
-        style={{ backgroundColor: SIDEBAR_BG }}>
+      {/* DESKTOP : sidebar normale */}
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300" style={{ backgroundColor: SIDEBAR_BG }}>
 
         {/* Logo */}
         <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
@@ -419,16 +408,76 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </div>
       </aside>
 
+      {/* MOBILE : sidebar en drawer par-dessus le contenu */}
+      {sidebarOpen && (
+        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          {/* Bouton fermer */}
+          <button onClick={() => setSidebarOpen(false)}
+            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">
+            ✕
+          </button>
+          {/* Logo */}
+          <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
+                style={{ backgroundColor: ACCENT }}>
+                <span className="text-black font-black text-sm">B</span>
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm">Butt Premium</p>
+                {activeSociety && <p className="text-zinc-500 text-[10px]">{activeSociety.name}</p>}
+              </div>
+            </div>
+          </div>
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+            {visibleNav.map(({ section, items }) => (
+              <div key={section}>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+                {items.map(tab => {
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-0.5 relative"
+                      style={{ backgroundColor: isActive ? ACCENT + "18" : undefined, color: isActive ? ACCENT : "#71717a" }}>
+                      {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full" style={{ backgroundColor: ACCENT }} />}
+                      <span className="text-base">{tab.icon}</span>
+                      <span className="flex-1 truncate">{tab.label}</span>
+                      {tab.id === "messages" && unreadMessages > 0 && (
+                        <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+          {/* Profil bas */}
+          <div className="border-t border-zinc-900 p-3">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
+              <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className="text-zinc-500 text-[10px]">En ligne</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
       {/* ── MAIN ─────────────────────────────── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
-        {/* Bouton hamburger mobile — caché sur desktop */}
+        {/* Bouton hamburger — visible uniquement sur mobile */}
         <button
           onClick={() => setSidebarOpen(true)}
-          className="md:hidden fixed top-3 left-3 z-30 w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-lg border border-zinc-700"
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
           style={{ backgroundColor: SIDEBAR_BG }}>
-          <span className="w-4 h-0.5 rounded-full bg-zinc-300" />
-          <span className="w-4 h-0.5 rounded-full bg-zinc-300" />
-          <span className="w-3 h-0.5 rounded-full bg-zinc-300" />
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
         </button>
         {renderContent()}
       </main>
