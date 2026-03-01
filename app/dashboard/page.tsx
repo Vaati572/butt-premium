@@ -55,6 +55,10 @@ const ALL_NAV = [
     { id: "notes",      label: "Notes",             icon: "📝" },
     { id: "documents",  label: "Documents",         icon: "📁" },
   ]},
+  { section: "Démarchage", items: [
+    { id: "prospects",  label: "Prospects",         icon: "🎯" },
+    { id: "map",        label: "Map & Tournées",    icon: "🗺️" },
+  ]},
   { section: "Système", items: [
     { id: "admin",      label: "Admin",             icon: "🔒" },
     { id: "parametres", label: "Paramètres",        icon: "⚙️" },
