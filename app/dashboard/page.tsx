@@ -12,7 +12,6 @@ import AccueilModule from "@/components/accueil/AccueilModule"
 import DepensesOffertsModule from "@/components/depenses/DepensesModule"
 import StatsModule from "@/components/stats/StatsModule"
 import MessagesModule from "@/components/messages/MessagesModule"
-import MobileNav from "@/components/shared/MobileNav"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
 const ADMIN_PIN = "18072209"
@@ -122,29 +121,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [unreadMessages, setUnreadMessages] = useState(0)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
-  const sidebarRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
-  // Detect mobile
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener("resize", check)
-    return () => window.removeEventListener("resize", check)
-  }, [])
-
-  // Close sidebar on outside tap (mobile)
-  useEffect(() => {
-    if (!sidebarOpen) return
-    const handler = (e: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node))
-        setSidebarOpen(false)
-    }
-    document.addEventListener("mousedown", handler)
-    return () => document.removeEventListener("mousedown", handler)
-  }, [sidebarOpen])
 
   const ACCENT = settings.accent_color || "#eab308"
   const BG = settings.background || "#0a0a0a"
@@ -303,60 +281,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   return (
     <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
-
-      {/* ── MOBILE HEADER BAR ─────────────────── */}
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 border-b border-zinc-900" style={{ backgroundColor: SIDEBAR_BG }}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 shadow-lg"
-              style={{ backgroundColor: ACCENT }}>
-              <span className="text-black font-black text-xs">B</span>
-            </div>
-            <p className="text-white font-bold text-sm">{ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.icon} {ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.label}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {unreadMessages > 0 && (
-              <button onClick={() => setActiveTab("messages")}
-                className="relative flex items-center justify-center w-8 h-8 rounded-full"
-                style={{ backgroundColor: ACCENT + "20" }}>
-                <span className="text-sm">💬</span>
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-black text-black flex items-center justify-center"
-                  style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
-              </button>
-            )}
-            <button onClick={() => setSidebarOpen(true)}
-              className="w-8 h-8 flex flex-col items-center justify-center gap-1.5 rounded-lg bg-zinc-800">
-              <span className="w-4 h-0.5 bg-zinc-300 rounded-full" />
-              <span className="w-4 h-0.5 bg-zinc-300 rounded-full" />
-              <span className="w-3 h-0.5 bg-zinc-300 rounded-full" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── MOBILE OVERLAY ────────────────────── */}
-      {isMobile && sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-      )}
-
       {/* ═══════════ SIDEBAR ═══════════ */}
-      <aside ref={sidebarRef}
-        className={`flex flex-col shrink-0 transition-all duration-300 border-r border-zinc-900
-          ${isMobile
-            ? `fixed top-0 left-0 h-full z-50 w-72 shadow-2xl ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`
-            : "w-56 relative"
-          }`}
-        style={{ backgroundColor: SIDEBAR_BG }}>
+      <aside className="w-56 border-r border-zinc-900 flex flex-col shrink-0 transition-colors duration-300" style={{ backgroundColor: SIDEBAR_BG }}>
 
         {/* Logo */}
         <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
           <div className="flex items-center gap-2.5">
-            {isMobile && (
-              <button onClick={() => setSidebarOpen(false)}
-                className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                ✕
-              </button>
-            )}
+
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
               style={{ backgroundColor: ACCENT, boxShadow: `0 4px 12px ${ACCENT}40` }}>
               <span className="text-black font-black text-sm">B</span>
@@ -381,7 +312,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               {items.map(tab => {
                 const isActive = activeTab === tab.id
                 return (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (isMobile) setSidebarOpen(false) }}
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5`}
                     style={{
                       backgroundColor: isActive ? ACCENT + "18" : undefined,
@@ -472,24 +403,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
       {/* ── MAIN ─────────────────────────────── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
-        {/* Spacer for mobile fixed header */}
-        {isMobile && <div className="h-14 shrink-0" />}
-        {/* Content with bottom padding on mobile for bottom nav */}
-        <div className={`flex-1 overflow-hidden flex flex-col ${isMobile ? "pb-16" : ""}`}>
-          {renderContent()}
-        </div>
+        {renderContent()}
       </main>
-
-      {/* ── MOBILE BOTTOM NAV ─────────────────── */}
-      {isMobile && (
-        <MobileNav
-          activeTab={activeTab}
-          setActiveTab={(tab) => { setActiveTab(tab); setSidebarOpen(false) }}
-          unreadMessages={unreadMessages}
-          accent={ACCENT}
-          visibleTabs={visibleNav.flatMap(s => s.items.map(t => t.id))}
-        />
-      )}
     </div>
   )
 }
