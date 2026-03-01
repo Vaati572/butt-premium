@@ -292,23 +292,14 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300" style={{ backgroundColor: SIDEBAR_BG }}>
 
         {/* Logo */}
-        <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
-          <div className="flex items-center gap-2.5">
-
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
-              style={{ backgroundColor: ACCENT, boxShadow: `0 4px 12px ${ACCENT}40` }}>
-              <span className="text-black font-black text-sm">B</span>
+        <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
+          <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
+          {activeSociety && (
+            <div className="flex items-center gap-1 mt-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
+              <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
             </div>
-            <div className="min-w-0">
-              <p className="text-white font-bold text-sm leading-tight">Butt Premium</p>
-              {activeSociety && (
-                <div className="flex items-center gap-1 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
-                  <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -420,14 +411,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           {/* Logo */}
           <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
-                style={{ backgroundColor: ACCENT }}>
-                <span className="text-black font-black text-sm">B</span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">Butt Premium</p>
-                {activeSociety && <p className="text-zinc-500 text-[10px]">{activeSociety.name}</p>}
-              </div>
+              <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+              {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
             </div>
           </div>
           {/* Navigation */}

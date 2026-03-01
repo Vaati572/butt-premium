@@ -65,13 +65,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center px-4">
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
-          <span className="text-black font-black text-lg">B</span>
-        </div>
-        <p className="text-white font-black text-2xl tracking-tight">Butt Premium</p>
-      </div>
-      <p className="text-zinc-500 text-sm mb-10">Logiciel de gestion</p>
+      <img src="/logo.png" alt="Butt Premium" className="h-28 w-auto mb-6 drop-shadow-lg" />
 
       {/* Card */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
