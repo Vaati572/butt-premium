@@ -498,8 +498,31 @@ export default function DashboardPage() {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push("/"); return }
-      const { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+
+      // Load profile
+      let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+
+      // Si pas de profil → le créer automatiquement
+      if (!prof) {
+        const nom = session.user.user_metadata?.full_name
+          || session.user.user_metadata?.name
+          || session.user.email?.split("@")[0]
+          || "Utilisateur"
+        const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
+        await supabase.from("profiles").insert({
+          id: session.user.id,
+          nom,
+          email: session.user.email,
+          society_id: soc?.id,
+          role: "vendeur",
+          is_active: true,
+        })
+        const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        prof = newProf
+      }
+
       if (prof) setProfile({ ...prof, email: session.user.email })
+
       const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
       if (socs?.length) setActiveSociety(socs[0])
       setLoading(false)
@@ -513,7 +536,21 @@ export default function DashboardPage() {
     </div>
   )
 
-  if (!profile) return null
+  // Profil toujours manquant après tentative de création
+  if (!profile) return (
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
+      <p className="text-white font-bold text-lg">Problème de chargement</p>
+      <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
+      <button onClick={() => window.location.reload()}
+        className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors">
+        Réessayer
+      </button>
+      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }}
+        className="text-zinc-500 text-sm hover:text-white transition-colors">
+        Se déconnecter
+      </button>
+    </div>
+  )
 
   return (
     <UserSettingsProvider userId={profile.id}>
