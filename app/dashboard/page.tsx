@@ -9,9 +9,11 @@ import StocksModule from "@/components/stocks/StocksModule"
 import VenteModule from "@/components/vente/VenteModule"
 import AdminModule from "@/components/admin/AdminModule"
 import AccueilModule from "@/components/accueil/AccueilModule"
-import DepensesOffertsModule from "@/components/depenses/DepensesModule"
+import DepensesOffertsModule from "@/components/depenses/DepensesOffertsModule"
 import StatsModule from "@/components/stats/StatsModule"
 import MessagesModule from "@/components/messages/MessagesModule"
+import ProspectsModule from "@/components/prospects/ProspectsModule"
+import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
 const ADMIN_PIN = "18072209"
@@ -120,6 +122,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [focusProspect, setFocusProspect] = useState<any>(null)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
