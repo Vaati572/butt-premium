@@ -55,11 +55,12 @@ const PRIORITES = [
 
 const SOURCES = ["Salon", "Référence", "Internet", "Cold Call", "Réseau", "Autre"]
 
-const EMPTY: Omit<Prospect, "id" | "created_at"> = {
+const EMPTY: Omit<Prospect, "id" | "created_at"> & { source_autre?: string } = {
   nom: "", entreprise: "", poste: "", tel: "", email: "",
   adresse: "", cp: "", ville: "", latitude: null, longitude: null,
   statut: "a_faire", priorite: "normale", source: "", notes: "",
   prochaine_action: "", prochaine_action_date: "", tags: [], assigned_to: null,
+  source_autre: "",
 }
 
 export default function ProspectsModule({ activeSociety, profile, onShowOnMap, onSwitchToMap }: Props) {
@@ -74,6 +75,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const [saving, setSaving] = useState(false)
   const [geocoding, setGeocoding] = useState(false)
   const [tagInput, setTagInput] = useState("")
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => { load() }, [activeSociety])
 
@@ -103,8 +105,21 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const openCreate = () => { setForm({ ...EMPTY }); setEditing(null); setShowForm(true) }
   const openEdit = (p: Prospect) => { setForm({ ...p }); setEditing(p); setShowForm(true) }
 
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!form.nom.trim()) e.nom = "Le nom est obligatoire"
+    if (!form.adresse.trim()) e.adresse = "L'adresse est obligatoire"
+    if (!form.statut) e.statut = "Le statut est obligatoire"
+    if (!form.priorite) e.priorite = "La priorité est obligatoire"
+    if (!form.source) e.source = "La source est obligatoire"
+    if (form.source === "Autre" && !form.source_autre?.trim()) e.source_autre = "Précisez la source"
+    if (!form.prochaine_action_date) e.prochaine_action_date = "La date est obligatoire"
+    setErrors(e)
+    return Object.keys(e).length === 0
+  }
+
   const save = async () => {
-    if (!form.nom.trim()) return
+    if (!validate()) return
     setSaving(true)
     if (editing) {
       await supabase.from("prospects").update({ ...form, updated_at: new Date().toISOString() }).eq("id", editing.id)
@@ -418,10 +433,11 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
               {/* Identité */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom *</label>
-                  <input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))}
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5"><span className="text-zinc-500">Nom</span> <span className="text-red-400">*</span></label>
+                  <input value={form.nom} onChange={e => { setForm(f => ({ ...f, nom: e.target.value })); setErrors(e => ({...e, nom: ""})) }}
                     placeholder="Nom du contact"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
+                    className={`w-full bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none ${errors.nom ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`} />
+                  {errors.nom && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.nom}</p>}
                 </div>
                 <div>
                   <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Entreprise</label>
@@ -452,7 +468,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
               {/* Adresse + géocodage */}
               <div className="bg-zinc-900/50 rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-zinc-500 text-[11px] uppercase tracking-wider">Adresse</label>
+  <label className="text-[11px] uppercase tracking-wider"><span className="text-zinc-500">Adresse</span> <span className="text-red-400">*</span></label>
                   <button onClick={geocodeAddress} disabled={geocoding}
                     className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg transition-colors"
                     style={{ backgroundColor: "#3b82f620", color: "#3b82f6" }}>
@@ -461,9 +477,10 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                       : <><MapPin size={11} /> Géolocaliser</>}
                   </button>
                 </div>
-                <input value={form.adresse} onChange={e => setForm(f => ({ ...f, adresse: e.target.value }))}
+                <input value={form.adresse} onChange={e => { setForm(f => ({ ...f, adresse: e.target.value })); setErrors(e => ({...e, adresse: ""})) }}
                   placeholder="Rue, numéro..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
+                  className={`w-full bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none ${errors.adresse ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`} />
+                {errors.adresse && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.adresse}</p>}
                 <div className="grid grid-cols-3 gap-2">
                   <input value={form.cp} onChange={e => setForm(f => ({ ...f, cp: e.target.value }))}
                     placeholder="Code postal"
@@ -479,26 +496,33 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
               {/* Statut + Priorité + Source */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Statut</label>
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5"><span className="text-zinc-500">Statut</span> <span className="text-red-400">*</span></label>
                   <select value={form.statut} onChange={e => setForm(f => ({ ...f, statut: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60">
                     {STATUTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Priorité</label>
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5"><span className="text-zinc-500">Priorité</span> <span className="text-red-400">*</span></label>
                   <select value={form.priorite} onChange={e => setForm(f => ({ ...f, priorite: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60">
                     {PRIORITES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Source</label>
-                  <select value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60">
-                    <option value="">—</option>
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5"><span className="text-zinc-500">Source</span> <span className="text-red-400">*</span></label>
+                  <select value={form.source} onChange={e => { setForm(f => ({ ...f, source: e.target.value, source_autre: "" })); setErrors(e => ({...e, source: ""})) }}
+                    className={`w-full bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none ${errors.source ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`}>
+                    <option value="">— Choisir —</option>
                     {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  {errors.source && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.source}</p>}
+                  {form.source === "Autre" && (
+                    <input value={(form as any).source_autre || ""} onChange={e => { setForm(f => ({ ...f, source_autre: e.target.value } as any)); setErrors(e => ({...e, source_autre: ""})) }}
+                      placeholder="Précisez la source..."
+                      className={`w-full mt-2 bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none ${errors.source_autre ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`} />
+                  )}
+                  {errors.source_autre && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.source_autre}</p>}
                 </div>
               </div>
 
@@ -511,9 +535,10 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
                 </div>
                 <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Date</label>
-                  <input type="date" value={form.prochaine_action_date} onChange={e => setForm(f => ({ ...f, prochaine_action_date: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+                  <label className="block text-[11px] uppercase tracking-wider mb-1.5"><span className="text-zinc-500">Date</span> <span className="text-red-400">*</span></label>
+                  <input type="date" value={form.prochaine_action_date} onChange={e => { setForm(f => ({ ...f, prochaine_action_date: e.target.value })); setErrors(e => ({...e, prochaine_action_date: ""})) }}
+                    className={`w-full bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none ${errors.prochaine_action_date ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`} />
+                  {errors.prochaine_action_date && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.prochaine_action_date}</p>}
                 </div>
               </div>
 
@@ -545,7 +570,12 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
               </div>
 
               {/* Bouton save */}
-              <button onClick={save} disabled={saving || !form.nom.trim()}
+              {Object.keys(errors).length > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
+                  <p className="text-red-400 text-xs font-semibold">⚠ Certains champs obligatoires sont manquants</p>
+                </div>
+              )}
+              <button onClick={save} disabled={saving}
                 className="w-full py-3 rounded-xl text-black font-bold text-sm transition-colors disabled:opacity-50"
                 style={{ backgroundColor: "#eab308" }}>
                 {saving ? "Enregistrement..." : editing ? "Mettre à jour" : "Créer le prospect"}
