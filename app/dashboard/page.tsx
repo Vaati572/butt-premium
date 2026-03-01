@@ -13,6 +13,12 @@ import DepensesOffertsModule from "@/components/depenses/DepensesModule"
 import StatsModule from "@/components/stats/StatsModule"
 import MessagesModule from "@/components/messages/MessagesModule"
 import ProspectsModule from "@/components/prospects/ProspectsModule"
+import NotesModule from "@/components/notes/NotesModule"
+import DocumentsModule from "@/components/documents/DocumentsModule"
+import HistoriqueModule from "@/components/historique/HistoriqueModule"
+import ContratsModule from "@/components/contrats/ContratsModule"
+import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
+import CommandesModule from "@/components/commandes/CommandesModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
@@ -264,7 +270,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "vente":     return <VenteModule           activeSociety={activeSociety} profile={profile} />
       case "depenses":  return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
       case "stats":     return <StatsModule           activeSociety={activeSociety} profile={profile} />
-      case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
+      case "notes":      return <NotesModule      activeSociety={activeSociety} profile={profile} />
+    case "documents":  return <DocumentsModule  activeSociety={activeSociety} profile={profile} />
+    case "historique": return <HistoriqueModule activeSociety={activeSociety} profile={profile} />
+    case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
+    case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
+    case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
+    case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
         onShowOnMap={(p: any) => setFocusProspect(p)}
         onSwitchToMap={() => setActiveTab("map")} />
       case "map": return <MapModule activeSociety={activeSociety} profile={profile}
