@@ -793,14 +793,19 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Bouton hamburger paramètres — fixé sous le hamburger principal (top-16 = 64px) */}
+        <button onClick={() => setNavOpen(true)}
+          className="md:hidden fixed top-16 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
+          style={{ backgroundColor: "#111111" }}>
+          <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-3 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          {/* Petit badge ⚙️ pour différencier */}
+          <span className="absolute -bottom-1.5 -right-1.5 text-[9px]">⚙️</span>
+        </button>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-900 bg-[#111111] gap-3">
-          {/* Bouton hamburger — mobile seulement */}
-          <button onClick={() => setNavOpen(true)}
-            className="md:hidden flex flex-col gap-1 items-center justify-center w-8 h-8 rounded-lg bg-zinc-800 shrink-0">
-            <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-            <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-            <span className="w-3 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-          </button>
+          {/* Spacer mobile pour éviter chevauchement avec les boutons fixes */}
+          <div className="md:hidden w-12 shrink-0" />
           <p className="text-zinc-500 text-xs flex-1 truncate">
             <span className="md:hidden font-semibold text-zinc-300">{SECTIONS.find(s => s.id === activeSection)?.label}</span>
             <span className="hidden md:inline">Paramètres personnels — uniquement pour votre compte</span>

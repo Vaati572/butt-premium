@@ -470,7 +470,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
       {/* ── MAIN ─────────────────────────────── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
-        {/* Bouton hamburger — visible uniquement sur mobile */}
+        {/* Bouton hamburger principal */}
         <button
           onClick={() => setSidebarOpen(true)}
           className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
