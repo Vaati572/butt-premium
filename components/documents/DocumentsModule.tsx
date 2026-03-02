@@ -55,18 +55,28 @@ export default function DocumentsModule({ activeSociety, profile }: { activeSoci
   const upload = async () => {
     if (!selectedFile || !form.nom.trim()) return
     setUploading(true)
-    const ext = selectedFile.name.split(".").pop()
     const path = `documents/${activeSociety.id}/${Date.now()}_${selectedFile.name}`
-    const { error } = await supabase.storage.from("documents").upload(path, selectedFile, { upsert: true })
-    if (!error) {
+    const { error: uploadError } = await supabase.storage.from("documents").upload(path, selectedFile, { upsert: true })
+    if (uploadError) {
+      // Storage bucket might not exist — save without file URL
+      const { error: dbError } = await supabase.from("documents").insert({
+        nom: form.nom, description: form.description, categorie: form.categorie,
+        url: "", type: selectedFile.type, taille: selectedFile.size,
+        society_id: activeSociety.id, user_id: profile.id, user_nom: profile.nom || "",
+      })
+      setUploading(false)
+      if (dbError) { alert("Erreur: " + dbError.message); return }
+    } else {
       const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path)
-      await supabase.from("documents").insert({
+      const { error: dbError } = await supabase.from("documents").insert({
         nom: form.nom, description: form.description, categorie: form.categorie,
         url: urlData.publicUrl, type: selectedFile.type, taille: selectedFile.size,
-        society_id: activeSociety.id, user_id: profile.id, user_nom: profile.nom,
+        society_id: activeSociety.id, user_id: profile.id, user_nom: profile.nom || "",
       })
+      setUploading(false)
+      if (dbError) { alert("Erreur: " + dbError.message); return }
     }
-    setUploading(false); setShowForm(false); setSelectedFile(null)
+    setShowForm(false); setSelectedFile(null)
     setForm({ nom: "", description: "", categorie: "Autre" }); load()
   }
 

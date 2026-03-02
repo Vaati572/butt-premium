@@ -43,12 +43,17 @@ export default function NotesModule({ activeSociety, profile }: { activeSociety:
   const save = async () => {
     if (!form.contenu.trim()) return
     setSaving(true)
+    let error: any = null
     if (editing) {
-      await supabase.from("notes").update({ ...form, updated_at: new Date().toISOString() }).eq("id", editing.id)
+      const res = await supabase.from("notes").update({ ...form, updated_at: new Date().toISOString() }).eq("id", editing.id)
+      error = res.error
     } else {
-      await supabase.from("notes").insert({ ...form, user_id: profile.id, society_id: activeSociety.id })
+      const res = await supabase.from("notes").insert({ titre: form.titre, contenu: form.contenu, couleur: form.couleur, pinned: form.pinned, tags: form.tags, user_id: profile.id, society_id: activeSociety.id })
+      error = res.error
     }
-    setSaving(false); setShowForm(false); load()
+    setSaving(false)
+    if (error) { alert("Erreur: " + error.message); return }
+    setShowForm(false); load()
   }
 
   const remove = async (id: string) => {

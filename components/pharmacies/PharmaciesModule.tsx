@@ -46,10 +46,25 @@ export default function PharmaciesModule({ activeSociety, profile }: { activeSoc
   const save = async () => {
     if (!form.nom.trim()) return
     setSaving(true)
-    const payload = { ...form, chiffre_affaires: form.chiffre_affaires || null, society_id: activeSociety.id }
-    if (editing) await supabase.from("pharmacies").update(payload).eq("id", editing.id)
-    else await supabase.from("pharmacies").insert(payload)
-    setSaving(false); setShowForm(false); load()
+    const payload = {
+      nom: form.nom, enseigne: form.enseigne || "", responsable: form.responsable || "",
+      tel: form.tel || "", email: form.email || "", adresse: form.adresse || "",
+      cp: form.cp || "", ville: form.ville || "", statut: form.statut,
+      categorie: form.categorie, notes: form.notes || "",
+      chiffre_affaires: form.chiffre_affaires || null,
+      society_id: activeSociety.id,
+    }
+    let error: any = null
+    if (editing) {
+      const res = await supabase.from("pharmacies").update(payload).eq("id", editing.id)
+      error = res.error
+    } else {
+      const res = await supabase.from("pharmacies").insert(payload)
+      error = res.error
+    }
+    setSaving(false)
+    if (error) { alert("Erreur: " + error.message); return }
+    setShowForm(false); load()
   }
 
   const remove = async (id: string) => {

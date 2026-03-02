@@ -49,10 +49,32 @@ export default function ContratsModule({ activeSociety, profile }: { activeSocie
   const save = async () => {
     if (!form.titre.trim() || !form.date_debut) return
     setSaving(true)
-    const payload = { ...form, montant: form.montant || null, montant_mensuel: form.montant_mensuel || null, duree_mois: form.duree_mois || null, date_fin: form.date_fin || null, society_id: activeSociety.id }
-    if (editing) await supabase.from("contrats").update(payload).eq("id", editing.id)
-    else await supabase.from("contrats").insert(payload)
-    setSaving(false); setShowForm(false); load()
+    const payload = {
+      titre: form.titre,
+      client_nom: form.client_nom || "",
+      client_id: form.client_id || null,
+      type: form.type,
+      statut: form.statut,
+      montant: form.montant || null,
+      montant_mensuel: form.montant_mensuel || null,
+      date_debut: form.date_debut,
+      date_fin: form.date_fin || null,
+      duree_mois: form.duree_mois || null,
+      notes: form.notes || "",
+      fichier_url: form.fichier_url || "",
+      society_id: activeSociety.id,
+    }
+    let error: any = null
+    if (editing) {
+      const res = await supabase.from("contrats").update(payload).eq("id", editing.id)
+      error = res.error
+    } else {
+      const res = await supabase.from("contrats").insert(payload)
+      error = res.error
+    }
+    setSaving(false)
+    if (error) { alert("Erreur: " + error.message); return }
+    setShowForm(false); load()
   }
 
   const remove = async (id: string) => {

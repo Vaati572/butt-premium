@@ -53,10 +53,29 @@ export default function CommandesModule({ activeSociety, profile }: { activeSoci
     if (!form.fournisseur.trim()) return
     setSaving(true)
     const total = calcTotal(form.produits)
-    const payload = { ...form, total, date_livraison: form.date_livraison || null, society_id: activeSociety.id, user_nom: profile.nom }
-    if (editing) await supabase.from("commandes").update(payload).eq("id", editing.id)
-    else await supabase.from("commandes").insert(payload)
-    setSaving(false); setShowForm(false); load()
+    const payload = {
+      numero: form.numero,
+      fournisseur: form.fournisseur,
+      statut: form.statut,
+      produits: form.produits,
+      total,
+      date_commande: form.date_commande || null,
+      date_livraison: form.date_livraison || null,
+      notes: form.notes,
+      user_nom: profile.nom || "",
+      society_id: activeSociety.id,
+    }
+    let error: any = null
+    if (editing) {
+      const res = await supabase.from("commandes").update(payload).eq("id", editing.id)
+      error = res.error
+    } else {
+      const res = await supabase.from("commandes").insert(payload)
+      error = res.error
+    }
+    setSaving(false)
+    if (error) { alert("Erreur: " + error.message); return }
+    setShowForm(false); load()
   }
 
   const remove = async (id: string) => {
