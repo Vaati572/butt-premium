@@ -133,10 +133,20 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const save = async () => {
     if (!validate()) return
     setSaving(true)
+    // Strip source_autre (not a DB column) and build clean payload
+    const { source_autre, ...cleanForm } = form as any
+    // If source is "Autre", store the custom text in source field
+    const payload = {
+      ...cleanForm,
+      source: source_autre?.trim() ? `Autre: ${source_autre}` : cleanForm.source,
+      society_id: activeSociety.id,
+    }
     if (editing) {
-      await supabase.from("prospects").update({ ...form, updated_at: new Date().toISOString() }).eq("id", editing.id)
+      const { error } = await supabase.from("prospects").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id)
+      if (error) { console.error("Update error:", error); setSaving(false); return }
     } else {
-      await supabase.from("prospects").insert({ ...form, society_id: activeSociety.id, assigned_to: profile.id })
+      const { error } = await supabase.from("prospects").insert({ ...payload, assigned_to: profile.id })
+      if (error) { console.error("Insert error:", error); setSaving(false); return }
     }
     setSaving(false)
     setShowForm(false)

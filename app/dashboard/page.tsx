@@ -279,9 +279,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
     case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
     case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
+    case "tournees":  return <TourneesModule  activeSociety={activeSociety} profile={profile}
+        onLaunchOnMap={(t: any) => setActiveTournee(t)}
+        onSwitchToMap={() => setActiveTab("map")} />
     case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
         onShowOnMap={(p: any) => setFocusProspect(p)}
-        onSwitchToMap={() => setActiveTab("map")} />
+        onSwitchToMap={() => setActiveTab("map")}
+        onSwitchToTournees={() => setActiveTab("tournees")} />
       case "map": return <MapModule activeSociety={activeSociety} profile={profile}
         focusProspect={focusProspect}
         activeTournee={activeTournee}
