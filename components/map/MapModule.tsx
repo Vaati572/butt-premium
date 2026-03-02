@@ -9,6 +9,7 @@ interface Props {
   activeSociety: any
   profile: any
   focusProspect?: Prospect | null
+  activeTournee?: any | null
   onClearFocus?: () => void
   onSwitchToProspects?: () => void
 }
@@ -33,7 +34,7 @@ const makeMarkerSVG = (color: string, selected = false) => `
   ${selected ? '<circle cx="14" cy="14" r="3" fill="' + color + '"/>' : ''}
 </svg>`
 
-export default function MapModule({ activeSociety, profile, focusProspect, onClearFocus, onSwitchToProspects }: Props) {
+export default function MapModule({ activeSociety, profile, focusProspect, activeTournee, onClearFocus, onSwitchToProspects }: Props) {
   const mapRef = useRef<any>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersRef = useRef<Record<string, any>>({})
@@ -204,6 +205,48 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
       if (marker) setTimeout(() => marker.openPopup(), 300)
     }
   }, [focusProspect, leafletLoaded])
+
+  // Load saved tournee on map
+  useEffect(() => {
+    if (!activeTournee || !mapInstanceRef.current || !leafletLoaded) return
+    const L = (window as any).L
+    const map = mapInstanceRef.current
+
+    // Remove old route
+    if (routeLayerRef.current) { map.removeLayer(routeLayerRef.current); routeLayerRef.current = null }
+
+    const etapes = activeTournee.etapes || []
+    const isLivraison = activeTournee.mode === "livraison"
+
+    // Sort by heure if livraison
+    const sorted = isLivraison
+      ? [...etapes].sort((a: any, b: any) => (a.heure || "99:99").localeCompare(b.heure || "99:99"))
+      : etapes
+
+    const coords: [number, number][] = [
+      ...(homeCoords ? [homeCoords] : []),
+      ...sorted.filter((e: any) => e.latitude && e.longitude).map((e: any) => [e.latitude, e.longitude] as [number, number])
+    ]
+
+    if (coords.length < 2) return
+
+    // Draw route
+    routeLayerRef.current = L.polyline(coords, { color: "#eab308", weight: 4, opacity: 0.9, dashArray: "10, 6" }).addTo(map)
+
+    // Add numbered markers
+    sorted.forEach((e: any, i: number) => {
+      if (!e.latitude || !e.longitude) return
+      const icon = L.divIcon({
+        html: `<div style="background:${e.fait ? "#22c55e" : "#eab308"};color:#000;font-weight:900;font-size:11px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid #000;box-shadow:0 2px 8px rgba(0,0,0,0.5)">${i+1}</div>`,
+        className: "", iconSize: [24, 24], iconAnchor: [12, 12],
+      })
+      L.marker([e.latitude, e.longitude], { icon }).bindPopup(
+        `<div style="font-family:sans-serif;min-width:160px"><b style="font-size:14px">${e.nom}</b>${isLivraison && e.heure ? `<div style="color:#a78bfa;font-size:12px;margin-top:4px">⏰ ${e.heure}</div>` : ""}<div style="color:#666;font-size:11px;margin-top:4px">${e.ville || ""}</div></div>`
+      ).addTo(map)
+    })
+
+    map.fitBounds(coords, { padding: [60, 60] })
+  }, [activeTournee, leafletLoaded, homeCoords])
 
   // Draw route for tour
   useEffect(() => {
@@ -446,8 +489,17 @@ export default function MapModule({ activeSociety, profile, focusProspect, onCle
           </div>
         )}
 
+        {/* Active tournee banner */}
+        {activeTournee && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
+            <div className="flex items-center gap-2 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold text-sm shadow-lg">
+              🛣️ {activeTournee.nom} · {activeTournee.etapes?.length} étapes
+              {onClearFocus && <button onClick={onClearFocus} className="ml-1 hover:opacity-70"><X size={12} /></button>}
+            </div>
+          </div>
+        )}
         {/* Focus prospect banner */}
-        {focusProspect && (
+        {focusProspect && !activeTournee && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000]">
             <div className="flex items-center gap-2 bg-yellow-500 text-black px-4 py-2 rounded-xl font-bold text-sm shadow-lg">
               <MapPin size={14} /> Centré sur {focusProspect.nom}

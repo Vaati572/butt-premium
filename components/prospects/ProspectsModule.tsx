@@ -13,6 +13,7 @@ interface Props {
   profile: any
   onShowOnMap?: (prospect: Prospect) => void
   onSwitchToMap?: () => void
+  onSwitchToTournees?: () => void
 }
 
 export interface Prospect {
@@ -63,7 +64,7 @@ const EMPTY: Omit<Prospect, "id" | "created_at"> & { source_autre?: string } = {
   source_autre: "",
 }
 
-export default function ProspectsModule({ activeSociety, profile, onShowOnMap, onSwitchToMap }: Props) {
+export default function ProspectsModule({ activeSociety, profile, onShowOnMap, onSwitchToMap, onSwitchToTournees }: Props) {
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -76,8 +77,19 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const [geocoding, setGeocoding] = useState(false)
   const [tagInput, setTagInput] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [tourMode, setTourMode] = useState(false)
+  const [tourSelected, setTourSelected] = useState<Set<string>>(new Set())
+  const [showTourForm, setShowTourForm] = useState(false)
+  const [tourForm, setTourForm] = useState({ nom: "", date: "", mode: "prospect" as "prospect" | "livraison", notes: "" })
+  const [savingTour, setSavingTour] = useState(false)
+  const [homeAddress, setHomeAddress] = useState("")
 
   useEffect(() => { load() }, [activeSociety])
+
+  useEffect(() => {
+    supabase.from("profiles").select("adresse_depart").eq("id", profile.id).single()
+      .then(({ data }) => { if (data?.adresse_depart) setHomeAddress(data.adresse_depart) })
+  }, [profile])
 
   const load = async () => {
     setLoading(true)
@@ -150,6 +162,52 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
     if (onSwitchToMap) onSwitchToMap()
   }
 
+  const toggleTourSelect = (id: string) => {
+    setTourSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+
+  const saveTournee = async (goToMap: boolean) => {
+    if (tourSelected.size === 0 || !tourForm.nom.trim()) return
+    setSavingTour(true)
+
+    const selectedProspects = prospects.filter(p => tourSelected.has(p.id))
+    
+    // Sort by heure if livraison mode (user sets hours after creation)
+    const etapes = selectedProspects.map(p => ({
+      prospect_id: p.id, nom: p.nom, adresse: p.adresse, ville: p.ville,
+      latitude: p.latitude, longitude: p.longitude,
+      heure: "", notes: "", fait: false
+    }))
+
+    // Estimate distance (rough haversine sum)
+    let distKm = 0
+    for (let i = 0; i < etapes.length - 1; i++) {
+      const a = etapes[i]; const b = etapes[i + 1]
+      if (a.latitude && b.latitude) {
+        const R = 6371, dLat = (b.latitude - a.latitude) * Math.PI / 180, dLng = (b.longitude! - a.longitude!) * Math.PI / 180
+        const x = Math.sin(dLat/2)**2 + Math.cos(a.latitude*Math.PI/180)*Math.cos(b.latitude*Math.PI/180)*Math.sin(dLng/2)**2
+        distKm += R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
+      }
+    }
+
+    const { data: saved } = await supabase.from("tournees").insert({
+      nom: tourForm.nom, mode: tourForm.mode, statut: "planifiee",
+      date_tournee: tourForm.date || null, adresse_depart: homeAddress,
+      etapes, distance_km: Math.round(distKm) || null,
+      duree_min: distKm > 0 ? Math.round(distKm / 60 * 60) : null,
+      notes: tourForm.notes, society_id: activeSociety.id, user_id: profile.id
+    }).select().single()
+
+    setSavingTour(false)
+    setShowTourForm(false)
+    setTourMode(false)
+    setTourSelected(new Set())
+    setTourForm({ nom: "", date: "", mode: "prospect", notes: "" })
+
+    if (goToMap && saved && onSwitchToMap) onSwitchToMap()
+    else if (!goToMap && onSwitchToTournees) onSwitchToTournees()
+  }
+
   const filtered = prospects.filter(p => {
     const matchSearch = !search || p.nom.toLowerCase().includes(search.toLowerCase()) ||
       p.entreprise.toLowerCase().includes(search.toLowerCase()) ||
@@ -178,14 +236,28 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
           {onSwitchToMap && (
             <button onClick={onSwitchToMap}
               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors border border-zinc-700">
-              <Map size={14} /> Voir la map
+              <Map size={14} /> Map
             </button>
           )}
-          <button onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold transition-colors"
-            style={{ backgroundColor: "#eab308" }}>
-            <Plus size={14} /> Nouveau
+          <button onClick={() => { setTourMode(!tourMode); setTourSelected(new Set()) }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all border"
+            style={tourMode ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30850" } : { backgroundColor: "#18181b", color: "#a1a1aa", borderColor: "#3f3f46" }}>
+            <Route size={14} /> {tourMode ? `${tourSelected.size} sélectionné${tourSelected.size > 1 ? "s" : ""}` : "Tournée"}
           </button>
+          {tourMode && tourSelected.size > 0 && (
+            <button onClick={() => setShowTourForm(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold transition-colors"
+              style={{ backgroundColor: "#eab308" }}>
+              Créer tournée →
+            </button>
+          )}
+          {!tourMode && (
+            <button onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold transition-colors"
+              style={{ backgroundColor: "#eab308" }}>
+              <Plus size={14} /> Nouveau
+            </button>
+          )}
         </div>
       </div>
 
@@ -413,6 +485,45 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FORMULAIRE CRÉER TOURNÉE ──────────── */}
+      {showTourForm && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+              <div>
+                <h2 className="text-white font-bold">Créer une tournée</h2>
+                <p className="text-zinc-500 text-xs mt-0.5">{tourSelected.size} prospect{tourSelected.size > 1 ? "s" : ""} sélectionné{tourSelected.size > 1 ? "s" : ""}</p>
+              </div>
+              <button onClick={() => setShowTourForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white"><X size={14} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom de la tournée <span className="text-red-400">*</span></label>
+                <input value={tourForm.nom} onChange={e => setTourForm(f => ({ ...f, nom: e.target.value }))} placeholder="Ex: Tournée Metz Nord" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" /></div>
+              <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Date</label>
+                <input type="date" value={tourForm.date} onChange={e => setTourForm(f => ({ ...f, date: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Type de tournée</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setTourForm(f => ({ ...f, mode: "prospect" }))} className={`py-3 rounded-xl text-sm font-bold border transition-all ${tourForm.mode === "prospect" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>🎯 Prospection</button>
+                  <button onClick={() => setTourForm(f => ({ ...f, mode: "livraison" }))} className={`py-3 rounded-xl text-sm font-bold border transition-all flex flex-col items-center gap-0.5 ${tourForm.mode === "livraison" ? "bg-purple-500/20 text-purple-400 border-purple-500/40" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+                    🚛 Livraison
+                    <span className="text-[10px] opacity-70">avec heures</span>
+                  </button>
+                </div>
+                {tourForm.mode === "livraison" && <p className="text-zinc-600 text-[11px] mt-2">💡 Vous pourrez définir les heures de chaque arrêt dans l'onglet Tournées</p>}
+              </div>
+              {homeAddress && <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-2.5"><p className="text-green-400 text-xs font-semibold">🏠 Départ: {homeAddress}</p></div>}
+              <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Notes</label>
+                <textarea value={tourForm.notes} onChange={e => setTourForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Instructions..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => saveTournee(true)} disabled={savingTour || !tourForm.nom.trim()} className="py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"><Map size={14} /> Lancer sur Map</button>
+                <button onClick={() => saveTournee(false)} disabled={savingTour || !tourForm.nom.trim()} className="py-3 rounded-xl font-bold text-sm border border-zinc-600 text-zinc-200 hover:bg-zinc-800 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">💾 Sauvegarder</button>
+              </div>
             </div>
           </div>
         </div>

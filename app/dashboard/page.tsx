@@ -19,6 +19,7 @@ import HistoriqueModule from "@/components/historique/HistoriqueModule"
 import ContratsModule from "@/components/contrats/ContratsModule"
 import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
 import CommandesModule from "@/components/commandes/CommandesModule"
+import TourneesModule from "@/components/tournees/TourneesModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
@@ -63,6 +64,7 @@ const ALL_NAV = [
   ]},
   { section: "Démarchage", items: [
     { id: "prospects",  label: "Prospects",         icon: "🎯" },
+    { id: "tournees",   label: "Tournées",          icon: "🛣️" },
     { id: "map",        label: "Map & Tournées",    icon: "🗺️" },
   ]},
   { section: "Système", items: [
@@ -133,6 +135,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [focusProspect, setFocusProspect] = useState<any>(null)
+  const [activeTournee, setActiveTournee] = useState<any>(null)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -281,7 +284,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         onSwitchToMap={() => setActiveTab("map")} />
       case "map": return <MapModule activeSociety={activeSociety} profile={profile}
         focusProspect={focusProspect}
-        onClearFocus={() => setFocusProspect(null)}
+        activeTournee={activeTournee}
+        onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
         onSwitchToProspects={() => setActiveTab("prospects")} />
       case "messages":  return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres":return <ParametresModule      activeSociety={activeSociety} profile={profile} />
