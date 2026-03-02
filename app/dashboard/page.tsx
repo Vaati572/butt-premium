@@ -2,845 +2,590 @@
 
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase"
-import { useUserSettings, USER_DEFAULTS, UserSettings } from "@/lib/UserSettingsContext"
-import {
-  Save, User, Palette, Layout, Sidebar, Keyboard, Bell, Shield,
-  Globe, StickyNote, Star, Eye, EyeOff, ChevronRight, Camera,
-  Check, Monitor, Zap, MessageSquare, Printer, Lock,
-  Accessibility, ShoppingCart, Hash,
-} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { UserSettingsProvider, useUserSettings } from "@/lib/UserSettingsContext"
+import ClientsModule from "@/components/clients/ClientsModule"
+import StocksModule from "@/components/stocks/StocksModule"
+import VenteModule from "@/components/vente/VenteModule"
+import AdminModule from "@/components/admin/AdminModule"
+import AccueilModule from "@/components/accueil/AccueilModule"
+import DepensesOffertsModule from "@/components/depenses/DepensesModule"
+import StatsModule from "@/components/stats/StatsModule"
+import MessagesModule from "@/components/messages/MessagesModule"
+import ProspectsModule from "@/components/prospects/ProspectsModule"
+import NotesModule from "@/components/notes/NotesModule"
+import DocumentsModule from "@/components/documents/DocumentsModule"
+import HistoriqueModule from "@/components/historique/HistoriqueModule"
+import ContratsModule from "@/components/contrats/ContratsModule"
+import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
+import CommandesModule from "@/components/commandes/CommandesModule"
+import TourneesModule from "@/components/tournees/TourneesModule"
+import MapModule from "@/components/map/MapModule"
+import ParametresModule from "@/components/parametres/ParametresModule"
 
-interface Props { activeSociety: any; profile: any }
+const ADMIN_PIN = "18072209"
 
-type US = UserSettings
+type PresenceStatus = "online" | "busy" | "away" | "meeting" | "offline"
 
-/* ────────────────────────────────────────────── */
-function Section({ title, icon: Icon, color, desc, children }: {
-  title: string; icon: any; color: string; desc?: string; children: React.ReactNode
-}) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-zinc-800">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: color + "22" }}>
-          <Icon size={14} style={{ color }} />
-        </div>
-        <div>
-          <h3 className="text-white font-bold text-sm">{title}</h3>
-          {desc && <p className="text-zinc-500 text-[11px] mt-0.5">{desc}</p>}
-        </div>
-      </div>
-      <div className="p-5 space-y-4">{children}</div>
-    </div>
-  )
+interface OnlineUser {
+  id: string; nom: string; avatar_url?: string; color?: string
+  status: PresenceStatus
 }
 
-function Field({ label, sub, children, flex = true }: { label: string; sub?: string; children: React.ReactNode; flex?: boolean }) {
-  if (!flex) return (
-    <div>
-      <p className="text-zinc-300 text-sm mb-1">{label}</p>
-      {sub && <p className="text-zinc-600 text-[11px] mb-2">{sub}</p>}
-      {children}
-    </div>
-  )
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="min-w-0 flex-1">
-        <p className="text-zinc-300 text-sm">{label}</p>
-        {sub && <p className="text-zinc-600 text-[11px] mt-0.5">{sub}</p>}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  )
+const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: string }> = {
+  online:  { label: "En ligne",   color: "text-green-400",  dot: "bg-green-400"  },
+  busy:    { label: "Occupé",     color: "text-red-400",    dot: "bg-red-400"    },
+  away:    { label: "Absent",     color: "text-yellow-400", dot: "bg-yellow-400" },
+  meeting: { label: "En réunion", color: "text-purple-400", dot: "bg-purple-400" },
+  offline: { label: "Hors ligne", color: "text-zinc-500",   dot: "bg-zinc-600"   },
 }
 
-function Toggle({ value, onChange, accent }: { value: boolean; onChange: (v: boolean) => void; accent: string }) {
-  return (
-    <button onClick={() => onChange(!value)}
-      className="relative w-11 h-6 rounded-full transition-colors duration-200"
-      style={{ backgroundColor: value ? accent : "#3f3f46" }}>
-      <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 left-0.5"
-        style={{ transform: value ? "translateX(20px)" : "translateX(0)" }} />
-    </button>
-  )
-}
+const ALL_NAV = [
+  { section: "Principal", items: [
+    { id: "accueil",    label: "Accueil",           icon: "🏠" },
+    { id: "vente",      label: "Vente",             icon: "🛒" },
+    { id: "clients",    label: "Clients",           icon: "👤" },
+    { id: "stocks",     label: "Stock",             icon: "📦" },
+  ]},
+  { section: "Gestion", items: [
+    { id: "commandes",  label: "Commandes",         icon: "📋" },
+    { id: "depenses",   label: "Dépenses & Offerts",icon: "💸" },
+    { id: "contrats",   label: "Contrats",          icon: "📑" },
+    { id: "pharmacies", label: "Pharmacies",        icon: "🏥" },
+  ]},
+  { section: "Analyse", items: [
+    { id: "stats",      label: "Statistiques",      icon: "📊" },
+    { id: "historique", label: "Historique",        icon: "🕓" },
+  ]},
+  { section: "Outils", items: [
+    { id: "messages",   label: "Messages",          icon: "💬" },
+    { id: "notes",      label: "Notes",             icon: "📝" },
+    { id: "documents",  label: "Documents",         icon: "📁" },
+  ]},
+  { section: "Démarchage", items: [
+    { id: "prospects",  label: "Prospects",         icon: "🎯" },
+    { id: "tournees",   label: "Tournées",          icon: "🛣️" },
+    { id: "map",        label: "Map & Tournées",    icon: "🗺️" },
+  ]},
+  { section: "Système", items: [
+    { id: "admin",      label: "Admin",             icon: "🔒" },
+    { id: "parametres", label: "Paramètres",        icon: "⚙️" },
+  ]},
+]
 
-function Sel({ value, onChange, options, width = "auto" }: {
-  value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[] | string[]
-  width?: string
-}) {
-  const opts = (typeof options[0] === "string" ? (options as string[]).map(o => ({ value: o, label: o })) : options) as { value: string; label: string }[]
-  return (
-    <select value={value} onChange={e => onChange(e.target.value)} style={{ width: width !== "auto" ? width : undefined }}
-      className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-yellow-500/60">
-      {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  )
-}
-
-function ColorRow({ colors, value, onChange }: { colors: string[]; value: string; onChange: (c: string) => void }) {
-  return (
-    <div className="flex gap-2 flex-wrap">
-      {colors.map(c => (
-        <button key={c} onClick={() => onChange(c)}
-          className={`w-8 h-8 rounded-full transition-all ${value === c ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-900 scale-110" : "hover:scale-105"}`}
-          style={{ backgroundColor: c }} />
-      ))}
-      <label className="w-8 h-8 rounded-full border-2 border-dashed border-zinc-600 flex items-center justify-center cursor-pointer hover:border-zinc-400 transition-colors">
-        <input type="color" value={value} onChange={e => onChange(e.target.value)} className="sr-only" />
-        <span className="text-zinc-500 text-xs">+</span>
-      </label>
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════ */
-export default function ParametresModule({ activeSociety, profile }: Props) {
-  const { settings: us, updateSetting, saveSettings, saving, saved } = useUserSettings()
-  const set = updateSetting
-
-  const [nom, setNom] = useState("")
-  const [avatarUrl, setAvatarUrl] = useState("")
-  const [profileColor, setProfileColor] = useState("#d97706")
-  const [adresseDepart, setAdresseDepart] = useState("")
-  const [activeSection, setActiveSection] = useState("profil")
-  const [sidebarOpen, setNavOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [tagInput, setTagInput] = useState("")
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const ACCENT = us.accent_color
-
-  const SECTIONS = [
-    { id: "profil",          label: "Mon profil",          icon: User,          color: ACCENT },
-    { id: "apparence",       label: "Apparence",           icon: Palette,       color: "#a855f7" },
-    { id: "messagerie",      label: "Messagerie",          icon: MessageSquare, color: "#3b82f6" },
-    { id: "dashboard",       label: "Tableau de bord",     icon: Monitor,       color: "#06b6d4" },
-    { id: "navigation",      label: "Navigation",          icon: Sidebar,       color: "#22c55e" },
-    { id: "affichage",       label: "Affichage",           icon: Eye,           color: "#f97316" },
-    { id: "vente",           label: "Vente rapide",        icon: ShoppingCart,  color: "#84cc16" },
-    { id: "raccourcis",      label: "Raccourcis clavier",  icon: Keyboard,      color: "#eab308" },
-    { id: "notifications",   label: "Notifications",       icon: Bell,          color: "#ec4899" },
-    { id: "impression",      label: "Impression & Export", icon: Printer,       color: "#64748b" },
-    { id: "confidentialite", label: "Confidentialité",     icon: Lock,          color: "#8b5cf6" },
-    { id: "accessibilite",   label: "Accessibilité",       icon: Accessibility, color: "#14b8a6" },
-    { id: "favoris",         label: "Favoris",             icon: Star,          color: "#f59e0b" },
-    { id: "memo",            label: "Mémo personnel",      icon: StickyNote,    color: "#84cc16" },
-    { id: "systeme",         label: "Système",             icon: Zap,           color: "#ef4444" },
-  ]
-
-  const ALL_TABS = [
-    "accueil","vente","clients","stocks","commandes","depenses",
-    "contrats","pharmacies","stats","historique","messages","notes","documents",
-  ]
-  const TAB_LABELS: Record<string, string> = {
-    accueil: "🏠 Accueil", vente: "🛒 Vente", clients: "👤 Clients",
-    stocks: "📦 Stock", commandes: "📋 Commandes", depenses: "💸 Dépenses & Offerts",
-    contrats: "📑 Contrats", pharmacies: "🏥 Pharmacies", stats: "📊 Statistiques",
-    historique: "🕓 Historique", messages: "💬 Messages", notes: "📝 Notes", documents: "📁 Documents",
+/* ── ADMIN GATE ─────────────────────────────── */
+function AdminGate({ activeSociety, profile }: { activeSociety: any; profile: any }) {
+  const [pin, setPin] = useState(""); const [unlocked, setUnlocked] = useState(false)
+  const [error, setError] = useState(false); const [shake, setShake] = useState(false)
+  const handle = (d: string) => {
+    if (pin.length >= 8) return
+    const next = pin + d; setPin(next); setError(false)
+    if (next.length === 8) {
+      if (next === ADMIN_PIN) setUnlocked(true)
+      else { setShake(true); setError(true); setTimeout(() => { setPin(""); setShake(false) }, 600) }
+    }
   }
-  const WIDGETS = [
-    { id: "ca_jour",       label: "💰 CA du jour" },
-    { id: "nb_ventes",     label: "🛒 Ventes" },
-    { id: "stock_alerte",  label: "📦 Stock alerte" },
-    { id: "relances",      label: "📞 Relances" },
-    { id: "ca_mois",       label: "📈 CA du mois" },
-    { id: "top_produit",   label: "🏆 Top produit" },
-    { id: "depenses_mois", label: "💸 Dépenses mois" },
-    { id: "messages_nlus", label: "💬 Messages non lus" },
-    { id: "nouveaux_clients", label: "👤 Nouveaux clients" },
-    { id: "objectif_bar",  label: "🎯 Barre objectif" },
-  ]
-  const PALETTE = ["#eab308","#f97316","#ef4444","#ec4899","#a855f7","#3b82f6","#06b6d4","#22c55e","#84cc16","#14b8a6","#8b5cf6","#f43f5e"]
-  const BG_OPTIONS = ["#0a0a0a","#050505","#0d0d12","#0d1117","#0f0e17","#111827"]
+  if (unlocked) return <AdminModule activeSociety={activeSociety} profile={profile} />
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className={`bg-[#111111] border border-zinc-800 rounded-3xl p-8 w-80 text-center shadow-2xl ${shake ? "animate-bounce" : ""}`}>
+        <p className="text-2xl mb-1">🔒</p>
+        <p className="text-white font-bold text-lg mb-1">Panneau Admin</p>
+        <p className="text-zinc-500 text-xs mb-6">Entrez le code PIN administrateur</p>
+        <div className="flex justify-center gap-3 mb-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`w-3 h-3 rounded-full ${i < pin.length ? (error ? "bg-red-500" : "bg-yellow-500") : "bg-zinc-700"}`} />
+          ))}
+        </div>
+        {error && <p className="text-red-400 text-xs mb-3 font-semibold">Code incorrect</p>}
+        <div className="grid grid-cols-3 gap-3">
+          {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) => (
+            <button key={i} onClick={() => d === "⌫" ? setPin(p => p.slice(0,-1)) : d ? handle(d) : null}
+              className={`h-14 rounded-2xl text-lg font-bold transition-all ${d === "⌫" ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-400" : d === "" ? "invisible" : "bg-zinc-800 hover:bg-yellow-500 hover:text-black text-white active:scale-95"}`}>
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  // Load profile info (settings already loaded via context)
+function UserAvatar({ nom, url, color, size = 30 }: { nom: string; url?: string; color?: string; size?: number }) {
+  const colors = ["#d97706","#b45309","#f59e0b","#92400e"]
+  const bg = color || colors[(nom?.charCodeAt(0) || 0) % colors.length]
+  const initials = nom?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"
+  return (
+    <div className="rounded-full overflow-hidden flex items-center justify-center text-black font-bold shrink-0"
+      style={{ width: size, height: size, backgroundColor: url ? undefined : bg, fontSize: size * 0.35 }}>
+      {url ? <img src={url} className="w-full h-full object-cover" alt={nom} /> : initials}
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   INNER DASHBOARD — uses UserSettingsContext
+══════════════════════════════════════════════ */
+function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
+  const { settings, updateSetting } = useUserSettings()
+  const [activeTab, setActiveTab] = useState(settings.start_page || "vente")
+  const [myStatus, setMyStatus] = useState<PresenceStatus>("online")
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [focusProspect, setFocusProspect] = useState<any>(null)
+  const [activeTournee, setActiveTournee] = useState<any>(null)
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+
+  const ACCENT = settings.accent_color || "#eab308"
+  const BG = settings.background || "#0a0a0a"
+  const SIDEBAR_BG = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
+
+  // Apply start_page when settings load
   useEffect(() => {
-    const loadProfile = async () => {
-      const { data: p } = await supabase.from("profiles").select("nom, avatar_url, color, adresse_depart").eq("id", profile.id).single()
-      if (p) { setNom(p.nom || ""); setAvatarUrl(p.avatar_url || ""); setProfileColor(p.color || "#d97706"); setAdresseDepart(p.adresse_depart || "") }
+    if (settings.start_page) setActiveTab(settings.start_page)
+  }, [settings.start_page])
+
+  // Presence setup
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    supabase.from("user_presence").upsert({
+      user_id: profile.id, society_id: activeSociety.id,
+      status: "online", last_seen: new Date().toISOString(),
+    }, { onConflict: "user_id" }).then(() => {
+      setMyStatus("online")
+      loadUsers()
+    })
+
+    heartbeatRef.current = setInterval(() => {
+      supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+    }, 30000)
+
+    channel = supabase.channel(`presence_${activeSociety.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers)
+      .subscribe()
+
+    const bye = () => { supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id) }
+    window.addEventListener("beforeunload", bye)
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+      window.removeEventListener("beforeunload", bye)
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current)
     }
-    loadProfile()
-  }, [profile])
+  }, [profile, activeSociety])
 
-  const save = async () => {
-    await supabase.from("profiles").update({ nom, color: profileColor, adresse_depart: adresseDepart }).eq("id", profile.id)
-    await saveSettings()
+  // Unread messages
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    const countUnread = () => {
+      supabase.from("messages").select("*", { count: "exact", head: true })
+        .eq("society_id", activeSociety.id)
+        .not("read_by", "cs", `{${profile.id}}`)
+        .neq("sender_id", profile.id)
+        .then(({ count: c }) => setUnreadMessages(c || 0))
+    }
+    countUnread()
+    const ch = supabase.channel(`unread_${profile.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, countUnread)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [profile, activeSociety])
+
+  // Close status menu on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setShowStatusMenu(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const map: Record<string, string> = {
+        [settings.shortcut_vente]:      "vente",
+        [settings.shortcut_clients]:    "clients",
+        [settings.shortcut_stocks]:     "stocks",
+        [settings.shortcut_stats]:      "stats",
+        [settings.shortcut_messages]:   "messages",
+        [settings.shortcut_notes]:      "notes",
+        [settings.shortcut_parametres]: "parametres",
+      }
+      const target = map[e.key]
+      if (target) { e.preventDefault(); setActiveTab(target) }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [settings])
+
+  const loadUsers = async () => {
+    const [{ data: members }, { data: presences }] = await Promise.all([
+      supabase.from("profiles").select("id, nom, avatar_url, color").eq("society_id", activeSociety.id),
+      supabase.from("user_presence").select("*").eq("society_id", activeSociety.id),
+    ])
+    const ORDER: Record<PresenceStatus, number> = { online: 0, meeting: 1, busy: 2, away: 3, offline: 4 }
+    const users: OnlineUser[] = (members || [])
+      .filter(m => m.id !== profile.id)
+      .map(m => {
+        const p = presences?.find(x => x.user_id === m.id)
+        const minsAgo = p ? (Date.now() - new Date(p.last_seen).getTime()) / 60000 : 999
+        const status: PresenceStatus = !p ? "offline" : minsAgo > 2 ? "offline" : p.status
+        return { id: m.id, nom: m.nom, avatar_url: m.avatar_url, color: m.color, status }
+      })
+      .sort((a, b) => (ORDER[a.status] ?? 5) - (ORDER[b.status] ?? 5))
+    setOnlineUsers(users)
   }
 
-  const uploadAvatar = async (file: File) => {
-    const ext = file.name.split(".").pop()
-    const path = `profiles/${profile.id}_${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true })
-    if (!error) {
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path)
-      await supabase.from("profiles").update({ avatar_url: data.publicUrl }).eq("id", profile.id)
-      setAvatarUrl(data.publicUrl)
+  const updateStatus = async (s: PresenceStatus) => {
+    setMyStatus(s); setShowStatusMenu(false)
+    await supabase.from("user_presence").update({ status: s, last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+  }
+
+  const logout = async () => {
+    if (profile) await supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id)
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    await supabase.auth.signOut(); router.push("/")
+  }
+
+  // Filter out hidden tabs
+  const visibleNav = ALL_NAV.map(section => ({
+    ...section,
+    items: section.items.filter(tab => !settings.hidden_tabs.includes(tab.id))
+  })).filter(section => section.items.length > 0)
+
+  const myCfg = PRESENCE[myStatus]
+  const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "accueil":   return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":   return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "stocks":    return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":     return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":  return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":     return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":      return <NotesModule      activeSociety={activeSociety} profile={profile} />
+    case "documents":  return <DocumentsModule  activeSociety={activeSociety} profile={profile} />
+    case "historique": return <HistoriqueModule activeSociety={activeSociety} profile={profile} />
+    case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
+    case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
+    case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
+    case "tournees":  return <TourneesModule  activeSociety={activeSociety} profile={profile}
+        onLaunchOnMap={(t: any) => setActiveTournee(t)}
+        onSwitchToMap={() => setActiveTab("map")} />
+    case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
+        onShowOnMap={(p: any) => setFocusProspect(p)}
+        onSwitchToMap={() => setActiveTab("map")}
+        onSwitchToTournees={() => setActiveTab("tournees")} />
+      case "map": return <MapModule activeSociety={activeSociety} profile={profile}
+        focusProspect={focusProspect}
+        activeTournee={activeTournee}
+        onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
+        onSwitchToProspects={() => setActiveTab("prospects")} />
+      case "messages":  return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres":return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "admin":     return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      default: return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-5xl mb-4">🚧</p>
+            <p className="text-white text-xl font-bold">{ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.label}</p>
+            <p className="text-zinc-500 text-sm mt-2">Module en cours de construction</p>
+          </div>
+        </div>
+      )
     }
   }
 
-  const toggleList = (key: "hidden_tabs" | "dashboard_widgets" | "quick_products" | "fav_clients" | "fav_products", id: string) => {
-    const arr = us[key] as string[]
-    set(key, arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id])
-  }
+  // Font size applied inline
+  const fontSizeMap = { small: "13px", normal: "14px", large: "16px" }
+  const baseFontSize = fontSizeMap[settings.font_size as keyof typeof fontSizeMap] || "14px"
 
-  const addTag = (key: "fav_clients" | "fav_products" | "quick_products") => {
-    if (!tagInput.trim()) return
-    set(key, [...(us[key] as string[]), tagInput.trim()]); setTagInput("")
-  }
+  // Card radius
+  const radiusMap = { rounded: "12px", sharp: "4px", pill: "20px" }
+  const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
+
+  return (
+    <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+      {/* ═══════════ SIDEBAR ═══════════ */}
+      {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* DESKTOP : sidebar normale */}
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300" style={{ backgroundColor: SIDEBAR_BG }}>
+
+        {/* Logo */}
+        <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
+          <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
+          {activeSociety && (
+            <div className="flex items-center gap-1 mt-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
+              <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+          {visibleNav.map(({ section, items }) => (
+            <div key={section}>
+              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+              {items.map(tab => {
+                const isActive = activeTab === tab.id
+                return (
+                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5`}
+                    style={{
+                      backgroundColor: isActive ? ACCENT + "18" : undefined,
+                      color: isActive ? ACCENT : "#71717a",
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = ACCENT + "12"
+                        el.style.color = ACCENT
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = ""
+                        el.style.color = "#71717a"
+                      }
+                    }}>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+                    )}
+                    <span className="text-sm">{tab.icon}</span>
+                    <span className="flex-1 truncate">{tab.label}</span>
+                    {tab.id === "messages" && unreadMessages > 0 && (
+                      <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: ACCENT }}>
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Équipe en ligne */}
+        {onlineUsers.length > 0 && (
+          <div className="border-t border-zinc-900 px-2 pt-2 pb-1">
+            <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
+              Équipe · <span className={onlineCount > 0 ? "text-green-500" : "text-zinc-600"}>
+                {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
+              </span>
+            </p>
+            <div className="space-y-0.5 max-h-32 overflow-y-auto">
+              {onlineUsers.map(u => (
+                <button key={u.id} onClick={() => setActiveTab("messages")}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
+                  <div className="relative shrink-0">
+                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={24} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${PRESENCE[u.status].dot} ring-1 ring-[#0d0d0d]`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-zinc-400 text-[11px] font-medium truncate group-hover:text-zinc-200 transition-colors">{u.nom}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mon profil + statut */}
+        <div className="border-t border-zinc-900 p-2">
+          <div className="relative" ref={statusMenuRef}>
+            <button onClick={() => setShowStatusMenu(p => !p)}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 transition-colors">
+              <div className="relative shrink-0">
+                <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${myCfg.dot} ring-1 ring-[#0d0d0d]`} />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-white text-[11px] font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className={`text-[9px] font-medium ${myCfg.color}`}>{myCfg.label}</p>
+              </div>
+              <span className="text-zinc-700 text-[10px]">▾</span>
+            </button>
+
+            {showStatusMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50">
+                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider px-3 pt-2 pb-1">Mon statut</p>
+                {(Object.entries(PRESENCE) as [PresenceStatus, typeof PRESENCE[PresenceStatus]][]).map(([s, cfg]) => (
+                  <button key={s} onClick={() => updateStatus(s)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 transition-colors ${myStatus === s ? "bg-zinc-800/60" : ""}`}>
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                    <span className={`text-[13px] ${myStatus === s ? "text-white font-semibold" : "text-zinc-400"}`}>{cfg.label}</span>
+                    {myStatus === s && <span className="ml-auto text-[11px] font-bold" style={{ color: ACCENT }}>✓</span>}
+                  </button>
+                ))}
+                <div className="border-t border-zinc-800 mt-1">
+                  <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-red-500/10 transition-colors text-[13px]">
+                    <span>→</span> Déconnexion
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* MOBILE : sidebar en drawer par-dessus le contenu */}
+      {sidebarOpen && (
+        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          {/* Bouton fermer */}
+          <button onClick={() => setSidebarOpen(false)}
+            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">
+            ✕
+          </button>
+          {/* Logo */}
+          <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
+            <div className="flex items-center gap-2.5">
+              <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+              {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
+            </div>
+          </div>
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+            {visibleNav.map(({ section, items }) => (
+              <div key={section}>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+                {items.map(tab => {
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-0.5 relative"
+                      style={{ backgroundColor: isActive ? ACCENT + "18" : undefined, color: isActive ? ACCENT : "#71717a" }}>
+                      {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full" style={{ backgroundColor: ACCENT }} />}
+                      <span className="text-base">{tab.icon}</span>
+                      <span className="flex-1 truncate">{tab.label}</span>
+                      {tab.id === "messages" && unreadMessages > 0 && (
+                        <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+          {/* Profil bas */}
+          <div className="border-t border-zinc-900 p-3">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
+              <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className="text-zinc-500 text-[10px]">En ligne</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ── MAIN ─────────────────────────────── */}
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+        {/* Bouton hamburger principal */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+        </button>
+        {renderContent()}
+      </main>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   ROOT — charge session puis wrap avec provider
+══════════════════════════════════════════════ */
+export default function DashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [activeSociety, setActiveSociety] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push("/"); return }
+
+      // Load profile
+      let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+
+      // Si pas de profil → le créer automatiquement
+      if (!prof) {
+        const nom = session.user.user_metadata?.full_name
+          || session.user.user_metadata?.name
+          || session.user.email?.split("@")[0]
+          || "Utilisateur"
+        const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
+        await supabase.from("profiles").insert({
+          id: session.user.id,
+          nom,
+          email: session.user.email,
+          society_id: soc?.id,
+          role: "vendeur",
+          is_active: true,
+        })
+        const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        prof = newProf
+      }
+
+      if (prof) setProfile({ ...prof, email: session.user.email })
+
+      const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
+      if (socs?.length) setActiveSociety(socs[0])
+      setLoading(false)
+    }
+    init()
+  }, [router])
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+    <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
-  const renderSection = () => { switch (activeSection) {
-
-    /* ── PROFIL ─────────────────────────────── */
-    case "profil": return (<div className="space-y-4">
-      <Section title="Identité" icon={User} color={ACCENT} desc="Visible par votre équipe">
-        <div className="flex items-start gap-5">
-          <div className="relative shrink-0">
-            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-zinc-700 flex items-center justify-center"
-              style={{ backgroundColor: avatarUrl ? undefined : profileColor }}>
-              {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <span className="text-black font-black text-2xl">{nom?.slice(0,2).toUpperCase() || "?"}</span>}
-            </div>
-            <button onClick={() => fileRef.current?.click()}
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition"
-              style={{ backgroundColor: ACCENT }}>
-              <Camera size={12} className="text-black" />
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadAvatar(e.target.files[0])} />
-          </div>
-          <div className="flex-1 space-y-3">
-            <div>
-              <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Nom affiché</label>
-              <input value={nom} onChange={e => setNom(e.target.value)} placeholder="Votre nom"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-            </div>
-            <div>
-              <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Biographie / Poste</label>
-              <input value={us.bio} onChange={e => set("bio", e.target.value)} placeholder="Ex: Responsable commercial..."
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-            </div>
-            <div>
-              <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Badge / Statut texte</label>
-              <input value={us.user_badge} onChange={e => set("user_badge", e.target.value)} placeholder="Ex: 🔥 Top vendeur"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-            </div>
-            <div>
-              <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1">📍 Adresse de départ (tournées)</label>
-              <input value={adresseDepart} onChange={e => setAdresseDepart(e.target.value)}
-                placeholder="Ex: 12 rue de la Paix, 75001 Paris"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              <p className="text-zinc-600 text-[10px] mt-1">Utilisée comme point de départ lors de la planification de vos tournées</p>
-            </div>
-          </div>
-        </div>
-        <div>
-          <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-2">Couleur de profil</label>
-          <ColorRow colors={PALETTE} value={profileColor} onChange={setProfileColor} />
-        </div>
-      </Section>
-
-      <Section title="Aperçu" icon={User} color={ACCENT}>
-        <div className="bg-zinc-800 rounded-xl p-4 flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 border border-zinc-600"
-              style={{ backgroundColor: avatarUrl ? undefined : profileColor }}>
-              {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" /> : <span className="text-black font-bold text-sm">{nom?.slice(0,2).toUpperCase() || "?"}</span>}
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-400 ring-2 ring-zinc-800" />
-          </div>
-          <div>
-            <p className="text-white text-sm font-semibold">{nom || "Votre nom"}</p>
-            <p className="text-zinc-400 text-xs">{us.user_badge || us.bio || "En ligne"}</p>
-          </div>
-        </div>
-      </Section>
-    </div>)
-
-    /* ── APPARENCE ──────────────────────────── */
-    case "apparence": return (<div className="space-y-4">
-      <Section title="Couleur d'accentuation" icon={Palette} color="#a855f7" desc="Couleur principale de votre interface">
-        <ColorRow colors={PALETTE} value={ACCENT} onChange={v => set("accent_color", v)} />
-        <div className="bg-zinc-800 rounded-xl p-3 flex items-center gap-3 mt-1">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-black font-bold text-sm" style={{ backgroundColor: ACCENT }}>B</div>
-          <div className="flex-1 space-y-1.5">
-            <div className="h-2 rounded-full" style={{ backgroundColor: ACCENT + "50", width: "70%" }} />
-            <div className="h-1.5 rounded-full bg-zinc-700 w-1/2" />
-          </div>
-          <button className="px-3 py-1 rounded-lg text-black text-xs font-bold" style={{ backgroundColor: ACCENT }}>Aperçu</button>
-        </div>
-      </Section>
-
-      <Section title="Fond de l'application" icon={Monitor} color="#a855f7" desc="Couleur d'arrière-plan principale">
-        <div className="grid grid-cols-6 gap-2">
-          {BG_OPTIONS.map(c => (
-            <button key={c} onClick={() => set("background", c)}
-              className={`h-10 rounded-xl border-2 transition-all ${us.background === c ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "border-zinc-700 hover:border-zinc-500"}`}
-              style={{ backgroundColor: c }}>
-              {us.background === c && <Check size={12} className="text-white mx-auto" />}
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Style des cartes" icon={Layout} color="#a855f7" desc="Arrondi des coins dans l'interface">
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { value: "sharp",       label: "Carré",     radius: "4px"  },
-            { value: "rounded",     label: "Arrondi",   radius: "12px" },
-            { value: "pill",        label: "Doux",      radius: "20px" },
-            { value: "ultra",       label: "Ultra",     radius: "28px" },
-          ].map(s => (
-            <button key={s.value} onClick={() => set("card_style", s.value)}
-              className={`p-3 border text-center transition-all`}
-              style={{ borderRadius: s.radius, borderColor: us.card_style === s.value ? ACCENT : "#27272a", backgroundColor: us.card_style === s.value ? ACCENT + "15" : "#18181b" }}>
-              <div className="w-full h-5 bg-zinc-700 mb-2" style={{ borderRadius: s.radius }} />
-              <p className="text-[11px] font-semibold" style={{ color: us.card_style === s.value ? ACCENT : "#a1a1aa" }}>{s.label}</p>
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Densité d'affichage" icon={Monitor} color="#a855f7" desc="Espacement des éléments dans l'interface">
-        <div className="grid grid-cols-3 gap-3">
-          {[
-            { value: "compact",     label: "Compact",  desc: "Serré, plus d'éléments", icon: "▬▬▬" },
-            { value: "normal",      label: "Normal",   desc: "Équilibré",               icon: "▬ ▬ ▬" },
-            { value: "comfortable", label: "Aéré",     desc: "Espacé, plus lisible",    icon: "▬  ▬  ▬" },
-          ].map(d => (
-            <button key={d.value} onClick={() => { set("density", d.value); document.body.setAttribute("data-density", d.value) }}
-              className="p-3 rounded-xl border text-left transition-all"
-              style={{ borderColor: us.density === d.value ? ACCENT : "#27272a", backgroundColor: us.density === d.value ? ACCENT + "15" : "#18181b" }}>
-              <p className="text-[13px] mb-1.5 tracking-wider text-zinc-500">{d.icon}</p>
-              <p className="text-white text-xs font-bold">{d.label}</p>
-              <p className="text-zinc-500 text-[10px] mt-0.5">{d.desc}</p>
-              {us.density === d.value && <p className="text-[10px] font-bold mt-1.5" style={{ color: ACCENT }}>✓ Actif</p>}
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Taille du texte" icon={Monitor} color="#a855f7" desc="S'applique à toute l'interface">
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { value: "small",       label: "Petit",  size: "12px" },
-            { value: "normal",      label: "Normal", size: "14px" },
-            { value: "large",       label: "Grand",  size: "16px" },
-            { value: "extra-large", label: "Très grand", size: "18px" },
-          ].map(f => (
-            <button key={f.value} onClick={() => { set("font_size", f.value); document.body.style.fontSize = f.size; document.body.setAttribute("data-font-size", f.value) }}
-              className="p-3 rounded-xl border text-center transition-all"
-              style={{ borderColor: us.font_size === f.value ? ACCENT : "#27272a", backgroundColor: us.font_size === f.value ? ACCENT + "15" : "#18181b" }}>
-              <p className="font-bold text-white mb-1" style={{ fontSize: f.size }}>Aa</p>
-              <p className="text-zinc-500" style={{ fontSize: "10px" }}>{f.label}</p>
-              <p style={{ fontSize: "10px", color: f.size }}>{f.size}</p>
-            </button>
-          ))}
-        </div>
-        {/* Live preview */}
-        <div className="mt-3 bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-          <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-2">Aperçu</p>
-          <p className="text-white font-bold" style={{ fontSize: "var(--font-size-base)" }}>Titre exemple</p>
-          <p className="text-zinc-400" style={{ fontSize: "calc(var(--font-size-base) - 1px)" }}>Texte normal de l'interface</p>
-          <p className="text-zinc-500" style={{ fontSize: "calc(var(--font-size-base) - 2px)" }}>Texte secondaire</p>
-        </div>
-      </Section>
-
-      <Section title="Options visuelles" icon={Palette} color="#a855f7">
-        <Field label="Animations & transitions">
-          <Toggle value={us.animations} onChange={v => set("animations", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Couleur d'accent sur la sidebar" sub="Colore la barre latérale avec votre couleur principale">
-          <Toggle value={us.sidebar_accent} onChange={v => set("sidebar_accent", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Icônes dans les sections" sub="Affiche les icônes dans les titres de section">
-          <Toggle value={us.show_section_icons} onChange={v => set("show_section_icons", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── MESSAGERIE ─────────────────────────── */
-    case "messagerie": return (<div className="space-y-4">
-      <Section title="Apparence des bulles" icon={MessageSquare} color="#3b82f6">
-        <Field label="Couleur de mes messages">
-          <ColorRow colors={PALETTE} value={us.msg_bubble_me} onChange={v => set("msg_bubble_me", v)} />
-        </Field>
-        <Field label="Couleur des messages reçus">
-          <ColorRow colors={["#27272a","#1c1c1e","#18181b","#292524","#1e1b4b","#134e4a"]} value={us.msg_bubble_rx} onChange={v => set("msg_bubble_rx", v)} />
-        </Field>
-        <div className="bg-zinc-800 rounded-xl p-3 space-y-2 mt-2">
-          <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-2">Aperçu</p>
-          <div className="flex justify-start">
-            <div className="max-w-[60%] px-3 py-2 rounded-2xl rounded-bl-sm text-sm text-white" style={{ backgroundColor: us.msg_bubble_rx }}>
-              Bonjour, comment ça va ?
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <div className="max-w-[60%] px-3 py-2 rounded-2xl rounded-br-sm text-sm font-medium" style={{ backgroundColor: us.msg_bubble_me, color: us.msg_bubble_me === "#ffffff" ? "#000" : "white" }}>
-              Très bien merci ! 😊
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Comportement" icon={MessageSquare} color="#3b82f6">
-        <Field label="Taille du texte dans les messages">
-          <Sel value={us.msg_font_size} onChange={v => set("msg_font_size", v)} options={[
-            { value: "small", label: "Petit" }, { value: "normal", label: "Normal" }, { value: "large", label: "Grand" }
-          ]} />
-        </Field>
-        <Field label="Afficher l'horodatage" sub="Heure sous chaque message">
-          <Toggle value={us.msg_show_ts} onChange={v => set("msg_show_ts", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Mode compact" sub="Réduit l'espace entre les messages">
-          <Toggle value={us.msg_compact} onChange={v => set("msg_compact", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Entrée pour envoyer" sub="Sinon, utiliser Ctrl+Entrée">
-          <Toggle value={us.msg_enter_to_send} onChange={v => set("msg_enter_to_send", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── DASHBOARD ──────────────────────────── */
-    case "dashboard": return (<div className="space-y-4">
-      <Section title="Page de démarrage" icon={Monitor} color="#06b6d4">
-        <Sel value={us.start_page} onChange={v => set("start_page", v)} options={[
-          { value: "accueil", label: "🏠 Accueil" },
-          { value: "vente", label: "🛒 Vente" },
-          { value: "clients", label: "👤 Clients" },
-          { value: "stocks", label: "📦 Stock" },
-          { value: "stats", label: "📊 Statistiques" },
-          { value: "messages", label: "💬 Messages" },
-        ]} />
-      </Section>
-
-      <Section title="Widgets affichés" icon={Layout} color="#06b6d4" desc="Sélectionnez les indicateurs sur votre accueil">
-        <div className="grid grid-cols-2 gap-2">
-          {WIDGETS.map(w => {
-            const active = us.dashboard_widgets.includes(w.id)
-            return (
-              <button key={w.id} onClick={() => toggleList("dashboard_widgets", w.id)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${active ? "bg-zinc-800 border-zinc-600" : "border-zinc-800 hover:border-zinc-700"}`}>
-                <div className="w-4 h-4 rounded flex items-center justify-center shrink-0 border transition-colors"
-                  style={{ backgroundColor: active ? ACCENT : undefined, borderColor: active ? ACCENT : "#52525b" }}>
-                  {active && <Check size={10} className="text-black" />}
-                </div>
-                <span className="text-sm text-zinc-300">{w.label}</span>
-              </button>
-            )
-          })}
-        </div>
-      </Section>
-
-      <Section title="Mise en page" icon={Layout} color="#06b6d4">
-        <Field label="Colonnes de widgets">
-          <Sel value={us.dashboard_columns} onChange={v => set("dashboard_columns", v)} options={[
-            { value: "2", label: "2 colonnes" },
-            { value: "3", label: "3 colonnes" },
-            { value: "4", label: "4 colonnes" },
-          ]} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── NAVIGATION ─────────────────────────── */
-    case "navigation": return (<div className="space-y-4">
-      <Section title="Onglets visibles" icon={Sidebar} color="#22c55e" desc="Masquez les modules que vous n'utilisez pas">
-        <div className="space-y-1">
-          {ALL_TABS.map(id => {
-            const hidden = us.hidden_tabs.includes(id)
-            return (
-              <div key={id} className={`flex items-center justify-between px-3 py-2.5 rounded-xl transition-colors ${hidden ? "opacity-40" : "hover:bg-zinc-800/40"}`}>
-                <span className="text-zinc-300 text-sm">{TAB_LABELS[id]}</span>
-                <button onClick={() => toggleList("hidden_tabs", id)}
-                  className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${hidden ? "text-red-400 border-red-500/30 bg-red-500/10" : "text-green-400 border-green-500/30 bg-green-500/10"}`}>
-                  {hidden ? <><EyeOff size={11} /> Masqué</> : <><Eye size={11} /> Visible</>}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-        {us.hidden_tabs.length > 0 && (
-          <button onClick={() => set("hidden_tabs", [])} className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors">
-            Tout réafficher ({us.hidden_tabs.length} masqué{us.hidden_tabs.length > 1 ? "s" : ""})
-          </button>
-        )}
-      </Section>
-    </div>)
-
-    /* ── AFFICHAGE ──────────────────────────── */
-    case "affichage": return (<div className="space-y-4">
-      <Section title="Données visibles" icon={Eye} color="#f97316">
-        <Field label="Prix dans le module Stock" sub="PV et CF visibles dans l'inventaire">
-          <Toggle value={us.show_prices_in_stock} onChange={v => set("show_prices_in_stock", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Coût de fabrication dans la Vente">
-          <Toggle value={us.show_cf_in_vente} onChange={v => set("show_cf_in_vente", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Marge brute dans la Vente">
-          <Toggle value={us.show_marge_in_vente} onChange={v => set("show_marge_in_vente", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Stock disponible dans la Vente" sub="Quantité restante visible lors de la sélection">
-          <Toggle value={us.show_stock_in_vente} onChange={v => set("show_stock_in_vente", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-
-      <Section title="Valeurs par défaut" icon={Eye} color="#f97316">
-        <Field label="Mode de paiement par défaut">
-          <Sel value={us.default_payment} onChange={v => set("default_payment", v)} options={["Espèces","CB","Chèque","Virement","PayPal"]} />
-        </Field>
-        <Field label="Format de date">
-          <Sel value={us.date_format} onChange={v => set("date_format", v)} options={["DD/MM/YYYY","MM/DD/YYYY","YYYY-MM-DD"]} />
-        </Field>
-        <Field label="Affichage de la devise">
-          <Sel value={us.currency_display} onChange={v => set("currency_display", v)} options={["€","$ USD","£ GBP","CHF"]} />
-        </Field>
-        <Field label="Éléments par page">
-          <Sel value={us.nb_items_per_page} onChange={v => set("nb_items_per_page", v)} options={["10","20","50","100"]} />
-        </Field>
-      </Section>
-
-      <Section title="Interactions" icon={Eye} color="#f97316">
-        <Field label="Fenêtres de confirmation" sub="Demander confirmation avant chaque action critique">
-          <Toggle value={us.show_confirmations} onChange={v => set("show_confirmations", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── VENTE RAPIDE ───────────────────────── */
-    case "vente": return (<div className="space-y-4">
-      <Section title="Options de vente" icon={ShoppingCart} color="#84cc16">
-        <Field label="Focus automatique sur la recherche" sub="La barre de recherche est activée dès l'ouverture">
-          <Toggle value={us.vente_auto_focus_search} onChange={v => set("vente_auto_focus_search", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Afficher la composition des produits" sub="Liste les composants utilisés pour chaque produit">
-          <Toggle value={us.vente_show_composition} onChange={v => set("vente_show_composition", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Afficher le total TTC" sub="Affiche le montant toutes taxes comprises">
-          <Toggle value={us.vente_show_total_ttc} onChange={v => set("vente_show_total_ttc", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Client par défaut" sub="Pré-sélectionné à l'ouverture d'une vente">
-          <input value={us.vente_default_client} onChange={e => set("vente_default_client", e.target.value)}
-            placeholder="Nom du client..."
-            className="w-40 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-        </Field>
-      </Section>
-
-      <Section title="Produits en accès rapide" icon={Zap} color="#84cc16" desc="Affichés en premier dans la liste de vente">
-        <div className="flex flex-wrap gap-2 mb-3">
-          {us.quick_products.length === 0 && <p className="text-zinc-600 text-sm">Aucun produit configuré</p>}
-          {us.quick_products.map(p => (
-            <span key={p} className="flex items-center gap-1.5 bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700">
-              ⚡ {p}
-              <button onClick={() => set("quick_products", us.quick_products.filter(x => x !== p))} className="text-zinc-500 hover:text-red-400 transition-colors ml-1">×</button>
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input value={tagInput} onChange={e => setTagInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addTag("quick_products")}
-            placeholder="Nom du produit..."
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-          <button onClick={() => addTag("quick_products")} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-xl text-sm transition-colors">+</button>
-        </div>
-      </Section>
-    </div>)
-
-    /* ── RACCOURCIS ─────────────────────────── */
-    case "raccourcis": return (<div className="space-y-4">
-      <Section title="Touches de fonction" icon={Keyboard} color="#eab308" desc="Touche assignée à chaque module">
-        <div className="space-y-3">
-          {[
-            { key: "shortcut_vente",      label: "🛒 Vente" },
-            { key: "shortcut_clients",    label: "👤 Clients" },
-            { key: "shortcut_stocks",     label: "📦 Stock" },
-            { key: "shortcut_stats",      label: "📊 Statistiques" },
-            { key: "shortcut_messages",   label: "💬 Messages" },
-            { key: "shortcut_notes",      label: "📝 Notes" },
-            { key: "shortcut_parametres", label: "⚙️ Paramètres" },
-          ].map(({ key, label }) => (
-            <Field key={key} label={label}>
-              <Sel value={(us as any)[key]} onChange={v => set(key as keyof US, v)}
-                options={["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"]} />
-            </Field>
-          ))}
-        </div>
-        <div className="bg-zinc-800/60 rounded-xl p-3">
-          <p className="text-zinc-500 text-[11px]">💡 Actifs depuis n'importe quelle page. Évitez les doublons.</p>
-        </div>
-      </Section>
-    </div>)
-
-    /* ── NOTIFICATIONS ──────────────────────── */
-    case "notifications": return (<div className="space-y-4">
-      <Section title="Alertes" icon={Bell} color="#ec4899">
-        <Field label="Relances clients" sub="Clients dépassant leur délai de relance">
-          <Toggle value={us.notif_relance} onChange={v => set("notif_relance", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Stock bas" sub="Produits sous le seuil critique">
-          <Toggle value={us.notif_stock_bas} onChange={v => set("notif_stock_bas", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Nouveaux messages" sub="Badge non-lu sur l'onglet Messages">
-          <Toggle value={us.notif_message} onChange={v => set("notif_message", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Objectifs atteints">
-          <Toggle value={us.notif_objectif} onChange={v => set("notif_objectif", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Sons de notification">
-          <Toggle value={us.notif_son} onChange={v => set("notif_son", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Notifications bureau" sub="Notifications système hors de l'application">
-          <Toggle value={us.notif_desktop} onChange={v => set("notif_desktop", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Badge avec compteur" sub="Affiche le nombre de notifications non lues">
-          <Toggle value={us.notif_badge_count} onChange={v => set("notif_badge_count", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-      <Section title="Rapport quotidien" icon={Bell} color="#ec4899">
-        <Field label="Activer le rapport de fin de journée">
-          <Toggle value={us.eod_enabled} onChange={v => set("eod_enabled", v)} accent={ACCENT} />
-        </Field>
-        {us.eod_enabled && (
-          <Field label="Heure du rapport">
-            <div className="flex items-center gap-2">
-              <input type="number" min={0} max={23} value={us.eod_hour} onChange={e => set("eod_hour", Number(e.target.value))}
-                className="w-20 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-1.5 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60" />
-              <span className="text-zinc-500 text-xs">h00</span>
-            </div>
-          </Field>
-        )}
-      </Section>
-    </div>)
-
-    /* ── IMPRESSION ─────────────────────────── */
-    case "impression": return (<div className="space-y-4">
-      <Section title="Impression" icon={Printer} color="#64748b">
-        <Field label="Afficher l'en-tête sur les documents" sub="Nom de la société et logo en haut de page">
-          <Toggle value={us.print_header} onChange={v => set("print_header", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Inclure le logo" sub="Logo de la société sur les impressions">
-          <Toggle value={us.print_logo} onChange={v => set("print_logo", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Taille de police à l'impression">
-          <Sel value={us.print_font_size} onChange={v => set("print_font_size", v)} options={[
-            { value: "small", label: "Petite" }, { value: "normal", label: "Normale" }, { value: "large", label: "Grande" }
-          ]} />
-        </Field>
-        <Field label="Texte de pied de page" flex={false}>
-          <input value={us.print_footer_text} onChange={e => set("print_footer_text", e.target.value)}
-            placeholder="Ex: Merci pour votre confiance..."
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/60 mt-2" />
-        </Field>
-      </Section>
-      <Section title="Export" icon={Printer} color="#64748b">
-        <Field label="Format d'export par défaut">
-          <Sel value={us.export_format} onChange={v => set("export_format", v)} options={[
-            { value: "xlsx", label: "Excel (.xlsx)" },
-            { value: "csv",  label: "CSV (.csv)" },
-            { value: "pdf",  label: "PDF (.pdf)" },
-          ]} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── CONFIDENTIALITE ────────────────────── */
-    case "confidentialite": return (<div className="space-y-4">
-      <Section title="Visibilité" icon={Lock} color="#8b5cf6" desc="Ce que vos collègues peuvent voir de vous">
-        <Field label="Afficher mon statut de présence" sub="En ligne, Occupé, Absent...">
-          <Toggle value={us.show_online_status} onChange={v => set("show_online_status", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Afficher ma dernière connexion" sub="Date et heure de dernière activité">
-          <Toggle value={us.show_last_seen} onChange={v => set("show_last_seen", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Afficher ma biographie à l'équipe" sub="Poste et bio visible dans la messagerie">
-          <Toggle value={us.show_bio_to_team} onChange={v => set("show_bio_to_team", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Autoriser les messages directs" sub="Vos collègues peuvent vous écrire en direct">
-          <Toggle value={us.allow_direct_messages} onChange={v => set("allow_direct_messages", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── ACCESSIBILITE ──────────────────────── */
-    case "accessibilite": return (<div className="space-y-4">
-      <Section title="Accessibilité" icon={Accessibility} color="#14b8a6">
-        <Field label="Contraste élevé" sub="Augmente le contraste des textes et bordures">
-          <Toggle value={us.high_contrast} onChange={v => set("high_contrast", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Réduire les animations" sub="Désactive les transitions pour limiter la fatigue visuelle">
-          <Toggle value={us.reduce_motion} onChange={v => set("reduce_motion", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Grandes zones de clic" sub="Agrandit les boutons et zones interactives">
-          <Toggle value={us.large_click_targets} onChange={v => set("large_click_targets", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Indicateurs de focus visibles" sub="Contour visible lors de la navigation clavier">
-          <Toggle value={us.focus_indicators} onChange={v => set("focus_indicators", v)} accent={ACCENT} />
-        </Field>
-        <Field label="Délai des infobulles">
-          <Sel value={us.tooltip_delay} onChange={v => set("tooltip_delay", v)} options={[
-            { value: "instant", label: "Instantané" },
-            { value: "normal",  label: "Normal (500ms)" },
-            { value: "slow",    label: "Lent (1s)" },
-          ]} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── FAVORIS ────────────────────────────── */
-    case "favoris": return (<div className="space-y-4">
-      {(["fav_clients","fav_products"] as const).map(key => (
-        <Section key={key} title={key === "fav_clients" ? "⭐ Clients favoris" : "⭐ Produits favoris"}
-          icon={Star} color={ACCENT} desc="Accès rapide dans le module Vente">
-          <div className="flex flex-wrap gap-2 mb-3">
-            {(us[key] as string[]).length === 0 && <p className="text-zinc-600 text-sm">Aucun favori</p>}
-            {(us[key] as string[]).map(item => (
-              <span key={item} className="flex items-center gap-1.5 bg-zinc-800 text-zinc-300 text-xs px-3 py-1.5 rounded-lg border border-zinc-700">
-                ⭐ {item}
-                <button onClick={() => set(key, (us[key] as string[]).filter(x => x !== item))} className="text-zinc-500 hover:text-red-400 transition-colors ml-1">×</button>
-              </span>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input value={tagInput} onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addTag(key)} placeholder="Ajouter..."
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-            <button onClick={() => addTag(key)} className="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded-xl text-sm transition-colors">+</button>
-          </div>
-        </Section>
-      ))}
-    </div>)
-
-    /* ── MEMO ───────────────────────────────── */
-    case "memo": return (<div className="space-y-4">
-      <Section title="Mémo personnel" icon={StickyNote} color="#84cc16" desc="Note privée — visible uniquement par vous">
-        <div>
-          <label className="block text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">Couleur du mémo</label>
-          <ColorRow colors={["#eab308","#22c55e","#3b82f6","#ec4899","#a855f7","#f97316","#ef4444","#84cc16"]} value={us.memo_color} onChange={v => set("memo_color", v)} />
-        </div>
-        <div className="rounded-xl overflow-hidden border-2" style={{ borderColor: us.memo_color + "50" }}>
-          <div className="px-3 py-2 text-xs font-bold" style={{ backgroundColor: us.memo_color + "15", color: us.memo_color }}>
-            📝 Mon mémo
-          </div>
-          <textarea value={us.memo} onChange={e => set("memo", e.target.value)} rows={10}
-            placeholder="Vos notes personnelles, tâches du jour, rappels..."
-            className="w-full bg-zinc-800 px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed" />
-        </div>
-        <Field label="Pop-up au lancement" sub="Affiche le mémo à l'ouverture si non vide">
-          <Toggle value={us.memo_popup} onChange={v => set("memo_popup", v)} accent={ACCENT} />
-        </Field>
-      </Section>
-    </div>)
-
-    /* ── SYSTEME ────────────────────────────── */
-    case "systeme": return (<div className="space-y-4">
-      <Section title="Compte" icon={Zap} color="#ef4444">
-        <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-xl">
-          <div>
-            <p className="text-white text-sm font-semibold">{profile.email}</p>
-            <p className="text-zinc-500 text-xs mt-0.5">Compte connecté</p>
-          </div>
-          <span className="w-2 h-2 rounded-full bg-green-400" />
-        </div>
-      </Section>
-      <Section title="Réinitialisation" icon={Zap} color="#ef4444">
-        <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-4">
-          <p className="text-red-400 font-semibold text-sm mb-1">Zone de réinitialisation</p>
-          <p className="text-zinc-500 text-xs mb-3">Remet toutes vos préférences personnelles aux valeurs par défaut.</p>
-          <button onClick={() => { if (confirm("Réinitialiser toutes vos préférences ?")) { Object.entries(USER_DEFAULTS).forEach(([k, v]) => updateSetting(k as any, v)) } }}
-            className="text-xs text-red-400 border border-red-500/30 px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors">
-            Réinitialiser mes préférences
-          </button>
-        </div>
-      </Section>
-    </div>)
-
-    default: return null
-  }}
-
-  const NavContent = () => (
-    <>
-      <div className="p-5 border-b border-zinc-900 flex items-center justify-between">
-        <div>
-          <h2 className="text-white font-bold text-sm">⚙️ Mes paramètres</h2>
-          <p className="text-zinc-500 text-[11px] mt-0.5">Personnalisation</p>
-        </div>
-        {/* Bouton fermer — mobile seulement */}
-        <button onClick={() => setNavOpen(false)} className="md:hidden w-7 h-7 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-sm">✕</button>
-      </div>
-      <nav className="flex-1 overflow-y-auto p-2">
-        {SECTIONS.map(s => {
-          const Icon = s.icon
-          const isActive = activeSection === s.id
-          return (
-            <button key={s.id} onClick={() => { setActiveSection(s.id); setNavOpen(false) }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all mb-0.5 relative ${isActive ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/50"}`}>
-              {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full" style={{ backgroundColor: s.color }} />}
-              <div className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? s.color + "22" : "transparent" }}>
-                <Icon size={11} style={{ color: isActive ? s.color : "currentColor" }} />
-              </div>
-              <span className="truncate text-[13px]">{s.label}</span>
-              {isActive && <ChevronRight size={11} className="ml-auto shrink-0" style={{ color: s.color }} />}
-            </button>
-          )
-        })}
-      </nav>
-    </>
+  // Profil toujours manquant après tentative de création
+  if (!profile) return (
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
+      <p className="text-white font-bold text-lg">Problème de chargement</p>
+      <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
+      <button onClick={() => window.location.reload()}
+        className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors">
+        Réessayer
+      </button>
+      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }}
+        className="text-zinc-500 text-sm hover:text-white transition-colors">
+        Se déconnecter
+      </button>
+    </div>
   )
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0a0a0a] relative">
-
-      {/* Overlay mobile */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setNavOpen(false)} />
-      )}
-
-      {/* DESKTOP sidebar */}
-      <div className="hidden md:flex w-56 bg-[#111111] border-r border-zinc-900 flex-col shrink-0">
-        <NavContent />
-      </div>
-
-      {/* MOBILE sidebar drawer */}
-      {sidebarOpen && (
-        <div className="fixed top-0 left-0 h-full w-64 bg-[#111111] border-r border-zinc-900 flex flex-col z-50 md:hidden">
-          <NavContent />
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Bouton hamburger paramètres — fixé sous le hamburger principal (top-16 = 64px) */}
-        <button onClick={() => setNavOpen(true)}
-          className="md:hidden fixed top-16 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
-          style={{ backgroundColor: "#111111" }}>
-          <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-          <span className="w-4 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-          <span className="w-3 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-          {/* Petit badge ⚙️ pour différencier */}
-          <span className="absolute -bottom-1.5 -right-1.5 text-[9px]">⚙️</span>
-        </button>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-900 bg-[#111111] gap-3">
-          {/* Spacer mobile pour éviter chevauchement avec les boutons fixes */}
-          <div className="md:hidden w-12 shrink-0" />
-          <p className="text-zinc-500 text-xs flex-1 truncate">
-            <span className="md:hidden font-semibold text-zinc-300">{SECTIONS.find(s => s.id === activeSection)?.label}</span>
-            <span className="hidden md:inline">Paramètres personnels — uniquement pour votre compte</span>
-          </p>
-          <button onClick={save} disabled={saving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 ${saved ? "bg-green-500/20 text-green-400 border border-green-500/30" : "text-black"}`}
-            style={!saved ? { backgroundColor: ACCENT } : {}}>
-            {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
-            <span className="hidden sm:inline">{saved ? "Sauvegardé !" : saving ? "En cours..." : "Sauvegarder"}</span>
-            {!saving && !saved && <span className="sm:hidden"><Save size={14} /></span>}
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-2xl mx-auto">{renderSection()}</div>
-        </div>
-      </div>
-    </div>
+    <UserSettingsProvider userId={profile.id}>
+      <InnerDashboard profile={profile} activeSociety={activeSociety} />
+    </UserSettingsProvider>
   )
 }
