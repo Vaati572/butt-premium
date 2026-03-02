@@ -68,6 +68,10 @@ function ClientFiche({ client, societyId, profile, onClose, onUpdated }: {
   const [tags, setTags] = useState<string[]>(client.tags || [])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Prix personnalisés
+  const [products, setProducts] = useState<any[]>([])
+  const [clientPrix, setClientPrix] = useState<Record<string, string>>({})
+  const [savingPrix, setSavingPrix] = useState(false)
 
   useEffect(() => { loadVentes() }, [])
 
@@ -78,6 +82,36 @@ function ClientFiche({ client, societyId, profile, onClose, onUpdated }: {
       .order("created_at", { ascending: false })
     setVentes(data || [])
     setLoadingVentes(false)
+  }
+
+  useEffect(() => { loadPrix() }, [client.id])
+
+  const loadPrix = async () => {
+    const [{ data: prods }, { data: prix }] = await Promise.all([
+      supabase.from("products").select("id, name, gamme, pv").eq("society_id", societyId).order("gamme").order("name"),
+      supabase.from("client_prix").select("*").eq("client_id", client.id),
+    ])
+    setProducts(prods || [])
+    const map: Record<string, string> = {}
+    ;(prix || []).forEach((p: any) => { map[p.product_id] = String(p.prix) })
+    setClientPrix(map)
+  }
+
+  const savePrix = async () => {
+    setSavingPrix(true)
+    for (const [product_id, prixStr] of Object.entries(clientPrix)) {
+      const prix = parseFloat(prixStr)
+      if (isNaN(prix) || prixStr === "") {
+        await supabase.from("client_prix").delete().eq("client_id", client.id).eq("product_id", product_id)
+      } else {
+        await supabase.from("client_prix").upsert(
+          { client_id: client.id, product_id, prix, society_id: societyId, updated_at: new Date().toISOString() },
+          { onConflict: "client_id,product_id" }
+        )
+      }
+    }
+    setSavingPrix(false)
+    alert("Prix sauvegardés ✓")
   }
 
   const saveNote = async () => {
@@ -219,6 +253,8 @@ function ClientFiche({ client, societyId, profile, onClose, onUpdated }: {
             { id: "historique", label: "🧾 Historique" },
             { id: "stats", label: "📊 Stats" },
             { id: "notes", label: "📝 Notes" },
+            { id: "prix", label: "💰 Prix" },
+            { id: "prix", label: "💰 Prix" },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
               className={`flex-1 py-3 text-xs font-semibold transition-colors border-b-2 ${activeTab === t.id ? "border-yellow-500 text-yellow-500" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}>
@@ -328,6 +364,63 @@ function ClientFiche({ client, societyId, profile, onClose, onUpdated }: {
                 className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-2.5 rounded-xl text-sm transition-colors">
                 {savingNote ? "Sauvegarde..." : "💾 Sauvegarder les notes"}
               </button>
+            </div>
+          )}
+
+          {/* PRIX PERSONNALISÉS */}
+          {activeTab === "prix" && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <p className="text-white font-semibold text-sm">Prix personnalisés</p>
+                  <p className="text-zinc-500 text-xs">Laissez vide = prix catalogue standard</p>
+                </div>
+                <button onClick={savePrix} disabled={savingPrix}
+                  className="px-4 py-2 rounded-xl text-black text-xs font-bold bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
+                  {savingPrix ? "..." : "💾 Sauvegarder"}
+                </button>
+              </div>
+              {products.length === 0 ? (
+                <p className="text-zinc-500 text-xs text-center py-8">Aucun produit dans le catalogue</p>
+              ) : (
+                <>
+                  {["Particuliers", "Professionnels"].map(gamme => {
+                    const gammeProds = products.filter(p => p.gamme === gamme)
+                    if (gammeProds.length === 0) return null
+                    return (
+                      <div key={gamme}>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold mb-2">{gamme}</p>
+                        <div className="space-y-1.5">
+                          {gammeProds.map(prod => (
+                            <div key={prod.id} className="flex items-center gap-3 bg-zinc-900 rounded-xl px-3 py-2.5">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-xs font-semibold truncate">{prod.name}</p>
+                                <p className="text-zinc-500 text-[10px]">Catalogue: {Number(prod.pv).toFixed(2)}€</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <input
+                                  type="number"
+                                  value={clientPrix[prod.id] ?? ""}
+                                  onChange={e => setClientPrix(prev => ({ ...prev, [prod.id]: e.target.value }))}
+                                  placeholder={String(Number(prod.pv).toFixed(2))}
+                                  className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white text-right focus:outline-none focus:border-yellow-500/60"
+                                />
+                                <span className="text-zinc-500 text-xs">€</span>
+                                {clientPrix[prod.id] && (
+                                  <span className={`text-[10px] font-bold ${parseFloat(clientPrix[prod.id]) < prod.pv ? "text-red-400" : "text-green-400"}`}>
+                                    {parseFloat(clientPrix[prod.id]) < prod.pv ? "▼" : "▲"}
+                                    {Math.abs(((parseFloat(clientPrix[prod.id]) - prod.pv) / prod.pv) * 100).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
             </div>
           )}
         </div>

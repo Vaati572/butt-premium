@@ -248,6 +248,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const [search, setSearch] = useState("")
   const [searchClient, setSearchClient] = useState("")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [clientPrixMap, setClientPrixMap] = useState<Record<string, number>>({})
   const [showClients, setShowClients] = useState(false)
   const [typeVente, setTypeVente] = useState("Particulier")
   const [paiement, setPaiement] = useState("Espèces")
@@ -295,8 +296,10 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(i => i.product_id === product.id)
+      // Use client custom price if available
+      const prix = clientPrixMap[product.id] ?? product.pv
       if (existing) return prev.map(i => i.product_id === product.id ? { ...i, quantite: i.quantite + 1 } : i)
-      return [...prev, { product_id: product.id, nom: product.name, gamme: product.gamme, quantite: 1, pv: product.pv, cf: product.cf }]
+      return [...prev, { product_id: product.id, nom: product.name, gamme: product.gamme, quantite: 1, pv: prix, cf: product.cf }]
     })
   }
 
@@ -312,10 +315,9 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
   const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
   const totalTTC = totalHT + portVal
-  const urssaf = totalHT * URSSAF_RATE
-  const netApresUrssaf = totalHT - urssaf
+  const urssaf = totalTTC * URSSAF_RATE                // 14% sur (PV + port)
   const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
-  const benefice = netApresUrssaf - cfTotal
+  const resultat = totalTTC - urssaf - cfTotal          // Résultat net final
 
   const saveBrouillon = () => {
     try { localStorage.setItem("brouillon_vente_" + activeSociety.id, JSON.stringify(cart)) } catch {}
@@ -418,7 +420,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           }
         }
       }
-      setCart([]); setSelectedClient(null); setNotes("")
+      setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
       setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso("")
       setSuccess(true)
       setTimeout(() => { setSuccess(false); loadData() }, 2500)
@@ -632,7 +634,15 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                   <div className="p-2"><input type="text" placeholder="Rechercher..." value={searchClient} onChange={(e) => setSearchClient(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" /></div>
                   <div className="max-h-48 overflow-y-auto">
                     {filteredClients.map(c => (
-                      <button key={c.id} onClick={() => { setSelectedClient(c); setShowClients(false) }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
+                      <button key={c.id} onClick={async () => {
+                      setSelectedClient(c)
+                      setShowClients(false)
+                      // Load custom prices for this client
+                      const { data } = await supabase.from("client_prix").select("*").eq("client_id", c.id)
+                      const map: Record<string, number> = {}
+                      ;(data || []).forEach((p: any) => { map[p.product_id] = p.prix })
+                      setClientPrixMap(map)
+                    }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
                         <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
                       </button>
                     ))}
@@ -736,16 +746,27 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             {/* Résultats financiers */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-1">
               <div className="flex justify-between text-xs text-zinc-400">
-                <span>CA BRUT</span><span>{totalHT.toFixed(2)}€ | Port: {portVal.toFixed(2)}€</span>
+                <span>CA Brut</span><span>{totalHT.toFixed(2)}€</span>
+              </div>
+              {portVal > 0 && (
+                <div className="flex justify-between text-xs text-zinc-400">
+                  <span>Port</span><span>+{portVal.toFixed(2)}€</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs text-zinc-500 border-t border-zinc-800 pt-1">
+                <span>Sous-total</span><span>{totalTTC.toFixed(2)}€</span>
               </div>
               <div className="flex justify-between text-xs text-zinc-600">
-                <span>URSSAF ({(URSSAF_RATE * 100).toFixed(1)}%)</span><span>-{urssaf.toFixed(2)}€</span>
+                <span>URSSAF ({(URSSAF_RATE * 100).toFixed(0)}%)</span><span>-{urssaf.toFixed(2)}€</span>
               </div>
-              <div className={`flex justify-between text-xs font-semibold ${benefice >= 0 ? "text-green-500" : "text-red-400"}`}>
-                <span>Bénéfice estimé</span><span>{benefice.toFixed(2)}€</span>
+              <div className="flex justify-between text-xs text-zinc-600">
+                <span>Coût fabrication</span><span>-{cfTotal.toFixed(2)}€</span>
+              </div>
+              <div className={`flex justify-between text-sm font-bold border-t border-zinc-800 pt-1.5 ${resultat >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <span>Résultat net</span><span>{resultat.toFixed(2)}€</span>
               </div>
               <div className="flex justify-between text-base font-bold text-white border-t border-zinc-800 pt-1.5">
-                <span>TOTAL</span>
+                <span>TOTAL CLIENT</span>
                 <span className="text-yellow-500 text-lg">{totalTTC.toFixed(2)}€</span>
               </div>
             </div>
