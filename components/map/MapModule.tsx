@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { X, MapPin, Navigation, Route, ExternalLink, Filter, RotateCcw, Check } from "lucide-react"
+import { X, MapPin, Navigation, Route, ExternalLink, Filter, RotateCcw, Check , Search} from "lucide-react"
 import type { Prospect } from "@/components/prospects/ProspectsModule"
 
 interface Props {
@@ -51,6 +51,11 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
   const [homeCoords, setHomeCoords] = useState<[number, number] | null>(null)
   const [geocodingHome, setGeocodingHome] = useState(false)
   const homeMarkerRef = useRef<any>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchTimeoutRef = useRef<any>(null)
+  const searchMarkerRef = useRef<any>(null)
 
   // Load Leaflet dynamically (no SSR issues)
   useEffect(() => {
@@ -92,6 +97,51 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
   const saveHomeAddress = async () => {
     await supabase.from("profiles").update({ adresse_depart: homeAddress }).eq("id", profile.id)
     geocodeHome(homeAddress)
+  }
+
+  const searchAddress = async (query: string) => {
+    if (!query.trim() || query.length < 3) { setSearchResults([]); return }
+    setSearching(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=fr`)
+      const data = await res.json()
+      setSearchResults(data || [])
+    } catch {}
+    setSearching(false)
+  }
+
+  const onSearchChange = (val: string) => {
+    setSearchQuery(val)
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    searchTimeoutRef.current = setTimeout(() => searchAddress(val), 400)
+  }
+
+  const goToSearchResult = (result: any) => {
+    const map = mapInstanceRef.current
+    const L = (window as any).L
+    if (!map || !L) return
+    const lat = parseFloat(result.lat)
+    const lon = parseFloat(result.lon)
+    map.setView([lat, lon], 15, { animate: true })
+    // Place a temporary pin
+    if (searchMarkerRef.current) map.removeLayer(searchMarkerRef.current)
+    const icon = L.divIcon({
+      html: `<div style="background:#3b82f6;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);width:20px;height:20px;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,
+      className: "", iconSize: [20, 20], iconAnchor: [10, 20],
+    })
+    searchMarkerRef.current = L.marker([lat, lon], { icon })
+      .bindPopup(`<b>${result.display_name.split(",")[0]}</b><br><span style="font-size:11px;color:#666">${result.display_name.split(",").slice(1, 3).join(",")}</span>`)
+      .addTo(map)
+    setTimeout(() => searchMarkerRef.current?.openPopup(), 200)
+    setSearchResults([])
+    setSearchQuery(result.display_name.split(",")[0])
+  }
+
+  const clearSearch = () => {
+    setSearchQuery("")
+    setSearchResults([])
+    const map = mapInstanceRef.current
+    if (searchMarkerRef.current && map) { map.removeLayer(searchMarkerRef.current); searchMarkerRef.current = null }
   }
 
   const load = async () => {
@@ -375,6 +425,34 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700 transition-colors">
             <Navigation size={12} /> Ma position
           </button>
+          {/* Search bar */}
+          <div className="relative">
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5">
+              <Search size={12} className="text-zinc-500 shrink-0" />
+              <input
+                value={searchQuery}
+                onChange={e => onSearchChange(e.target.value)}
+                onKeyDown={e => e.key === "Escape" && clearSearch()}
+                placeholder="Rechercher une adresse..."
+                className="bg-transparent text-xs text-white placeholder-zinc-600 focus:outline-none w-52"
+              />
+              {searching && <div className="w-3 h-3 border border-zinc-400 border-t-transparent rounded-full animate-spin shrink-0" />}
+              {searchQuery && !searching && (
+                <button onClick={clearSearch} className="text-zinc-500 hover:text-white shrink-0"><X size={11} /></button>
+              )}
+            </div>
+            {searchResults.length > 0 && (
+              <div className="absolute top-full mt-1 left-0 w-80 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-[2000] overflow-hidden">
+                {searchResults.map((r, i) => (
+                  <button key={i} onClick={() => goToSearchResult(r)}
+                    className="w-full text-left px-3 py-2.5 hover:bg-zinc-800 transition-colors border-b border-zinc-800 last:border-0">
+                    <p className="text-white text-xs font-semibold truncate">{r.display_name.split(",")[0]}</p>
+                    <p className="text-zinc-500 text-[10px] truncate">{r.display_name.split(",").slice(1, 3).join(",")}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {/* Adresse de départ */}
           <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5">
             <span className="text-green-400 text-xs">🏠</span>
