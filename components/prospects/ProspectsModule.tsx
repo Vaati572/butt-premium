@@ -319,7 +319,22 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
               const sc = statutCfg(p.statut)
               const pc = PRIORITES.find(x => x.id === p.priorite)
               return (
-                <div key={p.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 hover:border-zinc-700 transition-all group">
+                <div key={p.id}
+                  onClick={() => { if (tourMode) toggleTourSelect(p.id) }}
+                  className={`relative bg-zinc-900 border rounded-2xl p-4 transition-all group
+                    ${tourMode
+                      ? tourSelected.has(p.id)
+                        ? "border-yellow-500 bg-yellow-500/5 cursor-pointer"
+                        : "border-zinc-700 hover:border-yellow-500/50 cursor-pointer"
+                      : "border-zinc-800 hover:border-zinc-700"
+                    }`}>
+                  {/* Checkbox tournée */}
+                  {tourMode && (
+                    <div className={`absolute top-3 right-3 w-6 h-6 rounded-full border-2 flex items-center justify-center z-10 transition-all
+                      ${tourSelected.has(p.id) ? "bg-yellow-500 border-yellow-500" : "border-zinc-500 bg-zinc-800"}`}>
+                      {tourSelected.has(p.id) && <Check size={12} className="text-black font-black" />}
+                    </div>
+                  )}
                   {/* Top row */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
@@ -366,7 +381,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                   )}
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5 pt-3 border-t border-zinc-800">
+                  <div className="flex items-center gap-1.5 pt-3 border-t border-zinc-800" onClick={e => e.stopPropagation()}>
                     <button onClick={() => setViewing(p)}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs transition-colors">
                       <Eye size={11} /> Voir
