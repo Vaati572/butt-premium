@@ -287,55 +287,66 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
         </div>
       </Section>
 
-      <Section title="Style des cartes" icon={Layout} color="#a855f7">
-        <div className="grid grid-cols-3 gap-3">
+      <Section title="Style des cartes" icon={Layout} color="#a855f7" desc="Arrondi des coins dans l'interface">
+        <div className="grid grid-cols-4 gap-2">
           {[
-            { value: "rounded",  label: "Arrondi",  radius: "12px" },
-            { value: "sharp",    label: "Angulaire",radius: "4px"  },
-            { value: "pill",     label: "Doux",     radius: "20px" },
+            { value: "sharp",       label: "Carré",     radius: "4px"  },
+            { value: "rounded",     label: "Arrondi",   radius: "12px" },
+            { value: "pill",        label: "Doux",      radius: "20px" },
+            { value: "ultra",       label: "Ultra",     radius: "28px" },
           ].map(s => (
             <button key={s.value} onClick={() => set("card_style", s.value)}
-              className={`p-3 border text-center transition-all ${us.card_style === s.value ? "border-2 bg-zinc-800" : "border-zinc-800 hover:border-zinc-600"}`}
-              style={{ borderRadius: s.radius, borderColor: us.card_style === s.value ? ACCENT : undefined }}>
-              <div className="w-full h-6 bg-zinc-700 mb-2" style={{ borderRadius: s.radius }} />
-              <p className="text-zinc-300 text-xs font-semibold">{s.label}</p>
+              className={`p-3 border text-center transition-all`}
+              style={{ borderRadius: s.radius, borderColor: us.card_style === s.value ? ACCENT : "#27272a", backgroundColor: us.card_style === s.value ? ACCENT + "15" : "#18181b" }}>
+              <div className="w-full h-5 bg-zinc-700 mb-2" style={{ borderRadius: s.radius }} />
+              <p className="text-[11px] font-semibold" style={{ color: us.card_style === s.value ? ACCENT : "#a1a1aa" }}>{s.label}</p>
             </button>
           ))}
         </div>
       </Section>
 
-      <Section title="Densité" icon={Monitor} color="#a855f7">
+      <Section title="Densité d'affichage" icon={Monitor} color="#a855f7" desc="Espacement des éléments dans l'interface">
         <div className="grid grid-cols-3 gap-3">
           {[
-            { value: "compact",      label: "Compact",     desc: "Plus d'infos à l'écran" },
-            { value: "normal",       label: "Normal",      desc: "Équilibré" },
-            { value: "comfortable",  label: "Aéré",        desc: "Plus d'espace" },
+            { value: "compact",     label: "Compact",  desc: "Serré, plus d'éléments", icon: "▬▬▬" },
+            { value: "normal",      label: "Normal",   desc: "Équilibré",               icon: "▬ ▬ ▬" },
+            { value: "comfortable", label: "Aéré",     desc: "Espacé, plus lisible",    icon: "▬  ▬  ▬" },
           ].map(d => (
-            <button key={d.value} onClick={() => set("density", d.value)}
-              className={`p-3 rounded-xl border text-left transition-all ${us.density === d.value ? "border-2 bg-zinc-800" : "border-zinc-800 hover:border-zinc-600"}`}
-              style={{ borderColor: us.density === d.value ? ACCENT : undefined }}>
-              <p className="text-white text-xs font-semibold">{d.label}</p>
+            <button key={d.value} onClick={() => { set("density", d.value); document.body.setAttribute("data-density", d.value) }}
+              className="p-3 rounded-xl border text-left transition-all"
+              style={{ borderColor: us.density === d.value ? ACCENT : "#27272a", backgroundColor: us.density === d.value ? ACCENT + "15" : "#18181b" }}>
+              <p className="text-[13px] mb-1.5 tracking-wider text-zinc-500">{d.icon}</p>
+              <p className="text-white text-xs font-bold">{d.label}</p>
               <p className="text-zinc-500 text-[10px] mt-0.5">{d.desc}</p>
-              {us.density === d.value && <p className="text-[10px] font-bold mt-1" style={{ color: ACCENT }}>✓ Actif</p>}
+              {us.density === d.value && <p className="text-[10px] font-bold mt-1.5" style={{ color: ACCENT }}>✓ Actif</p>}
             </button>
           ))}
         </div>
       </Section>
 
-      <Section title="Taille du texte" icon={Monitor} color="#a855f7">
-        <div className="grid grid-cols-3 gap-3">
+      <Section title="Taille du texte" icon={Monitor} color="#a855f7" desc="S'applique à toute l'interface">
+        <div className="grid grid-cols-4 gap-2">
           {[
-            { value: "small",  label: "Petit",  sample: "text-xs" },
-            { value: "normal", label: "Normal", sample: "text-sm" },
-            { value: "large",  label: "Grand",  sample: "text-base" },
+            { value: "small",       label: "Petit",  size: "12px" },
+            { value: "normal",      label: "Normal", size: "14px" },
+            { value: "large",       label: "Grand",  size: "16px" },
+            { value: "extra-large", label: "Très grand", size: "18px" },
           ].map(f => (
-            <button key={f.value} onClick={() => set("font_size", f.value)}
-              className={`p-4 rounded-xl border text-center transition-all ${us.font_size === f.value ? "border-2 bg-zinc-800" : "border-zinc-800 hover:border-zinc-600"}`}
-              style={{ borderColor: us.font_size === f.value ? ACCENT : undefined }}>
-              <p className={`text-white font-bold ${f.sample} mb-1`}>Aa</p>
-              <p className="text-zinc-500 text-[10px]">{f.label}</p>
+            <button key={f.value} onClick={() => { set("font_size", f.value); document.body.style.fontSize = f.size; document.body.setAttribute("data-font-size", f.value) }}
+              className="p-3 rounded-xl border text-center transition-all"
+              style={{ borderColor: us.font_size === f.value ? ACCENT : "#27272a", backgroundColor: us.font_size === f.value ? ACCENT + "15" : "#18181b" }}>
+              <p className="font-bold text-white mb-1" style={{ fontSize: f.size }}>Aa</p>
+              <p className="text-zinc-500" style={{ fontSize: "10px" }}>{f.label}</p>
+              <p style={{ fontSize: "10px", color: f.size }}>{f.size}</p>
             </button>
           ))}
+        </div>
+        {/* Live preview */}
+        <div className="mt-3 bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+          <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-2">Aperçu</p>
+          <p className="text-white font-bold" style={{ fontSize: "var(--font-size-base)" }}>Titre exemple</p>
+          <p className="text-zinc-400" style={{ fontSize: "calc(var(--font-size-base) - 1px)" }}>Texte normal de l'interface</p>
+          <p className="text-zinc-500" style={{ fontSize: "calc(var(--font-size-base) - 2px)" }}>Texte secondaire</p>
         </div>
       </Section>
 

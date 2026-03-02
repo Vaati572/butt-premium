@@ -127,6 +127,7 @@ export function useUserSettings() { return useContext(Ctx) }
 /* ── CSS VARIABLE APPLICATION ──────────────── */
 function applySettingsToDOM(s: UserSettings) {
   const root = document.documentElement
+  const body = document.body
 
   // Accent color → CSS variable
   root.style.setProperty("--accent", s.accent_color)
@@ -134,18 +135,24 @@ function applySettingsToDOM(s: UserSettings) {
 
   // Background
   root.style.setProperty("--bg", s.background)
+  body.style.backgroundColor = s.background
 
-  // Density → spacing variable
+  // Density → CSS variable + data attribute for CSS selectors
   const densityMap = { compact: "0.4rem", normal: "0.75rem", comfortable: "1.25rem" }
   root.style.setProperty("--density", densityMap[s.density as keyof typeof densityMap] || "0.75rem")
+  body.setAttribute("data-density", s.density || "normal")
 
-  // Font size → base size
-  const fontMap = { small: "13px", normal: "14px", large: "16px" }
-  root.style.setProperty("--font-size-base", fontMap[s.font_size as keyof typeof fontMap] || "14px")
+  // Font size → CSS variable + data attribute
+  const fontSizes: Record<string, string> = { small: "12px", normal: "14px", large: "16px", "extra-large": "18px" }
+  const fontSize = fontSizes[s.font_size] || "14px"
+  root.style.setProperty("--font-size-base", fontSize)
+  body.style.fontSize = fontSize
+  body.setAttribute("data-font-size", s.font_size || "normal")
 
-  // Card border radius
-  const radiusMap = { rounded: "12px", sharp: "4px", pill: "20px" }
-  root.style.setProperty("--card-radius", radiusMap[s.card_style as keyof typeof radiusMap] || "12px")
+  // Card border radius → CSS variable + data attribute
+  const radiusMap: Record<string, string> = { rounded: "12px", sharp: "4px", pill: "24px" }
+  root.style.setProperty("--card-radius", radiusMap[s.card_style] || "12px")
+  body.setAttribute("data-card-style", s.card_style || "rounded")
 
   // Animations
   if (s.reduce_motion || !s.animations) {
@@ -167,12 +174,6 @@ function applySettingsToDOM(s: UserSettings) {
 
   // Large click targets
   root.style.setProperty("--min-click-size", s.large_click_targets ? "44px" : "32px")
-
-  // Apply background color to body
-  document.body.style.backgroundColor = s.background
-
-  // Font size on body
-  document.body.style.fontSize = fontMap[s.font_size as keyof typeof fontMap] || "14px"
 }
 
 /* ── PROVIDER ──────────────────────────────── */
