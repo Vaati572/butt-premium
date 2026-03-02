@@ -242,7 +242,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
           <button onClick={() => { setTourMode(!tourMode); setTourSelected(new Set()) }}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all border"
             style={tourMode ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30850" } : { backgroundColor: "#18181b", color: "#a1a1aa", borderColor: "#3f3f46" }}>
-            <Route size={14} /> {tourMode ? `${tourSelected.size} sélectionné${tourSelected.size > 1 ? "s" : ""}` : "Tournée"}
+            <Navigation2 size={14} /> {tourMode ? `${tourSelected.size} sélectionné${tourSelected.size > 1 ? "s" : ""}` : "Tournée"}
           </button>
           {tourMode && tourSelected.size > 0 && (
             <button onClick={() => setShowTourForm(true)}
