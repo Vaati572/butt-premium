@@ -4,8 +4,8 @@ import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   Plus, X, Search, MapPin, Eye, Phone, Mail, Building2,
-  ChevronDown, StickyNote, Check, Pencil, Trash2, Map,
-  User, Calendar, Tag, ArrowRight, Filter
+  ChevronDown, Check, Pencil, Trash2, Map,
+  User, Calendar, Tag, Filter
 } from "lucide-react"
 
 interface Props {
@@ -242,7 +242,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
           <button onClick={() => { setTourMode(!tourMode); setTourSelected(new Set()) }}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-bold transition-all border"
             style={tourMode ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30850" } : { backgroundColor: "#18181b", color: "#a1a1aa", borderColor: "#3f3f46" }}>
-            <Navigation2 size={14} /> {tourMode ? `${tourSelected.size} sélectionné${tourSelected.size > 1 ? "s" : ""}` : "Tournée"}
+             {tourMode ? `${tourSelected.size} sélectionné${tourSelected.size > 1 ? "s" : ""}` : "Tournée"}
           </button>
           {tourMode && tourSelected.size > 0 && (
             <button onClick={() => setShowTourForm(true)}
