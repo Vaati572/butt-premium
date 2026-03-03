@@ -315,7 +315,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
   const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
   const totalTTC = totalHT + portVal
-  const urssaf = totalTTC * URSSAF_RATE                // 14% sur (PV + port)
+  const urssaf = totalTTC * URSSAF_RATE                // 13.8% sur (PV + port)
   const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
   const resultat = totalTTC - urssaf - cfTotal          // Résultat net final
 
