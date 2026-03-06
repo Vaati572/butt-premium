@@ -23,7 +23,7 @@ const PORT_OPTIONS = [
   "10.48€ ( 1kg - 2kg )",
   "11€ ( 2kg - 3kg )",
 ]
-const URSSAF_RATE = 0.14
+const DEFAULT_URSSAF_RATE = 0.138 // 13.8% par défaut
 const parsePort = (p: string) => { const m = p.match(/^([\d.,]+)€/); return m ? parseFloat(m[1].replace(",", ".")) : 0 }
 
 /* ── HISTORIQUE ─────────────────────────────── */
@@ -244,13 +244,16 @@ function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; on
 export default function VenteModule({ activeSociety, profile }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [urssafRate, setUrssafRate] = useState(DEFAULT_URSSAF_RATE)
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState("")
   const [searchClient, setSearchClient] = useState("")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [clientPrixMap, setClientPrixMap] = useState<Record<string, number>>({})
+  const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [showClients, setShowClients] = useState(false)
   const [typeVente, setTypeVente] = useState("Particulier")
+  const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [paiement, setPaiement] = useState("Espèces")
   const [port, setPort] = useState(PORT_OPTIONS[0])
   const [portPerso, setPortPerso] = useState("")
@@ -315,7 +318,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
   const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
   const totalTTC = totalHT + portVal
-  const urssaf = totalTTC * URSSAF_RATE                // 13.8% sur (PV + port)
+  const urssaf = totalTTC * urssafRate                // 14% sur (PV + port)
   const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
   const resultat = totalTTC - urssaf - cfTotal          // Résultat net final
 
@@ -336,7 +339,8 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     const { data: vente, error } = await supabase.from("ventes").insert({
       society_id: activeSociety.id, user_id: profile.id,
       client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : "Client de passage"),
+      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : "Client de passage"),
+        created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
       total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
     }).select().single()
     if (!error && vente) {
@@ -457,10 +461,10 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
           {/* Type de vente */}
           <div className="flex gap-2">
-            {["Particulier", "Shopify", "Clients"].map(t => (
+            {["Particulier", "Shopify", "Clients", "Pharmacie"].map(t => (
               <button key={t} onClick={() => { setTypeVente(t); setSelectedClient(null) }}
                 className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${typeVente === t ? "bg-yellow-500 text-black border-yellow-500" : "text-zinc-400 border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}>
-                {t}
+                {t === "Pharmacie" ? "🏥 " : ""}{t}
               </button>
             ))}
           </div>
@@ -757,7 +761,10 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                 <span>Sous-total</span><span>{totalTTC.toFixed(2)}€</span>
               </div>
               <div className="flex justify-between text-xs text-zinc-600">
-                <span>URSSAF ({(URSSAF_RATE * 100).toFixed(0)}%)</span><span>-{urssaf.toFixed(2)}€</span>
+                <span>URSSAF ({(urssafRate * 100).toFixed(1)}%)</span><span>-{urssaf.toFixed(2)}€</span>
+              </div>
+              <div className="flex justify-between text-xs text-orange-400/80">
+                <span>Après URSSAF</span><span>{(totalTTC - urssaf).toFixed(2)}€</span>
               </div>
               <div className="flex justify-between text-xs text-zinc-600">
                 <span>Coût fabrication</span><span>-{cfTotal.toFixed(2)}€</span>

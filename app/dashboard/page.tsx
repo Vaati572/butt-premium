@@ -20,6 +20,7 @@ import ContratsModule from "@/components/contrats/ContratsModule"
 import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
 import CommandesModule from "@/components/commandes/CommandesModule"
 import TourneesModule from "@/components/tournees/TourneesModule"
+import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
@@ -279,6 +280,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
     case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
     case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
+    case "playlists": return <PlaylistsModule activeSociety={activeSociety} profile={profile} />
     case "tournees":  return <TourneesModule  activeSociety={activeSociety} profile={profile}
         onLaunchOnMap={(t: any) => setActiveTournee(t)}
         onSwitchToMap={() => setActiveTab("map")} />
@@ -323,7 +325,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       )}
 
       {/* DESKTOP : sidebar normale */}
-      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300" style={{ backgroundColor: SIDEBAR_BG }}>
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden" style={{ backgroundColor: SIDEBAR_BG }}>
 
         {/* Logo */}
         <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
@@ -390,8 +392,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                 {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
               </span>
             </p>
-            <div className="space-y-0.5 max-h-32 overflow-y-auto">
-              {onlineUsers.map(u => (
+            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+              {onlineUsers.slice(0, 5).map(u => (
                 <button key={u.id} onClick={() => setActiveTab("messages")}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
                   <div className="relative shrink-0">

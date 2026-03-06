@@ -54,7 +54,7 @@ const PRIORITES = [
   { id: "urgente", label: "Urgente", color: "#ef4444" },
 ]
 
-const SOURCES = ["Salon", "Référence", "Internet", "Cold Call", "Réseau", "Autre"]
+const SOURCES = ["Tatouage", "Esthétique", "Pharmacie", "Autre"]
 
 const EMPTY: Omit<Prospect, "id" | "created_at"> & { source_autre?: string } = {
   nom: "", entreprise: "", poste: "", tel: "", email: "",
@@ -69,6 +69,9 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterStatut, setFilterStatut] = useState("tous")
+  const [filterSource, setFilterSource] = useState("tous")
+  const [filterPriorite, setFilterPriorite] = useState("tous")
+  const [filterVille, setFilterVille] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Prospect | null>(null)
   const [viewing, setViewing] = useState<Prospect | null>(null)
@@ -83,6 +86,7 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
   const [tourForm, setTourForm] = useState({ nom: "", date: "", mode: "prospect" as "prospect" | "livraison", notes: "" })
   const [savingTour, setSavingTour] = useState(false)
   const [homeAddress, setHomeAddress] = useState("")
+  const [convertingToClient, setConvertingToClient] = useState(false)
 
   useEffect(() => { load() }, [activeSociety])
 
@@ -167,6 +171,30 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
     if (viewing?.id === id) setViewing(v => v ? { ...v, statut } : v)
   }
 
+  const convertToClient = async (p: Prospect) => {
+    if (!confirm(`Créer une fiche client pour ${p.nom} et supprimer ce prospect ?`)) return
+    setConvertingToClient(true)
+    // Create client
+    const { error } = await supabase.from("clients").insert({
+      nom: p.nom,
+      telephone: p.tel || "",
+      email: p.email || "",
+      adresse: p.adresse || "",
+      cp: p.cp || "",
+      ville: p.ville || "",
+      notes: p.notes || "",
+      society_id: activeSociety.id,
+      contrat: "Prospect converti",
+    })
+    if (error) { alert("Erreur: " + error.message); setConvertingToClient(false); return }
+    // Delete prospect
+    await supabase.from("prospects").delete().eq("id", p.id)
+    setConvertingToClient(false)
+    setViewing(null)
+    load()
+    alert(`✅ Fiche client créée pour ${p.nom}`)
+  }
+
   const sendToMap = (p: Prospect) => {
     if (onShowOnMap) onShowOnMap(p)
     if (onSwitchToMap) onSwitchToMap()
@@ -223,7 +251,10 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
       p.entreprise.toLowerCase().includes(search.toLowerCase()) ||
       p.ville.toLowerCase().includes(search.toLowerCase())
     const matchStatut = filterStatut === "tous" || p.statut === filterStatut
-    return matchSearch && matchStatut
+    const matchSource = filterSource === "tous" || p.source === filterSource
+    const matchPriorite = filterPriorite === "tous" || p.priorite === filterPriorite
+    const matchVille = !filterVille.trim() || (p.ville || "").toLowerCase().includes(filterVille.toLowerCase())
+    return matchSearch && matchStatut && matchSource && matchPriorite && matchVille
   })
 
   const counts = STATUTS.reduce((acc, s) => {
@@ -288,8 +319,8 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
         ))}
       </div>
 
-      {/* Search */}
-      <div className="px-6 py-3 border-b border-zinc-900">
+      {/* Search + Filtres */}
+      <div className="px-6 py-3 border-b border-zinc-900 space-y-2">
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input value={search} onChange={e => setSearch(e.target.value)}
@@ -510,6 +541,16 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                   ))}
                 </div>
               )}
+
+              {/* Convertir en client */}
+              <div className="pt-2 border-t border-zinc-800">
+                <button onClick={() => convertToClient(viewing)} disabled={convertingToClient}
+                  className="w-full py-3 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: "#22c55e20", color: "#22c55e", border: "1px solid #22c55e30" }}>
+                  {convertingToClient ? "Création en cours..." : "✅ Créer fiche client → supprimer prospect"}
+                </button>
+                <p className="text-zinc-600 text-[10px] text-center mt-1.5">La fiche prospect sera supprimée après conversion</p>
+              </div>
             </div>
           </div>
         </div>

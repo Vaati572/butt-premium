@@ -43,13 +43,14 @@ function DepensesTab({ activeSociety, profile }: Props) {
     const mt = parseFloat(montant.replace(",", "."))
     if (isNaN(mt) || mt <= 0) return
     setSaving(true)
-    await supabase.from("depenses").insert({
+    const { error } = await supabase.from("depenses").insert({
       society_id: activeSociety.id,
       user_id: profile.id,
       motif: motif.trim(),
       montant: mt,
       categorie,
     })
+    if (error) { alert("Erreur: " + error.message); setSaving(false); return }
     setMotif(""); setMontant("")
     await loadDepenses()
     setSaving(false)
