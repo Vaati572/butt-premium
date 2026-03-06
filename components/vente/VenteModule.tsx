@@ -253,7 +253,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [showClients, setShowClients] = useState(false)
   const [typeVente, setTypeVente] = useState("Particulier")
-  const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [paiement, setPaiement] = useState("Espèces")
   const [port, setPort] = useState(PORT_OPTIONS[0])
   const [portPerso, setPortPerso] = useState("")
@@ -272,13 +271,15 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   const loadData = async () => {
     setLoading(true)
-    const [{ data: prods }, { data: cls }, { data: stockData }] = await Promise.all([
+    const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }] = await Promise.all([
       supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
       supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
       supabase.from("stock").select("*").eq("society_id", activeSociety.id),
+      supabase.from("biz_config").select("urssaf_rate_global").eq("society_id", activeSociety.id).single(),
     ])
     setProducts(prods || [])
     setClients(cls || [])
+    if (cfgData?.urssaf_rate_global != null) setUrssafRate(cfgData.urssaf_rate_global)
     const alerts = (stockData || [])
       .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
       .map((s: any) => s.quantite === 0 ? `⚠ RUPTURE: ${s.produit_nom}` : `⚠ Faible: ${s.produit_nom} (${s.quantite})`)
@@ -745,6 +746,16 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Date de vente */}
+            <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
+              <span className="text-zinc-500 text-xs whitespace-nowrap">📅 Date :</span>
+              <input type="date" value={venteDate} onChange={e => setVenteDate(e.target.value)}
+                className="flex-1 bg-transparent text-xs text-white focus:outline-none" />
+              {venteDate !== new Date().toISOString().split("T")[0] && (
+                <span className="text-orange-400 text-[10px] font-bold whitespace-nowrap">≠ Aujourd'hui</span>
+              )}
             </div>
 
             {/* Résultats financiers */}
