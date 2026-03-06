@@ -21,6 +21,7 @@ import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
 import CommandesModule from "@/components/commandes/CommandesModule"
 import TourneesModule from "@/components/tournees/TourneesModule"
 import PlaylistsModule from "@/components/playlists/PlaylistsModule"
+import ConventionModule from "@/components/conventions/ConventionModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
@@ -45,6 +46,7 @@ const ALL_NAV = [
   { section: "Principal", items: [
     { id: "accueil",    label: "Accueil",           icon: "🏠" },
     { id: "vente",      label: "Vente",             icon: "🛒" },
+    { id: "conventions", label: "Conventions",       icon: "🎪" },
     { id: "clients",    label: "Clients",           icon: "👤" },
     { id: "stocks",     label: "Stock",             icon: "📦" },
   ]},
@@ -270,6 +272,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     switch (activeTab) {
       case "accueil":   return <AccueilModule         activeSociety={activeSociety} profile={profile} />
       case "clients":   return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "conventions":return <ConventionModule      activeSociety={activeSociety} profile={profile} />
       case "stocks":    return <StocksModule          activeSociety={activeSociety} profile={profile} />
       case "vente":     return <VenteModule           activeSociety={activeSociety} profile={profile} />
       case "depenses":  return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
@@ -317,7 +320,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
   return (
-    <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+    <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
       {/* ═══════════ SIDEBAR ═══════════ */}
       {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (
