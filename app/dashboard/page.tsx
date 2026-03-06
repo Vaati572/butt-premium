@@ -317,7 +317,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
   return (
-    <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+    <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
       {/* ═══════════ SIDEBAR ═══════════ */}
       {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (

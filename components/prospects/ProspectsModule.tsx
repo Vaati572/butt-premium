@@ -327,6 +327,30 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
             placeholder="Rechercher un prospect..."
             className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
         </div>
+        {/* Filtres source / priorité / ville */}
+        <div className="flex gap-2 flex-wrap mt-2">
+          <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-yellow-500/60">
+            <option value="tous">Toutes sources</option>
+            {["Tatouage","Esthétique","Pharmacie","Autre"].map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={filterPriorite} onChange={e => setFilterPriorite(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-yellow-500/60">
+            <option value="tous">Toutes priorités</option>
+            {[{id:"haute",label:"🔴 Haute"},{id:"normale",label:"🔵 Normale"},{id:"basse",label:"⚫ Basse"}].map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+          <input value={filterVille} onChange={e => setFilterVille(e.target.value)}
+            placeholder="🏙 Ville..."
+            className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-yellow-500/60 flex-1 min-w-24" />
+          {(filterSource !== "tous" || filterPriorite !== "tous" || filterVille) && (
+            <button onClick={() => { setFilterSource("tous"); setFilterPriorite("tous"); setFilterVille("") }}
+              className="px-2.5 py-1.5 rounded-lg text-xs text-zinc-500 hover:text-white border border-zinc-700 transition-colors whitespace-nowrap">
+              ✕ Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* List */}
