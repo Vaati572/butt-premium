@@ -32,7 +32,7 @@ export default function NotesModule({ activeSociety, profile }: { activeSociety:
 
   const load = async () => {
     setLoading(true)
-    const { data } = await supabase.from("notes").select("*").eq("user_id", profile.id)
+    const { data } = await supabase.from("notes").select("*").eq("society_id", activeSociety.id)
       .order("pinned", { ascending: false }).order("updated_at", { ascending: false })
     setNotes(data || []); setLoading(false)
   }
@@ -72,7 +72,7 @@ export default function NotesModule({ activeSociety, profile }: { activeSociety:
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
       <div className="px-6 py-4 border-b border-zinc-900 flex items-center justify-between">
-        <div><h1 className="text-white font-bold text-xl">📝 Notes</h1><p className="text-zinc-500 text-xs mt-0.5">{notes.length} note{notes.length > 1 ? "s" : ""} personnelles</p></div>
+        <div><h1 className="text-white font-bold text-xl">📝 Notes</h1><p className="text-zinc-500 text-xs mt-0.5">{notes.length} note{notes.length > 1 ? "s" : ""} partagées</p></div>
         <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold bg-yellow-500 hover:bg-yellow-400 transition-colors"><Plus size={14} /> Nouvelle note</button>
       </div>
       <div className="px-6 py-3 border-b border-zinc-900">

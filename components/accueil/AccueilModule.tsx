@@ -13,14 +13,18 @@ interface Props { activeSociety: any; profile: any }
 const ALL_WIDGETS = [
   { key: "ca_jour",          label: "💰 CA du jour",           desc: "Chiffre d'affaires aujourd'hui" },
   { key: "nb_ventes",        label: "🛒 Ventes du jour",       desc: "Nombre de ventes passées" },
-  { key: "net_jour",         label: "📈 Net URSSAF",           desc: "CA net après charges (14%)" },
+  { key: "net_jour",         label: "📈 Net URSSAF",           desc: "CA net après charges" },
+  { key: "ca_mois",          label: "📅 CA du mois",           desc: "Chiffre d'affaires ce mois" },
   { key: "stock_alerte",     label: "⚠ Stocks critiques",     desc: "Produits sous le seuil d'alerte" },
   { key: "objectif",         label: "🎯 Objectif mensuel",     desc: "Progression vers l'objectif CA" },
-  { key: "memo",             label: "📝 Mon mémo",             desc: "Ton mémo personnel du jour" },
+  { key: "memo",             label: "📝 Mon mémo",             desc: "Mémo partagé avec l'équipe" },
   { key: "favoris",          label: "⭐ Accès rapide",         desc: "Tes produits favoris" },
   { key: "derniers_clients", label: "👤 Derniers clients",     desc: "Clients vus aujourd'hui" },
   { key: "top_produits",     label: "🏆 Top produits",         desc: "Produits les plus vendus ce mois" },
   { key: "activite_session", label: "⚡ Activité session",     desc: "Résumé de ta session en cours" },
+  { key: "nb_prospects",     label: "🎯 Prospects actifs",     desc: "Nombre de prospects en cours" },
+  { key: "ventes_semaine",   label: "📊 CA semaine",           desc: "Chiffre d'affaires cette semaine" },
+  { key: "marge_jour",       label: "💹 Marge du jour",        desc: "Marge brute après coût de fabrication" },
 ]
 
 const DEFAULT_WIDGETS = ["ca_jour", "nb_ventes", "stock_alerte", "memo", "favoris", "objectif"]
@@ -131,25 +135,43 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const [stockAlerts, setStockAlerts] = useState<any[]>([])
   const [topProduits, setTopProduits] = useState<{ nom: string; qty: number }[]>([])
   const [products, setProducts] = useState<any[]>([])
+  const [ventesSemaine, setVentesSemaine] = useState<any[]>([])
+  const [nbProspects, setNbProspects] = useState(0)
 
   useEffect(() => { if (activeSociety && profile) { loadPrefs(); loadData() } }, [activeSociety, profile])
 
   const loadPrefs = async () => {
-    const key = `accueil_prefs_${profile.id}`
     try {
-      const raw = localStorage.getItem(key)
-      if (raw) {
-        const prefs = JSON.parse(raw)
+      const { data } = await supabase.from("user_prefs").select("value")
+        .eq("user_id", profile.id).eq("key", "accueil_prefs").single()
+      if (data?.value) {
+        const prefs = data.value
         if (prefs.widgets) setActiveWidgets(prefs.widgets)
         if (prefs.objectif) setObjectif(prefs.objectif)
         if (prefs.memo !== undefined) setMemo(prefs.memo)
+      } else {
+        // fallback localStorage
+        const raw = localStorage.getItem(`accueil_prefs_${profile.id}`)
+        if (raw) {
+          const prefs = JSON.parse(raw)
+          if (prefs.widgets) setActiveWidgets(prefs.widgets)
+          if (prefs.objectif) setObjectif(prefs.objectif)
+          if (prefs.memo !== undefined) setMemo(prefs.memo)
+        }
       }
     } catch {}
   }
 
-  const savePrefs = (widgets: string[], obj: number, memoText: string) => {
-    const key = `accueil_prefs_${profile.id}`
-    try { localStorage.setItem(key, JSON.stringify({ widgets, objectif: obj, memo: memoText })) } catch {}
+  const savePrefs = async (widgets: string[], obj: number, memoText: string) => {
+    const prefs = { widgets, objectif: obj, memo: memoText }
+    try {
+      await supabase.from("user_prefs").upsert(
+        { user_id: profile.id, key: "accueil_prefs", value: prefs },
+        { onConflict: "user_id,key" }
+      )
+      // also save to localStorage as backup
+      localStorage.setItem(`accueil_prefs_${profile.id}`, JSON.stringify(prefs))
+    } catch {}
     setActiveWidgets(widgets)
     setObjectif(obj)
     setMemo(memoText)
@@ -196,6 +218,11 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const caMois = ventesMois.reduce((s, v) => s + Number(v.total_ttc), 0)
   const netJour = caJour - caJour * URSSAF
   const nbVentes = ventesJour.length
+  const caSemaine = ventesSemaine.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
+  const margeJour = ventesJour.reduce((s, v) => {
+    const items = v.vente_items || []
+    return s + items.reduce((si: number, i: any) => si + ((i.pv - i.cf) * i.quantite), 0)
+  }, 0)
   const pctObjectif = objectif > 0 ? Math.min(100, caMois / objectif * 100) : 0
 
   // Salutation
@@ -417,6 +444,38 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
                   ))}
                 </div>
               )}
+            </WidgetCard>
+          )}
+
+          {/* CA MOIS */}
+          {isActive("ca_mois") && (
+            <WidgetCard title="📅 CA du mois">
+              <p className="text-3xl font-bold text-yellow-500">{caMois.toFixed(2)}€</p>
+              <p className="text-zinc-500 text-sm mt-1">{ventesJour.length > 0 ? `${ventesJour.length} vente(s) aujourd'hui` : "Aucune vente aujourd'hui"}</p>
+            </WidgetCard>
+          )}
+
+          {/* CA SEMAINE */}
+          {isActive("ventes_semaine") && (
+            <WidgetCard title="📊 CA de la semaine">
+              <p className="text-3xl font-bold text-blue-400">{caSemaine.toFixed(2)}€</p>
+              <p className="text-zinc-500 text-sm mt-1">{ventesSemaine.length} vente{ventesSemaine.length > 1 ? "s" : ""} cette semaine</p>
+            </WidgetCard>
+          )}
+
+          {/* PROSPECTS ACTIFS */}
+          {isActive("nb_prospects") && (
+            <WidgetCard title="🎯 Prospects actifs">
+              <p className="text-3xl font-bold text-orange-400">{nbProspects}</p>
+              <p className="text-zinc-500 text-sm mt-1">En cours de démarchage</p>
+            </WidgetCard>
+          )}
+
+          {/* MARGE DU JOUR */}
+          {isActive("marge_jour") && (
+            <WidgetCard title="💹 Marge du jour">
+              <p className={`text-3xl font-bold ${margeJour >= 0 ? "text-green-400" : "text-red-400"}`}>{margeJour.toFixed(2)}€</p>
+              <p className="text-zinc-500 text-sm mt-1">Après coût de fabrication</p>
             </WidgetCard>
           )}
 

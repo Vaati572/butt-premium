@@ -275,11 +275,11 @@ export default function VenteModule({ activeSociety, profile }: Props) {
       supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
       supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
       supabase.from("stock").select("*").eq("society_id", activeSociety.id),
-      supabase.from("biz_config").select("urssaf_rate_global").eq("society_id", activeSociety.id).single(),
+      supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
     ])
     setProducts(prods || [])
     setClients(cls || [])
-    if (cfgData?.urssaf_rate_global != null) setUrssafRate(cfgData.urssaf_rate_global)
+    if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
     const alerts = (stockData || [])
       .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
       .map((s: any) => s.quantite === 0 ? `⚠ RUPTURE: ${s.produit_nom}` : `⚠ Faible: ${s.produit_nom} (${s.quantite})`)
