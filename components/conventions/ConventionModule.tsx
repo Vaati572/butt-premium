@@ -471,11 +471,11 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                       {selected.statut === "en_cours" && (
                         <>
                           <button onClick={() => openEdit(v)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-all">
+                            className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
                             ✏️
                           </button>
                           <button onClick={() => deleteVente(v.id)}
-                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-all">
                             <Trash2 size={11} />
                           </button>
                         </>
