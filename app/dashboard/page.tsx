@@ -20,8 +20,8 @@ import ContratsModule from "@/components/contrats/ContratsModule"
 import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
 import CommandesModule from "@/components/commandes/CommandesModule"
 import TourneesModule from "@/components/tournees/TourneesModule"
-import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import ConventionModule from "@/components/conventions/ConventionModule"
+import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 
@@ -48,6 +48,7 @@ const ALL_NAV = [
     { id: "vente",      label: "Vente",             icon: "🛒" },
     { id: "conventions", label: "Conventions",       icon: "🎪" },
     { id: "clients",    label: "Clients",           icon: "👤" },
+    { id: "playlists",  label: "Playlists clients",  icon: "🎵" },
     { id: "stocks",     label: "Stock",             icon: "📦" },
   ]},
   { section: "Gestion", items: [
@@ -138,11 +139,42 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [unreadMessages, setUnreadMessages] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [focusProspect, setFocusProspect] = useState<any>(null)
+  const [activeConvention, setActiveConvention] = useState<any>(null)
+  const [showConvPopup, setShowConvPopup] = useState(false)
+  const [activeConvention, setActiveConvention] = useState<any>(null)
+  const [showConvPopup, setShowConvPopup] = useState(false)
   const [activeTournee, setActiveTournee] = useState<any>(null)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+
+  // Load active convention
+  useEffect(() => {
+    if (!activeSociety) return
+    supabase.from("conventions")
+      .select("*").eq("society_id", activeSociety.id)
+      .eq("statut", "en_cours")
+      .order("date_debut", { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) { setActiveConvention(data); setShowConvPopup(true) }
+      })
+  }, [activeSociety])
+
+  useEffect(() => {
+    if (!activeSociety) return
+    supabase.from("conventions")
+      .select("*").eq("society_id", activeSociety.id)
+      .eq("statut", "en_cours")
+      .order("date_debut", { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) { setActiveConvention(data); setShowConvPopup(true) }
+      })
+  }, [activeSociety])
 
   const ACCENT = settings.accent_color || "#eab308"
   const BG = settings.background || "#0a0a0a"
@@ -320,7 +352,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
   return (
-    <div className="min-h-screen text-white flex" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+    <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
       {/* ═══════════ SIDEBAR ═══════════ */}
       {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (
@@ -516,6 +548,57 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
         </button>
         {renderContent()}
+
+        {/* ── POPUP CONVENTION EN COURS ── */}
+        {showConvPopup && activeConvention && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+              {/* Header animé */}
+              <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
+                <div className="text-5xl mb-3">🎪</div>
+                <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-green-400 text-xs font-bold">Convention en cours</span>
+                </div>
+                <h2 className="text-white font-bold text-xl">{activeConvention.nom}</h2>
+                {activeConvention.lieu && (
+                  <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>
+                )}
+              </div>
+
+              {/* Infos */}
+              <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Début</span>
+                  <span className="text-white text-sm font-semibold">
+                    {new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Fin</span>
+                  <span className="text-white text-sm font-semibold">
+                    {new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Boutons */}
+              <div className="px-6 pb-6 space-y-2">
+                <button
+                  onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+                  className="w-full py-3 rounded-xl text-black font-bold text-sm transition-colors"
+                  style={{ backgroundColor: ACCENT }}>
+                  📋 Aller à la convention
+                </button>
+                <button
+                  onClick={() => setShowConvPopup(false)}
+                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800 transition-colors">
+                  Continuer vers l'accueil
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
