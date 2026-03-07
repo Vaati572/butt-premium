@@ -1,926 +1,661 @@
 "use client"
-import { useEffect, useState } from "react"
+
+import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase"
-import { Plus, X, ChevronLeft, Trash2, FileText, Package, Clock, Calendar } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { UserSettingsProvider, useUserSettings } from "@/lib/UserSettingsContext"
+import ClientsModule from "@/components/clients/ClientsModule"
+import StocksModule from "@/components/stocks/StocksModule"
+import VenteModule from "@/components/vente/VenteModule"
+import AdminModule from "@/components/admin/AdminModule"
+import AccueilModule from "@/components/accueil/AccueilModule"
+import DepensesOffertsModule from "@/components/depenses/DepensesModule"
+import StatsModule from "@/components/stats/StatsModule"
+import MessagesModule from "@/components/messages/MessagesModule"
+import ProspectsModule from "@/components/prospects/ProspectsModule"
+import NotesModule from "@/components/notes/NotesModule"
+import DocumentsModule from "@/components/documents/DocumentsModule"
+import HistoriqueModule from "@/components/historique/HistoriqueModule"
+import ContratsModule from "@/components/contrats/ContratsModule"
+import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
+import CommandesModule from "@/components/commandes/CommandesModule"
+import TourneesModule from "@/components/tournees/TourneesModule"
+import PlaylistsModule from "@/components/playlists/PlaylistsModule"
+import MapModule from "@/components/map/MapModule"
+import ParametresModule from "@/components/parametres/ParametresModule"
 
-interface Convention {
-  id: string; nom: string; lieu: string
-  date_debut: string; date_fin: string
-  statut: string; notes: string; created_at: string
-}
-interface ConventionVente {
-  id: string; convention_id: string
-  produit_nom: string; produit_id: string | null
-  client_nom: string
-  quantite: number; prix_unitaire: number; cout_fab: number
-  jour: string; heure: string; paiement: string; created_at: string
-}
-interface ConventionFrais {
-  id: string; convention_id: string
-  label: string; montant: number; created_at: string
-}
-interface Product { id: string; name: string; pv: number; cf: number; gamme: string }
-interface Props { activeSociety: any; profile: any }
+const ADMIN_PIN = "18072209"
 
-const JOURS = ["Vendredi", "Samedi", "Dimanche"]
+type PresenceStatus = "online" | "busy" | "away" | "meeting" | "offline"
 
-const JOUR_COLORS: Record<string, string> = {
-  Vendredi:  "#3b82f6",
-  Samedi:    "#a855f7",
-  Dimanche:  "#f97316",
+interface OnlineUser {
+  id: string; nom: string; avatar_url?: string; color?: string
+  status: PresenceStatus
 }
 
-const PAIEMENTS = [
-  { id: "especes", label: "Espèces", icon: "💵" },
-  { id: "cb", label: "CB", icon: "💳" },
-  { id: "virement", label: "Virement", icon: "🏦" },
-  { id: "cheque", label: "Chèque", icon: "📝" },
-  { id: "mixte", label: "Mixte", icon: "🔀" },
+const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: string }> = {
+  online:  { label: "En ligne",   color: "text-green-400",  dot: "bg-green-400"  },
+  busy:    { label: "Occupé",     color: "text-red-400",    dot: "bg-red-400"    },
+  away:    { label: "Absent",     color: "text-yellow-400", dot: "bg-yellow-400" },
+  meeting: { label: "En réunion", color: "text-purple-400", dot: "bg-purple-400" },
+  offline: { label: "Hors ligne", color: "text-zinc-500",   dot: "bg-zinc-600"   },
+}
+
+const ALL_NAV = [
+  { section: "Principal", items: [
+    { id: "accueil",    label: "Accueil",           icon: "🏠" },
+    { id: "vente",      label: "Vente",             icon: "🛒" },
+    { id: "clients",    label: "Clients",           icon: "👤" },
+    { id: "playlists",  label: "Playlists clients",  icon: "🎵" },
+    { id: "stocks",     label: "Stock",             icon: "📦" },
+  ]},
+  { section: "Gestion", items: [
+    { id: "commandes",  label: "Commandes",         icon: "📋" },
+    { id: "depenses",   label: "Dépenses & Offerts",icon: "💸" },
+    { id: "contrats",   label: "Contrats",          icon: "📑" },
+    { id: "pharmacies", label: "Pharmacies",        icon: "🏥" },
+  ]},
+  { section: "Analyse", items: [
+    { id: "stats",      label: "Statistiques",      icon: "📊" },
+    { id: "historique", label: "Historique",        icon: "🕓" },
+  ]},
+  { section: "Outils", items: [
+    { id: "messages",   label: "Messages",          icon: "💬" },
+    { id: "notes",      label: "Notes",             icon: "📝" },
+    { id: "documents",  label: "Documents",         icon: "📁" },
+  ]},
+  { section: "Démarchage", items: [
+    { id: "prospects",  label: "Prospects",         icon: "🎯" },
+    { id: "tournees",   label: "Tournées",          icon: "🛣️" },
+    { id: "map",        label: "Map & Tournées",    icon: "🗺️" },
+  ]},
+  { section: "Système", items: [
+    { id: "admin",      label: "Admin",             icon: "🔒" },
+    { id: "parametres", label: "Paramètres",        icon: "⚙️" },
+  ]},
 ]
 
-export default function ConventionModule({ activeSociety, profile }: Props) {
-  const [view, setView] = useState<"list" | "detail" | "rapport">("list")
-  const [conventions, setConventions] = useState<Convention[]>([])
-  const [selected, setSelected] = useState<Convention | null>(null)
-  const [ventes, setVentes] = useState<ConventionVente[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-
-  // Formulaire convention
-  const [showConvForm, setShowConvForm] = useState(false)
-  const [convForm, setConvForm] = useState({ nom: "", lieu: "", date_debut: "", date_fin: "", notes: "" })
-  const [savingConv, setSavingConv] = useState(false)
-
-  // Formulaire vente (panier multi-produits)
-  const [showVenteForm, setShowVenteForm] = useState(false)
-  const [panier, setPanier] = useState<Array<{
-    produit_nom: string; produit_id: string
-    prix_unitaire: string; cout_fab: string; quantite: number
-  }>>([])
-  const [venteGlobal, setVenteGlobal] = useState({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
-  const [editVente, setEditVente] = useState<ConventionVente | null>(null)
-  const [editForm, setEditForm] = useState({ produit_nom: "", client_nom: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "", paiement: "especes" })
-  const [savingVente, setSavingVente] = useState(false)
-  const [searchProd, setSearchProd] = useState("")
-  const [panierSearch, setPanierSearch] = useState("")
-  const [frais, setFrais] = useState<ConventionFrais[]>([])
-  const [showFraisForm, setShowFraisForm] = useState(false)
-  const [fraisForm, setFraisForm] = useState({ label: "", montant: "" })
-
-  useEffect(() => { loadConventions() }, [activeSociety])
-  useEffect(() => { loadProducts() }, [activeSociety])
-  useEffect(() => { if (selected) { loadVentes(selected.id); loadFrais(selected.id) } }, [selected])
-
-  const loadConventions = async () => {
-    setLoading(true)
-    const { data } = await supabase.from("conventions")
-      .select("*").eq("society_id", activeSociety.id)
-      .order("date_debut", { ascending: false })
-    setConventions(data || [])
-    setLoading(false)
-  }
-
-  const loadProducts = async () => {
-    const { data } = await supabase.from("products")
-      .select("id, name, pv, cf, gamme")
-      .eq("society_id", activeSociety.id).order("name")
-    setProducts(data || [])
-  }
-
-  const loadVentes = async (convId: string) => {
-    const { data } = await supabase.from("convention_ventes")
-      .select("*").eq("convention_id", convId)
-      .order("jour").order("heure")
-    setVentes(data || [])
-  }
-
-  const loadFrais = async (convId: string) => {
-    const { data } = await supabase.from("convention_frais")
-      .select("*").eq("convention_id", convId)
-      .order("created_at")
-    setFrais(data || [])
-  }
-
-  const saveFrais = async () => {
-    if (!selected || !fraisForm.label.trim() || !fraisForm.montant) return
-    const { error } = await supabase.from("convention_frais").insert({
-      convention_id: selected.id,
-      society_id: activeSociety.id,
-      label: fraisForm.label,
-      montant: Number(fraisForm.montant),
-    })
-    if (error) { alert("Erreur: " + error.message); return }
-    setFraisForm({ label: "", montant: "" })
-    setShowFraisForm(false)
-    loadFrais(selected.id)
-  }
-
-  const deleteFrais = async (id: string) => {
-    await supabase.from("convention_frais").delete().eq("id", id)
-    if (selected) loadFrais(selected.id)
-  }
-
-  const saveConvention = async () => {
-    if (!convForm.nom.trim() || !convForm.date_debut || !convForm.date_fin) return
-    setSavingConv(true)
-    const { error } = await supabase.from("conventions").insert({
-      ...convForm, society_id: activeSociety.id, user_id: profile.id, statut: "en_cours"
-    })
-    if (error) { alert("Erreur: " + error.message); setSavingConv(false); return }
-    setSavingConv(false)
-    setShowConvForm(false)
-    setConvForm({ nom: "", lieu: "", date_debut: "", date_fin: "", notes: "" })
-    loadConventions()
-  }
-
-  const terminerConvention = async (id: string) => {
-    if (!confirm("Marquer cette convention comme terminée ?")) return
-    await supabase.from("conventions").update({ statut: "terminee" }).eq("id", id)
-    loadConventions()
-    if (selected?.id === id) setSelected(prev => prev ? { ...prev, statut: "terminee" } : prev)
-  }
-
-  const deleteConvention = async (id: string) => {
-    if (!confirm("Supprimer cette convention et toutes ses ventes ?")) return
-    await supabase.from("conventions").delete().eq("id", id)
-    loadConventions()
-    if (selected?.id === id) { setSelected(null); setView("list") }
-  }
-
-  const addToCart = (p: Product) => {
-    setPanier(prev => {
-      const existing = prev.findIndex(x => x.produit_id === p.id)
-      if (existing >= 0) {
-        const next = [...prev]
-        next[existing] = { ...next[existing], quantite: next[existing].quantite + 1 }
-        return next
-      }
-      return [...prev, { produit_nom: p.name, produit_id: p.id, prix_unitaire: String(p.pv), cout_fab: String(p.cf), quantite: 1 }]
-    })
-    setPanierSearch("")
-    setSearchProd("")
-  }
-
-  const updateCartQty = (idx: number, delta: number) => {
-    setPanier(prev => {
-      const next = [...prev]
-      const nq = next[idx].quantite + delta
-      if (nq <= 0) return prev.filter((_, i) => i !== idx)
-      next[idx] = { ...next[idx], quantite: nq }
-      return next
-    })
-  }
-
-  const removeFromCart = (idx: number) => setPanier(prev => prev.filter((_, i) => i !== idx))
-
-  const saveVente = async () => {
-    if (!selected || panier.length === 0) return
-    setSavingVente(true)
-    const rows = panier.map(item => ({
-      convention_id: selected.id,
-      society_id: activeSociety.id,
-      produit_nom: item.produit_nom,
-      produit_id: item.produit_id || null,
-      client_nom: venteGlobal.client_nom || "",
-      quantite: Number(item.quantite),
-      prix_unitaire: Number(item.prix_unitaire),
-      cout_fab: Number(item.cout_fab) || 0,
-      jour: venteGlobal.jour,
-      heure: venteGlobal.heure,
-      paiement: venteGlobal.paiement,
-    }))
-    const { error } = await supabase.from("convention_ventes").insert(rows)
-    if (error) { alert("Erreur: " + error.message); setSavingVente(false); return }
-    setSavingVente(false)
-    setShowVenteForm(false)
-    setPanier([])
-    setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
-    setSearchProd(""); setPanierSearch("")
-    loadVentes(selected.id)
-  }
-
-  const deleteVente = async (id: string) => {
-    await supabase.from("convention_ventes").delete().eq("id", id)
-    if (selected) loadVentes(selected.id)
-  }
-
-  const openEdit = (v: ConventionVente) => {
-    setEditVente(v)
-    setEditForm({
-      produit_nom: v.produit_nom, client_nom: v.client_nom || "",
-      quantite: v.quantite, prix_unitaire: String(v.prix_unitaire),
-      cout_fab: String(v.cout_fab), jour: v.jour, heure: v.heure || "",
-      paiement: v.paiement || "especes"
-    })
-  }
-
-  const saveEdit = async () => {
-    if (!editVente) return
-    const { error } = await supabase.from("convention_ventes").update({
-      produit_nom: editForm.produit_nom,
-      client_nom: editForm.client_nom,
-      quantite: Number(editForm.quantite),
-      prix_unitaire: Number(editForm.prix_unitaire),
-      cout_fab: Number(editForm.cout_fab) || 0,
-      jour: editForm.jour,
-      heure: editForm.heure,
-      paiement: editForm.paiement,
-    }).eq("id", editVente.id)
-    if (error) { alert("Erreur: " + error.message); return }
-    setEditVente(null)
-    if (selected) loadVentes(selected.id)
-  }
-
-  // Calculs totaux
-  const totalBrut = ventes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0)
-  const totalCF = ventes.reduce((s, v) => s + v.cout_fab * v.quantite, 0)
-  const totalMarge = totalBrut - totalCF
-  const totalQty = ventes.reduce((s, v) => s + v.quantite, 0)
-  const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
-  const urssaf = totalBrut * 0.138
-  const beneficeNet = totalBrut - urssaf - totalCF - totalFrais
-
-  // Par jour
-  const parJour = JOURS.map(jour => {
-    const lignes = ventes.filter(v => v.jour === jour)
-    return {
-      jour,
-      brut: lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0),
-      cf: lignes.reduce((s, v) => s + v.cout_fab * v.quantite, 0),
-      qty: lignes.reduce((s, v) => s + v.quantite, 0),
-      lignes
+/* ── ADMIN GATE ─────────────────────────────── */
+function AdminGate({ activeSociety, profile }: { activeSociety: any; profile: any }) {
+  const [pin, setPin] = useState(""); const [unlocked, setUnlocked] = useState(false)
+  const [error, setError] = useState(false); const [shake, setShake] = useState(false)
+  const handle = (d: string) => {
+    if (pin.length >= 8) return
+    const next = pin + d; setPin(next); setError(false)
+    if (next.length === 8) {
+      if (next === ADMIN_PIN) setUnlocked(true)
+      else { setShake(true); setError(true); setTimeout(() => { setPin(""); setShake(false) }, 600) }
     }
-  })
-
-  // Par produit
-  const parProduit = Object.values(
-    ventes.reduce((acc, v) => {
-      const key = v.produit_nom
-      if (!acc[key]) acc[key] = { nom: key, qty: 0, brut: 0, cf: 0 }
-      acc[key].qty += v.quantite
-      acc[key].brut += v.prix_unitaire * v.quantite
-      acc[key].cf += v.cout_fab * v.quantite
-      return acc
-    }, {} as Record<string, { nom: string; qty: number; brut: number; cf: number }>)
-  ).sort((a, b) => b.brut - a.brut)
-
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(panierSearch.toLowerCase())
-  ).slice(0, 8)
-
-  const formatDate = (d: string) => d ? new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : ""
-
-  // ═══ LISTE DES CONVENTIONS ═══
-  if (view === "list") return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center justify-between">
-        <div>
-          <h1 className="text-white font-bold text-xl">🎪 Conventions</h1>
-          <p className="text-zinc-500 text-xs mt-0.5">{conventions.length} convention{conventions.length > 1 ? "s" : ""}</p>
-        </div>
-        <button onClick={() => setShowConvForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold"
-          style={{ backgroundColor: "#eab308" }}>
-          <Plus size={14} /> Nouvelle convention
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : conventions.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-4">🎪</p>
-            <p className="text-zinc-400 font-bold text-lg">Aucune convention</p>
-            <p className="text-zinc-600 text-sm mt-2">Créez votre première convention pour commencer le suivi</p>
-          </div>
-        ) : (
-          <div className="space-y-3 max-w-2xl mx-auto">
-            {conventions.map(c => {
-              const isActive = c.statut === "en_cours"
-              return (
-                <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 hover:border-zinc-700 transition-all">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white font-bold truncate">{c.nom}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isActive ? "bg-green-500/20 text-green-400" : "bg-zinc-700 text-zinc-400"}`}>
-                          {isActive ? "● En cours" : "✓ Terminée"}
-                        </span>
-                      </div>
-                      {c.lieu && <p className="text-zinc-500 text-xs mb-1">📍 {c.lieu}</p>}
-                      <p className="text-zinc-600 text-xs">
-                        📅 {formatDate(c.date_debut)} → {formatDate(c.date_fin)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => { setSelected(c); setView("detail") }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-black transition-colors">
-                        {isActive ? "Saisir ventes" : "Voir détail"}
-                      </button>
-                      <button onClick={() => { setSelected(c); loadVentes(c.id); setView("rapport") }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                        <FileText size={12} /> Rapport
-                      </button>
-                      <button onClick={() => deleteConvention(c.id)}
-                        className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-colors">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Modal création convention */}
-      {showConvForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="text-white font-bold">Nouvelle convention</h2>
-              <button onClick={() => setShowConvForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom de la convention <span className="text-red-400">*</span></label>
-                <input value={convForm.nom} onChange={e => setConvForm(f => ({ ...f, nom: e.target.value }))}
-                  placeholder="Ex: Convention Paris 2026"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Lieu</label>
-                <input value={convForm.lieu} onChange={e => setConvForm(f => ({ ...f, lieu: e.target.value }))}
-                  placeholder="Ex: Parc des Expositions, Hall 3"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Début (Vendredi) <span className="text-red-400">*</span></label>
-                  <input type="date" value={convForm.date_debut} onChange={e => setConvForm(f => ({ ...f, date_debut: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Fin (Dimanche) <span className="text-red-400">*</span></label>
-                  <input type="date" value={convForm.date_fin} onChange={e => setConvForm(f => ({ ...f, date_fin: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Notes</label>
-                <textarea value={convForm.notes} onChange={e => setConvForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={2} placeholder="Infos utiles..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" />
-              </div>
-              <button onClick={saveConvention} disabled={savingConv || !convForm.nom.trim() || !convForm.date_debut || !convForm.date_fin}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                {savingConv ? "Création..." : "Créer la convention"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
-  // ═══ DÉTAIL / SAISIE VENTES ═══
-  if (view === "detail" && selected) return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-900">
-        <div className="flex items-center gap-3 mb-1">
-          <button onClick={() => setView("list")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-white font-bold text-lg truncate">{selected.nom}</h1>
-            {selected.lieu && <p className="text-zinc-500 text-xs">{selected.lieu}</p>}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setView("rapport")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-              <FileText size={12} /> Rapport
-            </button>
-            {selected.statut === "en_cours" && (
-              <button onClick={() => terminerConvention(selected.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors">
-                ✓ Terminer
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Totaux rapides */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {[
-            { label: "CA Brut", value: `${totalBrut.toFixed(2)}€`, color: "#eab308" },
-            { label: "Coût fab.", value: `${totalCF.toFixed(2)}€`, color: "#ef4444" },
-            { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-zinc-900 rounded-xl p-2.5 text-center">
-              <p className="font-bold text-sm" style={{ color }}>{value}</p>
-              <p className="text-zinc-600 text-[10px] mt-0.5">{label}</p>
-            </div>
+  }
+  if (unlocked) return <AdminModule activeSociety={activeSociety} profile={profile} />
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className={`bg-[#111111] border border-zinc-800 rounded-3xl p-8 w-80 text-center shadow-2xl ${shake ? "animate-bounce" : ""}`}>
+        <p className="text-2xl mb-1">🔒</p>
+        <p className="text-white font-bold text-lg mb-1">Panneau Admin</p>
+        <p className="text-zinc-500 text-xs mb-6">Entrez le code PIN administrateur</p>
+        <div className="flex justify-center gap-3 mb-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`w-3 h-3 rounded-full ${i < pin.length ? (error ? "bg-red-500" : "bg-yellow-500") : "bg-zinc-700"}`} />
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <div className="bg-zinc-900 rounded-xl p-2.5 text-center">
-            <p className="font-bold text-sm text-orange-400">-{urssaf.toFixed(2)}€</p>
-            <p className="text-zinc-600 text-[10px] mt-0.5">URSSAF 13.8%</p>
-          </div>
-          <div className="col-span-2 bg-zinc-900 rounded-xl p-2.5 text-center" style={{ borderColor: beneficeNet >= 0 ? "#22c55e40" : "#ef444440", border: "1px solid" }}>
-            <p className="font-bold text-base" style={{ color: beneficeNet >= 0 ? "#22c55e" : "#ef4444" }}>{beneficeNet.toFixed(2)}€</p>
-            <p className="text-zinc-500 text-[10px] mt-0.5 font-semibold">✦ Bénéfice net{totalFrais > 0 ? ` (−${totalFrais.toFixed(2)}€ frais)` : ""}</p>
-          </div>
+        {error && <p className="text-red-400 text-xs mb-3 font-semibold">Code incorrect</p>}
+        <div className="grid grid-cols-3 gap-3">
+          {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) => (
+            <button key={i} onClick={() => d === "⌫" ? setPin(p => p.slice(0,-1)) : d ? handle(d) : null}
+              className={`h-14 rounded-2xl text-lg font-bold transition-all ${d === "⌫" ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-400" : d === "" ? "invisible" : "bg-zinc-800 hover:bg-yellow-500 hover:text-black text-white active:scale-95"}`}>
+              {d}
+            </button>
+          ))}
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Bouton ajouter */}
-      <div className="px-6 py-3 border-b border-zinc-900 flex items-center justify-between">
-        <p className="text-zinc-500 text-xs">{ventes.length} vente{ventes.length > 1 ? "s" : ""} saisie{ventes.length > 1 ? "s" : ""}</p>
-        {selected.statut === "en_cours" && (
-          <button onClick={() => setShowVenteForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold"
-            style={{ backgroundColor: "#eab308" }}>
-            <Plus size={14} /> Ajouter une vente
-          </button>
-        )}
-      </div>
+function UserAvatar({ nom, url, color, size = 30 }: { nom: string; url?: string; color?: string; size?: number }) {
+  const colors = ["#d97706","#b45309","#f59e0b","#92400e"]
+  const bg = color || colors[(nom?.charCodeAt(0) || 0) % colors.length]
+  const initials = nom?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"
+  return (
+    <div className="rounded-full overflow-hidden flex items-center justify-center text-black font-bold shrink-0"
+      style={{ width: size, height: size, backgroundColor: url ? undefined : bg, fontSize: size * 0.35 }}>
+      {url ? <img src={url} className="w-full h-full object-cover" alt={nom} /> : initials}
+    </div>
+  )
+}
 
-      {/* Liste ventes par jour */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {JOURS.map(jour => {
-          const lignes = ventes.filter(v => v.jour === jour)
-          if (lignes.length === 0) return null
-          const jourBrut = lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0)
-          return (
-            <div key={jour}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
-                  <h3 className="text-white font-bold">{jour}</h3>
-                  <span className="text-zinc-600 text-xs">({lignes.length} vente{lignes.length > 1 ? "s" : ""})</span>
-                </div>
-                <span className="font-bold text-sm" style={{ color: JOUR_COLORS[jour] }}>{jourBrut.toFixed(2)}€</span>
-              </div>
-              <div className="space-y-2">
-                {lignes.map(v => (
-                  <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-3 group hover:border-zinc-700 transition-all">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-semibold text-sm truncate">{v.produit_nom}</span>
-                        {v.client_nom && (
-                          <span className="text-blue-400 text-xs shrink-0">👤 {v.client_nom}</span>
-                        )}
-                        {v.heure && (
-                          <span className="text-zinc-500 text-xs flex items-center gap-1 shrink-0">
-                            <Clock size={10} />{v.heure}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-zinc-500 text-xs">x{v.quantite}</span>
-                        <span className="text-zinc-500 text-xs">{v.prix_unitaire.toFixed(2)}€/u</span>
-                        {v.cout_fab > 0 && <span className="text-red-400/60 text-xs">CF: {v.cout_fab.toFixed(2)}€/u</span>}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-yellow-400 font-bold text-sm">{(v.prix_unitaire * v.quantite).toFixed(2)}€</p>
-                      {v.cout_fab > 0 && (
-                        <p className="text-green-400 text-xs">+{((v.prix_unitaire - v.cout_fab) * v.quantite).toFixed(2)}€</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {v.paiement && (
-                        <span className="text-[10px] text-zinc-600">
-                          {PAIEMENTS.find(p => p.id === v.paiement)?.icon}
-                        </span>
-                      )}
-                      {selected.statut === "en_cours" && (
-                        <>
-                          <button onClick={() => openEdit(v)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
-                            ✏️
-                          </button>
-                          <button onClick={() => deleteVente(v.id)}
-                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-all">
-                            <Trash2 size={11} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-        {ventes.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">📋</p>
-            <p className="text-zinc-500">Aucune vente saisie</p>
-            <p className="text-zinc-700 text-sm mt-1">Cliquez sur "Ajouter une vente" pour commencer</p>
+/* ══════════════════════════════════════════════
+   INNER DASHBOARD — uses UserSettingsContext
+══════════════════════════════════════════════ */
+function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
+  const { settings, updateSetting } = useUserSettings()
+  const [activeTab, setActiveTab] = useState(settings.start_page || "vente")
+  const [myStatus, setMyStatus] = useState<PresenceStatus>("online")
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [focusProspect, setFocusProspect] = useState<any>(null)
+  const [activeConvention, setActiveConvention] = useState<any>(null)
+  const [showConvPopup, setShowConvPopup] = useState(false)
+  const [activeTournee, setActiveTournee] = useState<any>(null)
+  const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+
+  // Load active convention
+  useEffect(() => {
+    if (!activeSociety) return
+    supabase.from("conventions")
+      .select("*").eq("society_id", activeSociety.id)
+      .eq("statut", "en_cours")
+      .order("date_debut", { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) { setActiveConvention(data); setShowConvPopup(true) }
+      })
+  }, [activeSociety])
+
+  const ACCENT = settings.accent_color || "#eab308"
+  const BG = settings.background || "#0a0a0a"
+  const SIDEBAR_BG = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
+
+  // Apply start_page when settings load
+  useEffect(() => {
+    if (settings.start_page) setActiveTab(settings.start_page)
+  }, [settings.start_page])
+
+  // Presence setup
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    supabase.from("user_presence").upsert({
+      user_id: profile.id, society_id: activeSociety.id,
+      status: "online", last_seen: new Date().toISOString(),
+    }, { onConflict: "user_id" }).then(() => {
+      setMyStatus("online")
+      loadUsers()
+    })
+
+    heartbeatRef.current = setInterval(() => {
+      supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+    }, 30000)
+
+    channel = supabase.channel(`presence_${activeSociety.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers)
+      .subscribe()
+
+    const bye = () => { supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id) }
+    window.addEventListener("beforeunload", bye)
+
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+      window.removeEventListener("beforeunload", bye)
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    }
+  }, [profile, activeSociety])
+
+  // Unread messages
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    const countUnread = () => {
+      supabase.from("messages").select("*", { count: "exact", head: true })
+        .eq("society_id", activeSociety.id)
+        .not("read_by", "cs", `{${profile.id}}`)
+        .neq("sender_id", profile.id)
+        .then(({ count: c }) => setUnreadMessages(c || 0))
+    }
+    countUnread()
+    const ch = supabase.channel(`unread_${profile.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, countUnread)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [profile, activeSociety])
+
+  // Close status menu on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setShowStatusMenu(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const map: Record<string, string> = {
+        [settings.shortcut_vente]:      "vente",
+        [settings.shortcut_clients]:    "clients",
+        [settings.shortcut_stocks]:     "stocks",
+        [settings.shortcut_stats]:      "stats",
+        [settings.shortcut_messages]:   "messages",
+        [settings.shortcut_notes]:      "notes",
+        [settings.shortcut_parametres]: "parametres",
+      }
+      const target = map[e.key]
+      if (target) { e.preventDefault(); setActiveTab(target) }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [settings])
+
+  const loadUsers = async () => {
+    const [{ data: members }, { data: presences }] = await Promise.all([
+      supabase.from("profiles").select("id, nom, avatar_url, color").eq("society_id", activeSociety.id),
+      supabase.from("user_presence").select("*").eq("society_id", activeSociety.id),
+    ])
+    const ORDER: Record<PresenceStatus, number> = { online: 0, meeting: 1, busy: 2, away: 3, offline: 4 }
+    const users: OnlineUser[] = (members || [])
+      .filter(m => m.id !== profile.id)
+      .map(m => {
+        const p = presences?.find(x => x.user_id === m.id)
+        const minsAgo = p ? (Date.now() - new Date(p.last_seen).getTime()) / 60000 : 999
+        const status: PresenceStatus = !p ? "offline" : minsAgo > 2 ? "offline" : p.status
+        return { id: m.id, nom: m.nom, avatar_url: m.avatar_url, color: m.color, status }
+      })
+      .sort((a, b) => (ORDER[a.status] ?? 5) - (ORDER[b.status] ?? 5))
+    setOnlineUsers(users)
+  }
+
+  const updateStatus = async (s: PresenceStatus) => {
+    setMyStatus(s); setShowStatusMenu(false)
+    await supabase.from("user_presence").update({ status: s, last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+  }
+
+  const logout = async () => {
+    if (profile) await supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id)
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    await supabase.auth.signOut(); router.push("/")
+  }
+
+  // Filter out hidden tabs
+  const visibleNav = ALL_NAV.map(section => ({
+    ...section,
+    items: section.items.filter(tab => !settings.hidden_tabs.includes(tab.id))
+  })).filter(section => section.items.length > 0)
+
+  const myCfg = PRESENCE[myStatus]
+  const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "accueil":   return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":   return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "stocks":    return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":     return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":  return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":     return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":      return <NotesModule      activeSociety={activeSociety} profile={profile} />
+    case "documents":  return <DocumentsModule  activeSociety={activeSociety} profile={profile} />
+    case "historique": return <HistoriqueModule activeSociety={activeSociety} profile={profile} />
+    case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
+    case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
+    case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
+    case "playlists": return <PlaylistsModule activeSociety={activeSociety} profile={profile} />
+    case "tournees":  return <TourneesModule  activeSociety={activeSociety} profile={profile}
+        onLaunchOnMap={(t: any) => setActiveTournee(t)}
+        onSwitchToMap={() => setActiveTab("map")} />
+    case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
+        onShowOnMap={(p: any) => setFocusProspect(p)}
+        onSwitchToMap={() => setActiveTab("map")}
+        onSwitchToTournees={() => setActiveTab("tournees")} />
+      case "map": return <MapModule activeSociety={activeSociety} profile={profile}
+        focusProspect={focusProspect}
+        activeTournee={activeTournee}
+        onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
+        onSwitchToProspects={() => setActiveTab("prospects")} />
+      case "messages":  return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres":return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "admin":     return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      default: return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-5xl mb-4">🚧</p>
+            <p className="text-white text-xl font-bold">{ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.label}</p>
+            <p className="text-zinc-500 text-sm mt-2">Module en cours de construction</p>
           </div>
-        )}
+        </div>
+      )
+    }
+  }
 
-        {/* Section frais */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-white font-bold text-sm">💸 Frais de convention</h3>
-              {totalFrais > 0 && <p className="text-red-400 text-xs mt-0.5">−{totalFrais.toFixed(2)}€ au total</p>}
-            </div>
-            {selected.statut === "en_cours" && (
-              <button onClick={() => setShowFraisForm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                <Plus size={12} /> Ajouter un frais
-              </button>
-            )}
-          </div>
-          {frais.length === 0 ? (
-            <p className="text-zinc-700 text-xs">Aucun frais ajouté</p>
-          ) : (
-            <div className="space-y-2">
-              {frais.map(f => (
-                <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                  <span className="text-zinc-300 text-sm">{f.label}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-red-400 font-bold text-sm">−{f.montant.toFixed(2)}€</span>
-                    {selected.statut === "en_cours" && (
-                      <button onClick={() => deleteFrais(f.id)}
-                        className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400">
-                        <Trash2 size={10} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+  // Font size applied inline
+  const fontSizeMap = { small: "13px", normal: "14px", large: "16px" }
+  const baseFontSize = fontSizeMap[settings.font_size as keyof typeof fontSizeMap] || "14px"
+
+  // Card radius
+  const radiusMap = { rounded: "12px", sharp: "4px", pill: "20px" }
+  const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
+
+  return (
+    <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+      {/* ═══════════ SIDEBAR ═══════════ */}
+      {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* DESKTOP : sidebar normale */}
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden" style={{ backgroundColor: SIDEBAR_BG }}>
+
+        {/* Logo */}
+        <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
+          <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
+          {activeSociety && (
+            <div className="flex items-center gap-1 mt-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
+              <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
             </div>
           )}
         </div>
 
-        {/* Modal ajout frais */}
-        {showFraisForm && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl">
-              <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-                <h2 className="text-white font-bold">Ajouter un frais</h2>
-                <button onClick={() => setShowFraisForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                  <X size={14} />
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+          {visibleNav.map(({ section, items }) => (
+            <div key={section}>
+              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+              {items.map(tab => {
+                const isActive = activeTab === tab.id
+                return (
+                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5`}
+                    style={{
+                      backgroundColor: isActive ? ACCENT + "18" : undefined,
+                      color: isActive ? ACCENT : "#71717a",
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = ACCENT + "12"
+                        el.style.color = ACCENT
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = ""
+                        el.style.color = "#71717a"
+                      }
+                    }}>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+                    )}
+                    <span className="text-sm">{tab.icon}</span>
+                    <span className="flex-1 truncate">{tab.label}</span>
+                    {tab.id === "messages" && unreadMessages > 0 && (
+                      <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: ACCENT }}>
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Équipe en ligne */}
+        {onlineUsers.length > 0 && (
+          <div className="border-t border-zinc-900 px-2 pt-2 pb-1">
+            <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
+              Équipe · <span className={onlineCount > 0 ? "text-green-500" : "text-zinc-600"}>
+                {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
+              </span>
+            </p>
+            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+              {onlineUsers.slice(0, 5).map(u => (
+                <button key={u.id} onClick={() => setActiveTab("messages")}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
+                  <div className="relative shrink-0">
+                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={24} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${PRESENCE[u.status].dot} ring-1 ring-[#0d0d0d]`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-zinc-400 text-[11px] font-medium truncate group-hover:text-zinc-200 transition-colors">{u.nom}</p>
+                  </div>
                 </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Mon profil + statut */}
+        <div className="border-t border-zinc-900 p-2">
+          <div className="relative" ref={statusMenuRef}>
+            <button onClick={() => setShowStatusMenu(p => !p)}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 transition-colors">
+              <div className="relative shrink-0">
+                <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${myCfg.dot} ring-1 ring-[#0d0d0d]`} />
               </div>
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Description</label>
-                  <input value={fraisForm.label} onChange={e => setFraisForm(f => ({ ...f, label: e.target.value }))}
-                    placeholder="Ex: Location stand, Essence, Repas..."
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-white text-[11px] font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className={`text-[9px] font-medium ${myCfg.color}`}>{myCfg.label}</p>
+              </div>
+              <span className="text-zinc-700 text-[10px]">▾</span>
+            </button>
+
+            {showStatusMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50">
+                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider px-3 pt-2 pb-1">Mon statut</p>
+                {(Object.entries(PRESENCE) as [PresenceStatus, typeof PRESENCE[PresenceStatus]][]).map(([s, cfg]) => (
+                  <button key={s} onClick={() => updateStatus(s)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 transition-colors ${myStatus === s ? "bg-zinc-800/60" : ""}`}>
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                    <span className={`text-[13px] ${myStatus === s ? "text-white font-semibold" : "text-zinc-400"}`}>{cfg.label}</span>
+                    {myStatus === s && <span className="ml-auto text-[11px] font-bold" style={{ color: ACCENT }}>✓</span>}
+                  </button>
+                ))}
+                <div className="border-t border-zinc-800 mt-1">
+                  <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-red-500/10 transition-colors text-[13px]">
+                    <span>→</span> Déconnexion
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Montant €</label>
-                  <input type="number" step="0.01" value={fraisForm.montant} onChange={e => setFraisForm(f => ({ ...f, montant: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* MOBILE : sidebar en drawer par-dessus le contenu */}
+      {sidebarOpen && (
+        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          {/* Bouton fermer */}
+          <button onClick={() => setSidebarOpen(false)}
+            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">
+            ✕
+          </button>
+          {/* Logo */}
+          <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
+            <div className="flex items-center gap-2.5">
+              <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+              {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
+            </div>
+          </div>
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+            {visibleNav.map(({ section, items }) => (
+              <div key={section}>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+                {items.map(tab => {
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-0.5 relative"
+                      style={{ backgroundColor: isActive ? ACCENT + "18" : undefined, color: isActive ? ACCENT : "#71717a" }}>
+                      {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full" style={{ backgroundColor: ACCENT }} />}
+                      <span className="text-base">{tab.icon}</span>
+                      <span className="flex-1 truncate">{tab.label}</span>
+                      {tab.id === "messages" && unreadMessages > 0 && (
+                        <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+          {/* Profil bas */}
+          <div className="border-t border-zinc-900 p-3">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
+              <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className="text-zinc-500 text-[10px]">En ligne</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* ── MAIN ─────────────────────────────── */}
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+        {/* Bouton hamburger principal */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+        </button>
+        {renderContent()}
+
+        {/* ── POPUP CONVENTION EN COURS ── */}
+        {showConvPopup && activeConvention && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+              {/* Header animé */}
+              <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
+                <div className="text-5xl mb-3">🎪</div>
+                <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-green-400 text-xs font-bold">Convention en cours</span>
                 </div>
-                <button onClick={saveFrais} disabled={!fraisForm.label.trim() || !fraisForm.montant}
-                  className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                  ✓ Ajouter ce frais
+                <h2 className="text-white font-bold text-xl">{activeConvention.nom}</h2>
+                {activeConvention.lieu && (
+                  <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>
+                )}
+              </div>
+
+              {/* Infos */}
+              <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Début</span>
+                  <span className="text-white text-sm font-semibold">
+                    {new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Fin</span>
+                  <span className="text-white text-sm font-semibold">
+                    {new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Boutons */}
+              <div className="px-6 pb-6 space-y-2">
+                <button
+                  onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+                  className="w-full py-3 rounded-xl text-black font-bold text-sm transition-colors"
+                  style={{ backgroundColor: ACCENT }}>
+                  📋 Aller à la convention
+                </button>
+                <button
+                  onClick={() => setShowConvPopup(false)}
+                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800 transition-colors">
+                  Continuer vers l'accueil
                 </button>
               </div>
             </div>
           </div>
         )}
-      </div>
+      </main>
+    </div>
+  )
+}
 
-      {/* Modal saisie vente — PANIER MULTI-PRODUITS */}
-      {showVenteForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
-              <div>
-                <h2 className="text-white font-bold">Nouvelle vente</h2>
-                {panier.length > 0 && (
-                  <p className="text-yellow-400 text-xs mt-0.5">
-                    {panier.reduce((s, i) => s + i.quantite, 0)} produit{panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} —{" "}
-                    {panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€
-                  </p>
-                )}
-              </div>
-              <button onClick={() => { setShowVenteForm(false); setPanier([]); setPanierSearch(""); setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" }) }}
-                className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
+/* ══════════════════════════════════════════════
+   ROOT — charge session puis wrap avec provider
+══════════════════════════════════════════════ */
+export default function DashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [activeSociety, setActiveSociety] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push("/"); return }
 
-              {/* Paiement + Client en haut */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Client</label>
-                  <input value={venteGlobal.client_nom} onChange={e => setVenteGlobal(f => ({ ...f, client_nom: e.target.value }))}
-                    placeholder="Nom client..."
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Paiement</label>
-                  <div className="grid grid-cols-3 gap-1">
-                    {PAIEMENTS.slice(0,3).map(p => (
-                      <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
-                        className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                        style={venteGlobal.paiement === p.id
-                          ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                          : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                        <span className="text-sm">{p.icon}</span>
-                        <span className="text-[9px]">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 mt-1">
-                    {PAIEMENTS.slice(3).map(p => (
-                      <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
-                        className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                        style={venteGlobal.paiement === p.id
-                          ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                          : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                        <span className="text-sm">{p.icon}</span>
-                        <span className="text-[9px]">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+      // Load profile
+      let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
 
-              {/* Recherche produit */}
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Ajouter un produit</label>
-                <input value={panierSearch} onChange={e => setPanierSearch(e.target.value)}
-                  placeholder="Rechercher dans le catalogue..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                {panierSearch && filteredProducts.length > 0 && (
-                  <div className="mt-1.5 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden">
-                    {filteredProducts.map(p => (
-                      <button key={p.id} onClick={() => addToCart(p)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-700 active:bg-yellow-500/20 transition-colors text-left border-b border-zinc-700 last:border-0">
-                        <div>
-                          <p className="text-white text-sm font-medium">{p.name}</p>
-                          <p className="text-zinc-500 text-xs">{p.gamme}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-yellow-400 text-sm font-bold">{p.pv.toFixed(2)}€</p>
-                          <p className="text-zinc-500 text-xs">+ Ajouter</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+      // Si pas de profil → le créer automatiquement
+      if (!prof) {
+        const nom = session.user.user_metadata?.full_name
+          || session.user.user_metadata?.name
+          || session.user.email?.split("@")[0]
+          || "Utilisateur"
+        const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
+        await supabase.from("profiles").insert({
+          id: session.user.id,
+          nom,
+          email: session.user.email,
+          society_id: soc?.id,
+          role: "vendeur",
+          is_active: true,
+        })
+        const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        prof = newProf
+      }
 
-              {/* Panier */}
-              {panier.length > 0 && (
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">🛒 Panier ({panier.length} produit{panier.length > 1 ? "s" : ""})</label>
-                  <div className="space-y-2">
-                    {panier.map((item, idx) => (
-                      <div key={idx} className="bg-zinc-800/80 border border-zinc-700 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-semibold truncate">{item.produit_nom}</p>
-                          <p className="text-zinc-500 text-xs">{Number(item.prix_unitaire).toFixed(2)}€/u · CF: {Number(item.cout_fab).toFixed(2)}€</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => updateCartQty(idx, -1)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">−</button>
-                          <span className="text-white font-bold text-sm w-6 text-center">{item.quantite}</span>
-                          <button onClick={() => updateCartQty(idx, 1)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">+</button>
-                        </div>
-                        <div className="text-right shrink-0 min-w-[52px]">
-                          <p className="text-yellow-400 font-bold text-sm">{(Number(item.prix_unitaire) * item.quantite).toFixed(2)}€</p>
-                        </div>
-                        <button onClick={() => removeFromCart(idx)}
-                          className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+      if (prof) setProfile({ ...prof, email: session.user.email })
 
-              {/* Jour */}
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {JOURS.map(j => (
-                    <button key={j} onClick={() => setVenteGlobal(f => ({ ...f, jour: j }))}
-                      className="py-2.5 rounded-xl text-sm font-bold border transition-all"
-                      style={venteGlobal.jour === j
-                        ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      {j}
-                    </button>
-                  ))}
-                </div>
-              </div>
+      const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
+      if (socs?.length) setActiveSociety(socs[0])
+      setLoading(false)
+    }
+    init()
+  }, [router])
 
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure (optionnel)</label>
-                <input type="time" value={venteGlobal.heure} onChange={e => setVenteGlobal(f => ({ ...f, heure: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-            </div>
-
-            {/* Footer fixe */}
-            <div className="p-5 border-t border-zinc-800 shrink-0">
-              <button onClick={saveVente} disabled={savingVente || panier.length === 0}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                {savingVente ? "Enregistrement..." : panier.length === 0 ? "Ajoute des produits au panier" : `✓ Enregistrer ${panier.reduce((s, i) => s + i.quantite, 0)} produit${panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} — ${panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  if (loading) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
-  // ═══ RAPPORT FINAL ═══
-  if (view === "rapport" && selected) return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center gap-3">
-        <button onClick={() => setView("detail")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-          <ChevronLeft size={16} />
-        </button>
-        <div>
-          <h1 className="text-white font-bold text-lg">📊 Rapport — {selected.nom}</h1>
-          <p className="text-zinc-500 text-xs">{formatDate(selected.date_debut)} → {formatDate(selected.date_fin)}{selected.lieu ? ` · ${selected.lieu}` : ""}</p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
-
-        {/* Totaux globaux */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2">💰 Résumé global</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "CA Brut total", value: `${totalBrut.toFixed(2)}€`, color: "#eab308", sub: `${totalQty} produits vendus` },
-              { label: "Coût fabrication", value: `${totalCF.toFixed(2)}€`, color: "#ef4444", sub: `${((totalCF / totalBrut) * 100 || 0).toFixed(1)}% du CA` },
-              { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e", sub: `${((totalMarge / totalBrut) * 100 || 0).toFixed(1)}% de marge` },
-              { label: "Marge / produit", value: `${totalQty > 0 ? (totalMarge / totalQty).toFixed(2) : "0.00"}€`, color: "#a855f7", sub: "moyenne par unité" },
-              { label: "Bénéfice net", value: `${beneficeNet.toFixed(2)}€`, color: beneficeNet >= 0 ? "#22c55e" : "#ef4444", sub: `Après URSSAF 13.8% + CF` },
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className="bg-zinc-800/50 rounded-xl p-3">
-                <p className="font-bold text-lg" style={{ color }}>{value}</p>
-                <p className="text-white text-xs font-semibold mt-0.5">{label}</p>
-                <p className="text-zinc-500 text-[10px] mt-0.5">{sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Par jour */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Calendar size={16} /> Par jour</h2>
-          <div className="space-y-3">
-            {parJour.filter(j => j.qty > 0).map(({ jour, brut, cf, qty }) => (
-              <div key={jour} className="bg-zinc-800/50 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
-                    <span className="text-white font-bold">{jour}</span>
-                    <span className="text-zinc-500 text-xs">{qty} vente{qty > 1 ? "s" : ""}</span>
-                  </div>
-                  <span className="font-bold" style={{ color: JOUR_COLORS[jour] }}>{brut.toFixed(2)}€</span>
-                </div>
-                <div className="flex items-center gap-1 h-2 rounded-full overflow-hidden bg-zinc-700">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${totalBrut > 0 ? (brut / totalBrut) * 100 : 0}%`, backgroundColor: JOUR_COLORS[jour] }} />
-                </div>
-                <div className="flex justify-between mt-1.5 text-xs text-zinc-500">
-                  <span>CF: {cf.toFixed(2)}€</span>
-                  <span className="text-green-400">Marge: {(brut - cf).toFixed(2)}€</span>
-                  <span>{totalBrut > 0 ? ((brut / totalBrut) * 100).toFixed(0) : 0}% du CA</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Par produit */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Package size={16} /> Top produits</h2>
-          <div className="space-y-2">
-            {parProduit.map(({ nom, qty, brut, cf }, i) => (
-              <div key={nom} className="bg-zinc-800/50 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                <span className="text-zinc-600 text-xs font-bold w-5 text-center">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{nom}</p>
-                  <p className="text-zinc-500 text-xs">{qty} unité{qty > 1 ? "s" : ""}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-yellow-400 font-bold text-sm">{brut.toFixed(2)}€</p>
-                  <p className="text-green-400 text-xs">+{(brut - cf).toFixed(2)}€</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
+  // Profil toujours manquant après tentative de création
+  if (!profile) return (
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
+      <p className="text-white font-bold text-lg">Problème de chargement</p>
+      <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
+      <button onClick={() => window.location.reload()}
+        className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors">
+        Réessayer
+      </button>
+      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }}
+        className="text-zinc-500 text-sm hover:text-white transition-colors">
+        Se déconnecter
+      </button>
     </div>
   )
 
-
-      {/* Modal édition vente */}
-      {editVente && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="text-white font-bold">Modifier la vente</h2>
-              <button onClick={() => setEditVente(null)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Produit</label>
-                <input value={editForm.produit_nom} onChange={e => setEditForm(f => ({ ...f, produit_nom: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom du client</label>
-                <input value={editForm.client_nom} onChange={e => setEditForm(f => ({ ...f, client_nom: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Prix €</label>
-                  <input type="number" step="0.01" value={editForm.prix_unitaire} onChange={e => setEditForm(f => ({ ...f, prix_unitaire: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Coût fab. €</label>
-                  <input type="number" step="0.01" value={editForm.cout_fab} onChange={e => setEditForm(f => ({ ...f, cout_fab: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Quantité</label>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setEditForm(f => ({ ...f, quantite: Math.max(1, f.quantite - 1) }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">−</button>
-                  <span className="text-white font-bold text-xl w-12 text-center">{editForm.quantite}</span>
-                  <button onClick={() => setEditForm(f => ({ ...f, quantite: f.quantite + 1 }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">+</button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {JOURS.map(j => (
-                    <button key={j} onClick={() => setEditForm(f => ({ ...f, jour: j }))}
-                      className="py-2.5 rounded-xl text-sm font-bold border transition-all"
-                      style={editForm.jour === j
-                        ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      {j}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure</label>
-                <input type="time" value={editForm.heure} onChange={e => setEditForm(f => ({ ...f, heure: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {PAIEMENTS.map(p => (
-                    <button key={p.id} onClick={() => setEditForm(f => ({ ...f, paiement: p.id }))}
-                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
-                      style={editForm.paiement === p.id
-                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      <span>{p.icon}</span>
-                      <span className="text-[10px]">{p.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={saveEdit}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 transition-colors">
-                ✓ Enregistrer les modifications
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-  return null
+  return (
+    <UserSettingsProvider userId={profile.id}>
+      <InnerDashboard profile={profile} activeSociety={activeSociety} />
+    </UserSettingsProvider>
+  )
 }
