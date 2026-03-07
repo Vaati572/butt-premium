@@ -13,7 +13,7 @@ interface ConventionVente {
   produit_nom: string; produit_id: string | null
   client_nom: string
   quantite: number; prix_unitaire: number; cout_fab: number
-  jour: string; heure: string; created_at: string
+  jour: string; heure: string; paiement: string; created_at: string
 }
 interface Product { id: string; name: string; pv: number; cf: number; gamme: string }
 interface Props { activeSociety: any; profile: any }
@@ -25,6 +25,14 @@ const JOUR_COLORS: Record<string, string> = {
   Samedi:    "#a855f7",
   Dimanche:  "#f97316",
 }
+
+const PAIEMENTS = [
+  { id: "especes", label: "Espèces", icon: "💵" },
+  { id: "cb", label: "CB", icon: "💳" },
+  { id: "virement", label: "Virement", icon: "🏦" },
+  { id: "cheque", label: "Chèque", icon: "📝" },
+  { id: "mixte", label: "Mixte", icon: "🔀" },
+]
 
 export default function ConventionModule({ activeSociety, profile }: Props) {
   const [view, setView] = useState<"list" | "detail" | "rapport">("list")
@@ -45,7 +53,9 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
     produit_nom: string; produit_id: string
     prix_unitaire: string; cout_fab: string; quantite: number
   }>>([])
-  const [venteGlobal, setVenteGlobal] = useState({ client_nom: "", jour: "Vendredi", heure: "" })
+  const [venteGlobal, setVenteGlobal] = useState({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
+  const [editVente, setEditVente] = useState<ConventionVente | null>(null)
+  const [editForm, setEditForm] = useState({ produit_nom: "", client_nom: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "", paiement: "especes" })
   const [savingVente, setSavingVente] = useState(false)
   const [searchProd, setSearchProd] = useState("")
   const [panierSearch, setPanierSearch] = useState("")
@@ -144,19 +154,47 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
       cout_fab: Number(item.cout_fab) || 0,
       jour: venteGlobal.jour,
       heure: venteGlobal.heure,
+      paiement: venteGlobal.paiement,
     }))
     const { error } = await supabase.from("convention_ventes").insert(rows)
     if (error) { alert("Erreur: " + error.message); setSavingVente(false); return }
     setSavingVente(false)
     setShowVenteForm(false)
     setPanier([])
-    setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "" })
+    setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
     setSearchProd(""); setPanierSearch("")
     loadVentes(selected.id)
   }
 
   const deleteVente = async (id: string) => {
     await supabase.from("convention_ventes").delete().eq("id", id)
+    if (selected) loadVentes(selected.id)
+  }
+
+  const openEdit = (v: ConventionVente) => {
+    setEditVente(v)
+    setEditForm({
+      produit_nom: v.produit_nom, client_nom: v.client_nom || "",
+      quantite: v.quantite, prix_unitaire: String(v.prix_unitaire),
+      cout_fab: String(v.cout_fab), jour: v.jour, heure: v.heure || "",
+      paiement: v.paiement || "especes"
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editVente) return
+    const { error } = await supabase.from("convention_ventes").update({
+      produit_nom: editForm.produit_nom,
+      client_nom: editForm.client_nom,
+      quantite: Number(editForm.quantite),
+      prix_unitaire: Number(editForm.prix_unitaire),
+      cout_fab: Number(editForm.cout_fab) || 0,
+      jour: editForm.jour,
+      heure: editForm.heure,
+      paiement: editForm.paiement,
+    }).eq("id", editVente.id)
+    if (error) { alert("Erreur: " + error.message); return }
+    setEditVente(null)
     if (selected) loadVentes(selected.id)
   }
 
@@ -424,12 +462,25 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                         <p className="text-green-400 text-xs">+{((v.prix_unitaire - v.cout_fab) * v.quantite).toFixed(2)}€</p>
                       )}
                     </div>
-                    {selected.statut === "en_cours" && (
-                      <button onClick={() => deleteVente(v.id)}
-                        className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0">
-                        <Trash2 size={11} />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {v.paiement && (
+                        <span className="text-[10px] text-zinc-600">
+                          {PAIEMENTS.find(p => p.id === v.paiement)?.icon}
+                        </span>
+                      )}
+                      {selected.statut === "en_cours" && (
+                        <>
+                          <button onClick={() => openEdit(v)}
+                            className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-all">
+                            ✏️
+                          </button>
+                          <button onClick={() => deleteVente(v.id)}
+                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                            <Trash2 size={11} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -552,6 +603,22 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                 <input type="time" value={venteGlobal.heure} onChange={e => setVenteGlobal(f => ({ ...f, heure: e.target.value }))}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
               </div>
+
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {PAIEMENTS.map(p => (
+                    <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
+                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
+                      style={venteGlobal.paiement === p.id
+                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
+                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
+                      <span>{p.icon}</span>
+                      <span className="text-[10px]">{p.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Footer fixe */}
@@ -653,5 +720,91 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
     </div>
   )
 
+
+      {/* Modal édition vente */}
+      {editVente && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+              <h2 className="text-white font-bold">Modifier la vente</h2>
+              <button onClick={() => setEditVente(null)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Produit</label>
+                <input value={editForm.produit_nom} onChange={e => setEditForm(f => ({ ...f, produit_nom: e.target.value }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom du client</label>
+                <input value={editForm.client_nom} onChange={e => setEditForm(f => ({ ...f, client_nom: e.target.value }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Prix €</label>
+                  <input type="number" step="0.01" value={editForm.prix_unitaire} onChange={e => setEditForm(f => ({ ...f, prix_unitaire: e.target.value }))}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+                </div>
+                <div>
+                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Coût fab. €</label>
+                  <input type="number" step="0.01" value={editForm.cout_fab} onChange={e => setEditForm(f => ({ ...f, cout_fab: e.target.value }))}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Quantité</label>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setEditForm(f => ({ ...f, quantite: Math.max(1, f.quantite - 1) }))}
+                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">−</button>
+                  <span className="text-white font-bold text-xl w-12 text-center">{editForm.quantite}</span>
+                  <button onClick={() => setEditForm(f => ({ ...f, quantite: f.quantite + 1 }))}
+                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">+</button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {JOURS.map(j => (
+                    <button key={j} onClick={() => setEditForm(f => ({ ...f, jour: j }))}
+                      className="py-2.5 rounded-xl text-sm font-bold border transition-all"
+                      style={editForm.jour === j
+                        ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
+                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
+                      {j}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure</label>
+                <input type="time" value={editForm.heure} onChange={e => setEditForm(f => ({ ...f, heure: e.target.value }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+              </div>
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {PAIEMENTS.map(p => (
+                    <button key={p.id} onClick={() => setEditForm(f => ({ ...f, paiement: p.id }))}
+                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
+                      style={editForm.paiement === p.id
+                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
+                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
+                      <span>{p.icon}</span>
+                      <span className="text-[10px]">{p.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={saveEdit}
+                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 transition-colors">
+                ✓ Enregistrer les modifications
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   return null
 }
