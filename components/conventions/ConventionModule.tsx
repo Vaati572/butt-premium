@@ -584,6 +584,22 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
               </div>
 
               <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {PAIEMENTS.map(p => (
+                    <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
+                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
+                      style={venteGlobal.paiement === p.id
+                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
+                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
+                      <span>{p.icon}</span>
+                      <span className="text-[10px]">{p.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
                 <div className="grid grid-cols-3 gap-2">
                   {JOURS.map(j => (
@@ -602,22 +618,6 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                 <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure (optionnel)</label>
                 <input type="time" value={venteGlobal.heure} onChange={e => setVenteGlobal(f => ({ ...f, heure: e.target.value }))}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {PAIEMENTS.map(p => (
-                    <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
-                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
-                      style={venteGlobal.paiement === p.id
-                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      <span>{p.icon}</span>
-                      <span className="text-[10px]">{p.label}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
