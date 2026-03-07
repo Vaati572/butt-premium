@@ -39,14 +39,16 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const [convForm, setConvForm] = useState({ nom: "", lieu: "", date_debut: "", date_fin: "", notes: "" })
   const [savingConv, setSavingConv] = useState(false)
 
-  // Formulaire vente
+  // Formulaire vente (panier multi-produits)
   const [showVenteForm, setShowVenteForm] = useState(false)
-  const [venteForm, setVenteForm] = useState({
-    produit_nom: "", produit_id: "", client_nom: "", quantite: 1,
-    prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: ""
-  })
+  const [panier, setPanier] = useState<Array<{
+    produit_nom: string; produit_id: string
+    prix_unitaire: string; cout_fab: string; quantite: number
+  }>>([])
+  const [venteGlobal, setVenteGlobal] = useState({ client_nom: "", jour: "Vendredi", heure: "" })
   const [savingVente, setSavingVente] = useState(false)
   const [searchProd, setSearchProd] = useState("")
+  const [panierSearch, setPanierSearch] = useState("")
 
   useEffect(() => { loadConventions() }, [activeSociety])
   useEffect(() => { loadProducts() }, [activeSociety])
@@ -102,34 +104,54 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
     if (selected?.id === id) { setSelected(null); setView("list") }
   }
 
-  const selectProduct = (p: Product) => {
-    setVenteForm(f => ({
-      ...f, produit_nom: p.name, produit_id: p.id,
-      prix_unitaire: String(p.pv), cout_fab: String(p.cf)
-    }))
+  const addToCart = (p: Product) => {
+    setPanier(prev => {
+      const existing = prev.findIndex(x => x.produit_id === p.id)
+      if (existing >= 0) {
+        const next = [...prev]
+        next[existing] = { ...next[existing], quantite: next[existing].quantite + 1 }
+        return next
+      }
+      return [...prev, { produit_nom: p.name, produit_id: p.id, prix_unitaire: String(p.pv), cout_fab: String(p.cf), quantite: 1 }]
+    })
+    setPanierSearch("")
     setSearchProd("")
   }
 
+  const updateCartQty = (idx: number, delta: number) => {
+    setPanier(prev => {
+      const next = [...prev]
+      const nq = next[idx].quantite + delta
+      if (nq <= 0) return prev.filter((_, i) => i !== idx)
+      next[idx] = { ...next[idx], quantite: nq }
+      return next
+    })
+  }
+
+  const removeFromCart = (idx: number) => setPanier(prev => prev.filter((_, i) => i !== idx))
+
   const saveVente = async () => {
-    if (!selected || !venteForm.produit_nom.trim() || !venteForm.prix_unitaire) return
+    if (!selected || panier.length === 0) return
     setSavingVente(true)
-    const { error } = await supabase.from("convention_ventes").insert({
+    const rows = panier.map(item => ({
       convention_id: selected.id,
       society_id: activeSociety.id,
-      produit_nom: venteForm.produit_nom,
-      produit_id: venteForm.produit_id || null,
-      client_nom: venteForm.client_nom || "",
-      quantite: Number(venteForm.quantite),
-      prix_unitaire: Number(venteForm.prix_unitaire),
-      cout_fab: Number(venteForm.cout_fab) || 0,
-      jour: venteForm.jour,
-      heure: venteForm.heure,
-    })
+      produit_nom: item.produit_nom,
+      produit_id: item.produit_id || null,
+      client_nom: venteGlobal.client_nom || "",
+      quantite: Number(item.quantite),
+      prix_unitaire: Number(item.prix_unitaire),
+      cout_fab: Number(item.cout_fab) || 0,
+      jour: venteGlobal.jour,
+      heure: venteGlobal.heure,
+    }))
+    const { error } = await supabase.from("convention_ventes").insert(rows)
     if (error) { alert("Erreur: " + error.message); setSavingVente(false); return }
     setSavingVente(false)
     setShowVenteForm(false)
-    setVenteForm({ produit_nom: "", produit_id: "", client_nom: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "" })
-    setSearchProd("")
+    setPanier([])
+    setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "" })
+    setSearchProd(""); setPanierSearch("")
     loadVentes(selected.id)
   }
 
@@ -143,8 +165,6 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const totalCF = ventes.reduce((s, v) => s + v.cout_fab * v.quantite, 0)
   const totalMarge = totalBrut - totalCF
   const totalQty = ventes.reduce((s, v) => s + v.quantite, 0)
-  const urssaf = totalBrut * 0.138
-  const beneficeNet = totalBrut - urssaf - totalCF
   const urssaf = totalBrut * 0.138
   const beneficeNet = totalBrut - urssaf - totalCF
 
@@ -173,8 +193,8 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   ).sort((a, b) => b.brut - a.brut)
 
   const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchProd.toLowerCase())
-  ).slice(0, 6)
+    p.name.toLowerCase().includes(panierSearch.toLowerCase())
+  ).slice(0, 8)
 
   const formatDate = (d: string) => d ? new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : ""
 
@@ -425,103 +445,100 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {/* Modal saisie vente */}
+      {/* Modal saisie vente — PANIER MULTI-PRODUITS */}
       {showVenteForm && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-[#111111]">
-              <h2 className="text-white font-bold">Saisir une vente</h2>
-              <button onClick={() => { setShowVenteForm(false); setSearchProd("") }}
+          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
+              <div>
+                <h2 className="text-white font-bold">Nouvelle vente</h2>
+                {panier.length > 0 && (
+                  <p className="text-yellow-400 text-xs mt-0.5">
+                    {panier.reduce((s, i) => s + i.quantite, 0)} produit{panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} —{" "}
+                    {panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€
+                  </p>
+                )}
+              </div>
+              <button onClick={() => { setShowVenteForm(false); setPanier([]); setPanierSearch(""); setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "" }) }}
                 className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
                 <X size={14} />
               </button>
             </div>
-            <div className="p-5 space-y-4">
 
-              {/* Recherche produit catalogue */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+              {/* Recherche produit */}
               <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Produit <span className="text-red-400">*</span></label>
-                <input value={searchProd} onChange={e => { setSearchProd(e.target.value); setVenteForm(f => ({ ...f, produit_nom: e.target.value })) }}
-                  placeholder="Rechercher dans le catalogue ou saisir manuellement..."
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Ajouter un produit</label>
+                <input value={panierSearch} onChange={e => setPanierSearch(e.target.value)}
+                  placeholder="Rechercher dans le catalogue..."
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                {searchProd && filteredProducts.length > 0 && (
+                {panierSearch && filteredProducts.length > 0 && (
                   <div className="mt-1.5 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden">
                     {filteredProducts.map(p => (
-                      <button key={p.id} onClick={() => selectProduct(p)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-700 transition-colors text-left border-b border-zinc-700 last:border-0">
+                      <button key={p.id} onClick={() => addToCart(p)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-700 active:bg-yellow-500/20 transition-colors text-left border-b border-zinc-700 last:border-0">
                         <div>
                           <p className="text-white text-sm font-medium">{p.name}</p>
                           <p className="text-zinc-500 text-xs">{p.gamme}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-yellow-400 text-sm font-bold">{p.pv.toFixed(2)}€</p>
-                          <p className="text-red-400/60 text-xs">CF: {p.cf.toFixed(2)}€</p>
+                          <p className="text-zinc-500 text-xs">+ Ajouter</p>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
-                {/* Affiche la sélection actuelle si produit choisi */}
-                {venteForm.produit_nom && !searchProd && (
-                  <div className="mt-1.5 bg-zinc-800/50 border border-yellow-500/30 rounded-xl px-3 py-2 flex items-center justify-between">
-                    <p className="text-yellow-300 text-sm font-medium">{venteForm.produit_nom}</p>
-                    <button onClick={() => setVenteForm(f => ({ ...f, produit_nom: "", produit_id: "", prix_unitaire: "", cout_fab: "" }))}
-                      className="text-zinc-500 hover:text-white text-xs">✕</button>
-                  </div>
-                )}
               </div>
 
-              {/* Nom client */}
+              {/* Panier */}
+              {panier.length > 0 && (
+                <div>
+                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">🛒 Panier ({panier.length} produit{panier.length > 1 ? "s" : ""})</label>
+                  <div className="space-y-2">
+                    {panier.map((item, idx) => (
+                      <div key={idx} className="bg-zinc-800/80 border border-zinc-700 rounded-xl px-3 py-2.5 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-sm font-semibold truncate">{item.produit_nom}</p>
+                          <p className="text-zinc-500 text-xs">{Number(item.prix_unitaire).toFixed(2)}€/u · CF: {Number(item.cout_fab).toFixed(2)}€</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button onClick={() => updateCartQty(idx, -1)}
+                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">−</button>
+                          <span className="text-white font-bold text-sm w-6 text-center">{item.quantite}</span>
+                          <button onClick={() => updateCartQty(idx, 1)}
+                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">+</button>
+                        </div>
+                        <div className="text-right shrink-0 min-w-[52px]">
+                          <p className="text-yellow-400 font-bold text-sm">{(Number(item.prix_unitaire) * item.quantite).toFixed(2)}€</p>
+                        </div>
+                        <button onClick={() => removeFromCart(idx)}
+                          className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Client + Jour + Heure */}
               <div>
                 <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom du client (optionnel)</label>
-                <input value={venteForm.client_nom} onChange={e => setVenteForm(f => ({ ...f, client_nom: e.target.value }))}
+                <input value={venteGlobal.client_nom} onChange={e => setVenteGlobal(f => ({ ...f, client_nom: e.target.value }))}
                   placeholder="Ex: Jean Dupont, Stand B12..."
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
               </div>
 
-              {/* Prix et CF */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Prix de vente € <span className="text-red-400">*</span></label>
-                  <input type="number" step="0.01" value={venteForm.prix_unitaire}
-                    onChange={e => setVenteForm(f => ({ ...f, prix_unitaire: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Coût fab. €</label>
-                  <input type="number" step="0.01" value={venteForm.cout_fab}
-                    onChange={e => setVenteForm(f => ({ ...f, cout_fab: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-              </div>
-
-              {/* Quantité */}
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Quantité</label>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setVenteForm(f => ({ ...f, quantite: Math.max(1, f.quantite - 1) }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold transition-colors flex items-center justify-center">−</button>
-                  <span className="text-white font-bold text-xl w-12 text-center">{venteForm.quantite}</span>
-                  <button onClick={() => setVenteForm(f => ({ ...f, quantite: f.quantite + 1 }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold transition-colors flex items-center justify-center">+</button>
-                  {venteForm.prix_unitaire && (
-                    <span className="text-yellow-400 font-bold ml-2">
-                      = {(Number(venteForm.prix_unitaire) * venteForm.quantite).toFixed(2)}€
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Jour */}
               <div>
                 <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
                 <div className="grid grid-cols-3 gap-2">
                   {JOURS.map(j => (
-                    <button key={j} onClick={() => setVenteForm(f => ({ ...f, jour: j }))}
+                    <button key={j} onClick={() => setVenteGlobal(f => ({ ...f, jour: j }))}
                       className="py-2.5 rounded-xl text-sm font-bold border transition-all"
-                      style={venteForm.jour === j
+                      style={venteGlobal.jour === j
                         ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
                         : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
                       {j}
@@ -530,16 +547,18 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                 </div>
               </div>
 
-              {/* Heure */}
               <div>
                 <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure (optionnel)</label>
-                <input type="time" value={venteForm.heure} onChange={e => setVenteForm(f => ({ ...f, heure: e.target.value }))}
+                <input type="time" value={venteGlobal.heure} onChange={e => setVenteGlobal(f => ({ ...f, heure: e.target.value }))}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
               </div>
+            </div>
 
-              <button onClick={saveVente} disabled={savingVente || !venteForm.produit_nom.trim() || !venteForm.prix_unitaire}
+            {/* Footer fixe */}
+            <div className="p-5 border-t border-zinc-800 shrink-0">
+              <button onClick={saveVente} disabled={savingVente || panier.length === 0}
                 className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                {savingVente ? "Enregistrement..." : `✓ Ajouter ${venteForm.quantite > 1 ? `(x${venteForm.quantite})` : ""}`}
+                {savingVente ? "Enregistrement..." : panier.length === 0 ? "Ajoute des produits au panier" : `✓ Enregistrer ${panier.reduce((s, i) => s + i.quantite, 0)} produit${panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} — ${panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€`}
               </button>
             </div>
           </div>
