@@ -11,6 +11,7 @@ interface Convention {
 interface ConventionVente {
   id: string; convention_id: string
   produit_nom: string; produit_id: string | null
+  client_nom: string
   quantite: number; prix_unitaire: number; cout_fab: number
   jour: string; heure: string; created_at: string
 }
@@ -41,7 +42,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   // Formulaire vente
   const [showVenteForm, setShowVenteForm] = useState(false)
   const [venteForm, setVenteForm] = useState({
-    produit_nom: "", produit_id: "", quantite: 1,
+    produit_nom: "", produit_id: "", client_nom: "", quantite: 1,
     prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: ""
   })
   const [savingVente, setSavingVente] = useState(false)
@@ -117,6 +118,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
       society_id: activeSociety.id,
       produit_nom: venteForm.produit_nom,
       produit_id: venteForm.produit_id || null,
+      client_nom: venteForm.client_nom || "",
       quantite: Number(venteForm.quantite),
       prix_unitaire: Number(venteForm.prix_unitaire),
       cout_fab: Number(venteForm.cout_fab) || 0,
@@ -126,7 +128,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
     if (error) { alert("Erreur: " + error.message); setSavingVente(false); return }
     setSavingVente(false)
     setShowVenteForm(false)
-    setVenteForm({ produit_nom: "", produit_id: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "" })
+    setVenteForm({ produit_nom: "", produit_id: "", client_nom: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "" })
     setSearchProd("")
     loadVentes(selected.id)
   }
@@ -366,8 +368,11 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                 {lignes.map(v => (
                   <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-3 group hover:border-zinc-700 transition-all">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-white font-semibold text-sm truncate">{v.produit_nom}</span>
+                        {v.client_nom && (
+                          <span className="text-blue-400 text-xs shrink-0">👤 {v.client_nom}</span>
+                        )}
                         {v.heure && (
                           <span className="text-zinc-500 text-xs flex items-center gap-1 shrink-0">
                             <Clock size={10} />{v.heure}
@@ -451,6 +456,14 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                       className="text-zinc-500 hover:text-white text-xs">✕</button>
                   </div>
                 )}
+              </div>
+
+              {/* Nom client */}
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom du client (optionnel)</label>
+                <input value={venteForm.client_nom} onChange={e => setVenteForm(f => ({ ...f, client_nom: e.target.value }))}
+                  placeholder="Ex: Jean Dupont, Stand B12..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
               </div>
 
               {/* Prix et CF */}
