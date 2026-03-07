@@ -821,4 +821,4 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         </div>
       )}
   return null
-} 
+}
