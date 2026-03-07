@@ -15,6 +15,10 @@ interface ConventionVente {
   quantite: number; prix_unitaire: number; cout_fab: number
   jour: string; heure: string; paiement: string; created_at: string
 }
+interface ConventionFrais {
+  id: string; convention_id: string
+  label: string; montant: number; created_at: string
+}
 interface Product { id: string; name: string; pv: number; cf: number; gamme: string }
 interface Props { activeSociety: any; profile: any }
 
@@ -59,10 +63,13 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const [savingVente, setSavingVente] = useState(false)
   const [searchProd, setSearchProd] = useState("")
   const [panierSearch, setPanierSearch] = useState("")
+  const [frais, setFrais] = useState<ConventionFrais[]>([])
+  const [showFraisForm, setShowFraisForm] = useState(false)
+  const [fraisForm, setFraisForm] = useState({ label: "", montant: "" })
 
   useEffect(() => { loadConventions() }, [activeSociety])
   useEffect(() => { loadProducts() }, [activeSociety])
-  useEffect(() => { if (selected) loadVentes(selected.id) }, [selected])
+  useEffect(() => { if (selected) { loadVentes(selected.id); loadFrais(selected.id) } }, [selected])
 
   const loadConventions = async () => {
     setLoading(true)
@@ -85,6 +92,32 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
       .select("*").eq("convention_id", convId)
       .order("jour").order("heure")
     setVentes(data || [])
+  }
+
+  const loadFrais = async (convId: string) => {
+    const { data } = await supabase.from("convention_frais")
+      .select("*").eq("convention_id", convId)
+      .order("created_at")
+    setFrais(data || [])
+  }
+
+  const saveFrais = async () => {
+    if (!selected || !fraisForm.label.trim() || !fraisForm.montant) return
+    const { error } = await supabase.from("convention_frais").insert({
+      convention_id: selected.id,
+      society_id: activeSociety.id,
+      label: fraisForm.label,
+      montant: Number(fraisForm.montant),
+    })
+    if (error) { alert("Erreur: " + error.message); return }
+    setFraisForm({ label: "", montant: "" })
+    setShowFraisForm(false)
+    loadFrais(selected.id)
+  }
+
+  const deleteFrais = async (id: string) => {
+    await supabase.from("convention_frais").delete().eq("id", id)
+    if (selected) loadFrais(selected.id)
   }
 
   const saveConvention = async () => {
@@ -203,8 +236,9 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const totalCF = ventes.reduce((s, v) => s + v.cout_fab * v.quantite, 0)
   const totalMarge = totalBrut - totalCF
   const totalQty = ventes.reduce((s, v) => s + v.quantite, 0)
+  const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
   const urssaf = totalBrut * 0.138
-  const beneficeNet = totalBrut - urssaf - totalCF
+  const beneficeNet = totalBrut - urssaf - totalCF - totalFrais
 
   // Par jour
   const parJour = JOURS.map(jour => {
@@ -402,7 +436,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
           </div>
           <div className="col-span-2 bg-zinc-900 rounded-xl p-2.5 text-center" style={{ borderColor: beneficeNet >= 0 ? "#22c55e40" : "#ef444440", border: "1px solid" }}>
             <p className="font-bold text-base" style={{ color: beneficeNet >= 0 ? "#22c55e" : "#ef4444" }}>{beneficeNet.toFixed(2)}€</p>
-            <p className="text-zinc-500 text-[10px] mt-0.5 font-semibold">✦ Bénéfice net</p>
+            <p className="text-zinc-500 text-[10px] mt-0.5 font-semibold">✦ Bénéfice net{totalFrais > 0 ? ` (−${totalFrais.toFixed(2)}€ frais)` : ""}</p>
           </div>
         </div>
       </div>
@@ -492,6 +526,74 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
             <p className="text-4xl mb-3">📋</p>
             <p className="text-zinc-500">Aucune vente saisie</p>
             <p className="text-zinc-700 text-sm mt-1">Cliquez sur "Ajouter une vente" pour commencer</p>
+          </div>
+        )}
+
+        {/* Section frais */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-white font-bold text-sm">💸 Frais de convention</h3>
+              {totalFrais > 0 && <p className="text-red-400 text-xs mt-0.5">−{totalFrais.toFixed(2)}€ au total</p>}
+            </div>
+            {selected.statut === "en_cours" && (
+              <button onClick={() => setShowFraisForm(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
+                <Plus size={12} /> Ajouter un frais
+              </button>
+            )}
+          </div>
+          {frais.length === 0 ? (
+            <p className="text-zinc-700 text-xs">Aucun frais ajouté</p>
+          ) : (
+            <div className="space-y-2">
+              {frais.map(f => (
+                <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-zinc-300 text-sm">{f.label}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-red-400 font-bold text-sm">−{f.montant.toFixed(2)}€</span>
+                    {selected.statut === "en_cours" && (
+                      <button onClick={() => deleteFrais(f.id)}
+                        className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400">
+                        <Trash2 size={10} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Modal ajout frais */}
+        {showFraisForm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl">
+              <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+                <h2 className="text-white font-bold">Ajouter un frais</h2>
+                <button onClick={() => setShowFraisForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Description</label>
+                  <input value={fraisForm.label} onChange={e => setFraisForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder="Ex: Location stand, Essence, Repas..."
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
+                </div>
+                <div>
+                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Montant €</label>
+                  <input type="number" step="0.01" value={fraisForm.montant} onChange={e => setFraisForm(f => ({ ...f, montant: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
+                </div>
+                <button onClick={saveFrais} disabled={!fraisForm.label.trim() || !fraisForm.montant}
+                  className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
+                  ✓ Ajouter ce frais
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
