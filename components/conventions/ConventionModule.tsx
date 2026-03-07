@@ -511,7 +511,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                   </p>
                 )}
               </div>
-              <button onClick={() => { setShowVenteForm(false); setPanier([]); setPanierSearch(""); setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "" }) }}
+              <button onClick={() => { setShowVenteForm(false); setPanier([]); setPanierSearch(""); setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" }) }}
                 className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
                 <X size={14} />
               </button>
@@ -821,4 +821,4 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         </div>
       )}
   return null
-} 
+}
