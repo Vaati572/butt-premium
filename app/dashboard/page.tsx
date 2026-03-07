@@ -141,8 +141,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [focusProspect, setFocusProspect] = useState<any>(null)
   const [activeConvention, setActiveConvention] = useState<any>(null)
   const [showConvPopup, setShowConvPopup] = useState(false)
-  const [activeConvention, setActiveConvention] = useState<any>(null)
-  const [showConvPopup, setShowConvPopup] = useState(false)
   const [activeTournee, setActiveTournee] = useState<any>(null)
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
