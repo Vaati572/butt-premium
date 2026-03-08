@@ -22,16 +22,23 @@ const STATUTS: Record<string, { label: string; color: string; hex: string }> = {
   perdu:     { label: "Perdu",      color: "red",    hex: "#ef4444" },
 }
 
+const SOURCES: Record<string, { label: string; initiale: string; hex: string }> = {
+  Tatouage:   { label: "Tatouage",   initiale: "T", hex: "#a855f7" },
+  Esthétique: { label: "Esthétique", initiale: "E", hex: "#ec4899" },
+  Pharmacie:  { label: "Pharmacie",  initiale: "P", hex: "#3b82f6" },
+  Autre:      { label: "Autre",      initiale: "A", hex: "#6b7280" },
+}
+
 // SVG marker factory — couleur dynamique
-const makeMarkerSVG = (color: string, selected = false) => `
+const makeMarkerSVG = (color: string, selected = false, initiale = "") => `
 <svg xmlns="http://www.w3.org/2000/svg" width="${selected ? 36 : 28}" height="${selected ? 44 : 36}" viewBox="0 0 28 36">
   <filter id="shadow">
     <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.4"/>
   </filter>
   <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 22 14 22S28 24.5 28 14C28 6.27 21.73 0 14 0z"
     fill="${color}" filter="url(#shadow)" />
-  <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
-  ${selected ? '<circle cx="14" cy="14" r="3" fill="' + color + '"/>' : ''}
+  <circle cx="14" cy="14" r="7" fill="white" opacity="0.95"/>
+  <text x="14" y="18" text-anchor="middle" font-size="9" font-weight="bold" fill="${color}" font-family="sans-serif">${initiale}</text>
 </svg>`
 
 export default function MapModule({ activeSociety, profile, focusProspect, activeTournee, onClearFocus, onSwitchToProspects }: Props) {
@@ -48,6 +55,7 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(false)
   const [homeAddress, setHomeAddress] = useState("")
+  const [filterSource, setFilterSource] = useState<string[]>(["Tatouage", "Esthétique", "Pharmacie", "Autre", ""])
   const [homeCoords, setHomeCoords] = useState<[number, number] | null>(null)
   const [geocodingHome, setGeocodingHome] = useState(false)
   const homeMarkerRef = useRef<any>(null)
@@ -179,7 +187,7 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
     Object.values(markersRef.current).forEach((m: any) => map.removeLayer(m))
     markersRef.current = {}
 
-    const visible = prospects.filter(p => filterStatut.includes(p.statut))
+    const visible = prospects.filter(p => filterStatut.includes(p.statut) && filterSource.includes(p.source || ""))
 
     visible.forEach(p => {
       if (!p.latitude || !p.longitude) return
@@ -187,8 +195,9 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
       const isInTour = tourSelection.has(p.id)
       const isSel = selected?.id === p.id || focusProspect?.id === p.id
 
+      const srcCfg = SOURCES[p.source || ""] || SOURCES["Autre"]
       const icon = L.divIcon({
-        html: makeMarkerSVG(cfg.hex, isSel || isInTour),
+        html: makeMarkerSVG(cfg.hex, isSel || isInTour, srcCfg.initiale),
         className: "",
         iconSize: [28, 36],
         iconAnchor: [14, 36],
@@ -211,7 +220,10 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
           <div style="font-family:sans-serif;min-width:180px;padding:4px">
             <div style="font-weight:700;font-size:14px;margin-bottom:4px">${p.nom}</div>
             ${p.entreprise ? `<div style="color:#888;font-size:12px;margin-bottom:4px">${p.entreprise}</div>` : ""}
-            <div style="display:inline-block;background:${cfg.hex}20;color:${cfg.hex};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-bottom:8px">${cfg.label}</div>
+            <div style="display:flex;gap:4px;margin-bottom:8px">
+              <div style="display:inline-block;background:${cfg.hex}20;color:${cfg.hex};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">${cfg.label}</div>
+              ${p.source ? `<div style="display:inline-block;background:${(SOURCES[p.source] || SOURCES["Autre"]).hex}20;color:${(SOURCES[p.source] || SOURCES["Autre"]).hex};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">${p.source}</div>` : ""}
+            </div>
             ${p.ville ? `<div style="color:#666;font-size:12px">📍 ${p.cp || ""} ${p.ville}</div>` : ""}
             ${p.tel ? `<div style="color:#666;font-size:12px">📞 ${p.tel}</div>` : ""}
           </div>
@@ -480,24 +492,48 @@ export default function MapModule({ activeSociety, profile, focusProspect, activ
         </div>
       </div>
 
-      {/* Filtres statuts */}
-      <div className="px-6 py-2 flex gap-2 overflow-x-auto border-b border-zinc-900 shrink-0">
-        {Object.entries(STATUTS).map(([id, cfg]) => {
-          const count = prospects.filter(p => p.statut === id).length
-          const active = filterStatut.includes(id)
-          return (
-            <button key={id} onClick={() => setFilterStatut(prev =>
-              prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-            )}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all"
-              style={active
-                ? { backgroundColor: cfg.hex + "20", color: cfg.hex, borderColor: cfg.hex + "50" }
-                : { borderColor: "#27272a", color: "#52525b" }}>
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: active ? cfg.hex : "#52525b" }} />
-              {cfg.label} {count > 0 && `· ${count}`}
-            </button>
-          )
-        })}
+      {/* Filtres statuts + sources */}
+      <div className="px-4 py-2 border-b border-zinc-900 shrink-0 space-y-1.5">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {Object.entries(STATUTS).map(([id, cfg]) => {
+            const count = prospects.filter(p => p.statut === id).length
+            const active = filterStatut.includes(id)
+            return (
+              <button key={id} onClick={() => setFilterStatut(prev =>
+                prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+              )}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all shrink-0"
+                style={active
+                  ? { backgroundColor: cfg.hex + "20", color: cfg.hex, borderColor: cfg.hex + "50" }
+                  : { borderColor: "#27272a", color: "#52525b" }}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: active ? cfg.hex : "#52525b" }} />
+                {cfg.label} {count > 0 && `· ${count}`}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto items-center">
+          <span className="text-zinc-700 text-[10px] uppercase tracking-wider shrink-0">Source</span>
+          {Object.entries(SOURCES).map(([key, cfg]) => {
+            const count = prospects.filter(p => (p.source || "") === key).length
+            const active = filterSource.includes(key)
+            return (
+              <button key={key} onClick={() => setFilterSource(prev =>
+                prev.includes(key) ? prev.filter(s => s !== key) : [...prev, key]
+              )}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap border transition-all shrink-0"
+                style={active
+                  ? { backgroundColor: cfg.hex + "20", color: cfg.hex, borderColor: cfg.hex + "50" }
+                  : { borderColor: "#27272a", color: "#52525b" }}>
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0"
+                  style={{ backgroundColor: active ? cfg.hex + "30" : "#27272a", color: active ? cfg.hex : "#52525b" }}>
+                  {cfg.initiale}
+                </span>
+                {cfg.label} {count > 0 && `· ${count}`}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Map container */}
