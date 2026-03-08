@@ -115,10 +115,10 @@ function NoteCard({ note, onEdit, onDelete, onTogglePin }: { note: Note; onEdit:
       {note.titre && <p className="font-bold text-sm text-white mb-2 pr-4">{note.titre}</p>}
       <p className="text-zinc-300 text-sm whitespace-pre-wrap line-clamp-6">{note.contenu}</p>
       <p className="text-zinc-600 text-[10px] mt-3">{new Date(note.updated_at || note.created_at).toLocaleDateString("fr-FR")}</p>
-      <div className="absolute bottom-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => onTogglePin(note)} className="w-6 h-6 rounded-lg bg-zinc-800/80 flex items-center justify-center hover:bg-zinc-700"><Pin size={10} className="text-zinc-400" /></button>
-        <button onClick={() => onEdit(note)} className="w-6 h-6 rounded-lg bg-zinc-800/80 flex items-center justify-center hover:bg-zinc-700"><Pencil size={10} className="text-zinc-400" /></button>
-        <button onClick={() => onDelete(note.id)} className="w-6 h-6 rounded-lg bg-red-500/20 flex items-center justify-center hover:bg-red-500/40"><Trash2 size={10} className="text-red-400" /></button>
+      <div className="absolute bottom-3 right-3 flex gap-1">
+        <button onClick={() => onTogglePin(note)} className="w-7 h-7 rounded-lg bg-zinc-800/80 flex items-center justify-center hover:bg-zinc-700"><Pin size={11} className="text-zinc-400" /></button>
+        <button onClick={() => onEdit(note)} className="w-7 h-7 rounded-lg bg-zinc-800/80 flex items-center justify-center hover:bg-zinc-700"><Pencil size={11} className="text-zinc-400" /></button>
+        <button onClick={() => onDelete(note.id)} className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center hover:bg-red-500/40"><Trash2 size={11} className="text-red-400" /></button>
       </div>
     </div>
   )
