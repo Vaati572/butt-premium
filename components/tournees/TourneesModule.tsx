@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { X, Trash2, Pencil, Map, Play, Check, Clock, ChevronDown, ChevronUp, Truck } from "lucide-react"
+import { X, Trash2, Pencil, Map, Play, Check, Clock, ChevronDown, ChevronUp, Truck, Home } from "lucide-react"
 
 interface Etape {
   prospect_id: string; nom: string; adresse: string; ville: string
@@ -29,6 +29,8 @@ export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, 
   const [editing, setEditing] = useState<Tournee | null>(null)
   const [editForm, setEditForm] = useState<Partial<Tournee>>({})
   const [saving, setSaving] = useState(false)
+  const [adresseSearch, setAdresseSearch] = useState("")
+  const [adresseSuggestions, setAdresseSuggestions] = useState<any[]>([])
 
   useEffect(() => { load() }, [activeSociety])
 
@@ -40,8 +42,26 @@ export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, 
   }
 
   const remove = async (id: string) => { if (!confirm("Supprimer ?")) return; await supabase.from("tournees").delete().eq("id", id); load() }
-  const openEdit = (t: Tournee) => { setEditForm({ ...t }); setEditing(t) }
-  const closeEdit = () => setEditing(null)
+  const openEdit = (t: Tournee) => { setEditForm({ ...t }); setAdresseSearch(t.adresse_depart || ""); setEditing(t) }
+  const closeEdit = () => { setEditing(null); setAdresseSearch(""); setAdresseSuggestions([]) }
+
+  const searchAdresse = async (q: string) => {
+    setAdresseSearch(q)
+    setEditForm(f => ({ ...f, adresse_depart: q }))
+    if (q.length < 3) { setAdresseSuggestions([]); return }
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=fr&limit=4`)
+      const data = await res.json()
+      setAdresseSuggestions(data)
+    } catch { setAdresseSuggestions([]) }
+  }
+
+  const selectAdresse = (item: any) => {
+    const addr = item.display_name
+    setAdresseSearch(addr)
+    setEditForm(f => ({ ...f, adresse_depart: addr }))
+    setAdresseSuggestions([])
+  }
 
   const saveEdit = async () => {
     if (!editForm.nom?.trim() || !editing) return
@@ -98,6 +118,18 @@ export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, 
                           {t.duree_min && <span>⏱ ~{Math.floor(t.duree_min / 60)}h{String(t.duree_min % 60).padStart(2, "0")}</span>}
                           {done > 0 && <span className="text-green-400 font-semibold">✓ {done}/{t.etapes.length}</span>}
                         </div>
+                        {/* Adresse de départ badge */}
+                        {t.adresse_depart ? (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <Home size={10} className="text-green-400 shrink-0" />
+                            <span className="text-zinc-500 text-xs truncate">{t.adresse_depart}</span>
+                          </div>
+                        ) : (
+                          <button onClick={() => openEdit(t)}
+                            className="flex items-center gap-1.5 mt-1.5 text-orange-400 text-xs font-semibold hover:text-orange-300 transition-colors">
+                            <Home size={10} /> Ajouter une adresse de départ
+                          </button>
+                        )}
                         {t.etapes.length > 0 && (
                           <div className="mt-2.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden w-full max-w-xs">
                             <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${(done / t.etapes.length) * 100}%` }} />
@@ -124,10 +156,10 @@ export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, 
                   {isExpanded && (
                     <div className="border-t border-zinc-800 px-4 py-3 space-y-2 bg-zinc-950/40">
                       {t.adresse_depart && (
-                        <div className="flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-500">
+                        <div className="flex items-center gap-2.5 px-3 py-2 text-xs text-zinc-500 bg-green-500/5 border border-green-500/20 rounded-xl">
                           <span className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-sm shrink-0">🏠</span>
-                          <span className="truncate">{t.adresse_depart}</span>
-                          <span className="text-zinc-600">Départ</span>
+                          <span className="truncate flex-1">{t.adresse_depart}</span>
+                          <span className="text-green-500/60 font-bold shrink-0">Départ</span>
                         </div>
                       )}
                       {t.etapes.map((e, i) => (
@@ -166,6 +198,32 @@ export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, 
             <div className="p-5 space-y-4">
               <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom</label>
                 <input value={editForm.nom || ""} onChange={e => setEditForm(f => ({ ...f, nom: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
+              
+              {/* Adresse de départ avec autocomplétion */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider mb-1.5 font-bold" style={{ color: "#22c55e" }}>
+                  🏠 Adresse de départ
+                </label>
+                <div className="relative">
+                  <input
+                    value={adresseSearch}
+                    onChange={e => searchAdresse(e.target.value)}
+                    placeholder="Ex: 12 rue de la Paix, Paris..."
+                    className="w-full bg-zinc-800 border border-green-500/40 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-green-500/70" />
+                  {adresseSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden z-10 shadow-xl">
+                      {adresseSuggestions.map((item, i) => (
+                        <button key={i} onClick={() => selectAdresse(item)}
+                          className="w-full text-left px-3 py-2.5 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-0">
+                          <p className="text-white text-xs font-medium truncate">{item.display_name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p className="text-zinc-600 text-[10px] mt-1">Point de départ utilisé sur la map pour calculer l'itinéraire</p>
+              </div>
+
               <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Date</label>
                 <input type="date" value={editForm.date_tournee || ""} onChange={e => setEditForm(f => ({ ...f, date_tournee: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
               <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Notes</label>
