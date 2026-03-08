@@ -502,8 +502,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                           {PAIEMENTS.find(p => p.id === v.paiement)?.icon}
                         </span>
                       )}
-                      {selected.statut === "en_cours" && (
-                        <>
+                      <>
                           <button onClick={() => openEdit(v)}
                             className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
                             ✏️
@@ -513,7 +512,6 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                             <Trash2 size={11} />
                           </button>
                         </>
-                      )}
                     </div>
                   </div>
                 ))}
