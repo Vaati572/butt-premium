@@ -334,7 +334,7 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
             { color: "#0a1a0a", label: "Forêt nuit" },
             { color: "#1c1c1c", label: "Anthracite" },
           ].map(({ color, label }) => (
-            <button key={color} onClick={() => set("background", color)}
+            <button key={color} onClick={() => { set("background", color); saveSettings() }}
               className="h-12 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-0.5"
               style={{
                 backgroundColor: color,
@@ -351,9 +351,9 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
           <div className="flex items-center gap-2 flex-1">
             <label className="w-9 h-9 rounded-lg border-2 border-zinc-600 cursor-pointer overflow-hidden hover:border-zinc-400 transition-colors"
               style={{ backgroundColor: us.background }}>
-              <input type="color" value={us.background} onChange={e => set("background", e.target.value)} className="sr-only" />
+              <input type="color" value={us.background} onChange={e => { set("background", e.target.value); saveSettings() }} className="sr-only" />
             </label>
-            <input value={us.background} onChange={e => set("background", e.target.value)}
+            <input value={us.background} onChange={e => { set("background", e.target.value); saveSettings() }}
               placeholder="#0a0a0a"
               className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-yellow-500/60" />
           </div>
