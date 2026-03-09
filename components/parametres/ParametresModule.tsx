@@ -263,6 +263,49 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
 
     /* ── APPARENCE ──────────────────────────── */
     case "apparence": return (<div className="space-y-4">
+      <Section title="Thème de l'application" icon={Palette} color="#a855f7" desc="Choisissez l'apparence générale">
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { id: "1", label: "Thème 1", desc: "Sidebar • Dark Gold", preview: ["#0d0d0d", "#eab308", "#18181b"] },
+            { id: "2", label: "Thème 2", desc: "Navbar • Néon Violet", preview: ["#050508", "#a855f7", "#0d0d18"] },
+          ].map(t => (
+            <button key={t.id} onClick={() => { set("app_theme", t.id); saveSettings() }}
+              className="p-3 rounded-xl border-2 transition-all text-left"
+              style={(us as any).app_theme === t.id
+                ? { borderColor: t.preview[1], backgroundColor: t.preview[1] + "15" }
+                : { borderColor: "#27272a", backgroundColor: "#18181b" }}>
+              {/* Mini preview */}
+              <div className="w-full h-14 rounded-lg overflow-hidden mb-2 flex" style={{ backgroundColor: t.preview[0] }}>
+                {t.id === "1" ? (
+                  <>
+                    <div className="w-8 h-full border-r flex flex-col gap-1 p-1" style={{ backgroundColor: t.preview[2], borderColor: t.preview[1] + "30" }}>
+                      {[1,2,3].map(i => <div key={i} className="w-full h-1.5 rounded-full" style={{ backgroundColor: t.preview[1] + "60" }} />)}
+                    </div>
+                    <div className="flex-1 p-1 space-y-1">
+                      {[1,2].map(i => <div key={i} className="w-full h-2 rounded" style={{ backgroundColor: t.preview[1] + "20" }} />)}
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full flex flex-col">
+                    <div className="w-full h-5 flex gap-1 items-center px-1" style={{ backgroundColor: t.preview[2], borderBottom: `1px solid ${t.preview[1]}30` }}>
+                      {[1,2,3,4].map(i => <div key={i} className="h-2 w-6 rounded-full" style={{ backgroundColor: t.preview[1] + "50" }} />)}
+                    </div>
+                    <div className="flex-1 p-1 space-y-1">
+                      {[1,2].map(i => <div key={i} className="w-full h-2 rounded" style={{ backgroundColor: t.preview[1] + "20" }} />)}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-white text-xs font-bold">{t.label}</p>
+              <p className="text-zinc-500 text-[10px]">{t.desc}</p>
+              {(us as any).app_theme === t.id && (
+                <p className="text-[10px] font-bold mt-1" style={{ color: t.preview[1] }}>✓ Actif</p>
+              )}
+            </button>
+          ))}
+        </div>
+        <p className="text-zinc-600 text-[10px]">Le changement est instantané. Rechargez la page si l'affichage ne se met pas à jour.</p>
+      </Section>
       <Section title="Couleur d'accentuation" icon={Palette} color="#a855f7" desc="Couleur principale de votre interface">
         <ColorRow colors={PALETTE} value={ACCENT} onChange={v => set("accent_color", v)} />
         <div className="bg-zinc-800 rounded-xl p-3 flex items-center gap-3 mt-1">
