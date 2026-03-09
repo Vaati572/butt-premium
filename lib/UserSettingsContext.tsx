@@ -100,6 +100,9 @@ export const USER_DEFAULTS = {
   memo: "",
   memo_popup: false,
   memo_color: "#eab308",
+
+  // Thème
+  app_theme: "1",
 }
 
 export type UserSettings = typeof USER_DEFAULTS
