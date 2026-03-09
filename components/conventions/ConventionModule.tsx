@@ -455,7 +455,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
 
         {/* Stats paiement */}
         {parPaiement.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto">
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
             {parPaiement.map(p => (
               <div key={p.id} className="flex items-center gap-1.5 bg-zinc-900 rounded-xl px-3 py-1.5 shrink-0">
                 <span className="text-sm">{p.icon}</span>
@@ -774,8 +774,8 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
           </div>
         </div>
       )}
-    </div>
-  )
+
+
       {/* Modal édition vente */}
       {editVente && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -861,6 +861,8 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
           </div>
         </div>
       )}
+    </div>
+  )
 
   // ═══ RAPPORT FINAL ═══
   if (view === "rapport" && selected) return (
@@ -928,7 +930,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         {/* Par paiement */}
         {parPaiement.length > 0 && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-            <h2 className="text-white font-bold mb-4 flex items-center gap-2">💳 Modes de paiement</h2>
+            <h2 className="text-white font-bold mb-4">💳 Modes de paiement</h2>
             <div className="space-y-2">
               {parPaiement.map(p => (
                 <div key={p.id} className="bg-zinc-800/50 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -972,7 +974,6 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
       </div>
     </div>
   )
-
 
   return null
 }
