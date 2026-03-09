@@ -178,6 +178,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const BG = settings.background || "#0a0a0a"
   const SIDEBAR_BG = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
   const APP_THEME = (settings as any).app_theme || "1"
+  const BG_GRADIENT = (settings as any).bg_gradient || ""
 
   // Apply start_page when settings load
   useEffect(() => {
@@ -377,7 +378,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   />
 
   return (
-    <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+    <div className="h-screen text-white flex overflow-hidden" style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
       {/* ═══════════ SIDEBAR ═══════════ */}
       {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (
@@ -720,7 +721,7 @@ function Theme2Layout({
 
   return (
     <div className="h-screen text-white flex flex-col overflow-hidden"
-      style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+      style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
 
       {/* ══ TOP NAVBAR ══ */}
       <header className="shrink-0 border-b z-30"
