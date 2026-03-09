@@ -103,6 +103,7 @@ export const USER_DEFAULTS = {
 
   // Thème
   app_theme: "1",
+  bg_gradient: "",  // ex: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)"
 }
 
 export type UserSettings = typeof USER_DEFAULTS
@@ -110,6 +111,7 @@ export type UserSettings = typeof USER_DEFAULTS
 interface CtxValue {
   settings: UserSettings
   updateSetting: (key: keyof UserSettings, value: any) => void
+  updateAndSave: (key: keyof UserSettings, value: any) => Promise<void>
   saveSettings: () => Promise<void>
   saving: boolean
   saved: boolean
@@ -119,6 +121,7 @@ interface CtxValue {
 const Ctx = createContext<CtxValue>({
   settings: { ...USER_DEFAULTS },
   updateSetting: () => {},
+  updateAndSave: async () => {},
   saveSettings: async () => {},
   saving: false,
   saved: false,
@@ -171,8 +174,14 @@ function applySettingsToDOM(s: UserSettings) {
   // Large click targets
   root.style.setProperty("--min-click-size", s.large_click_targets ? "44px" : "32px")
 
-  // Apply background color to body
-  document.body.style.backgroundColor = s.background
+  // Apply background (gradient or color)
+  if ((s as any).bg_gradient) {
+    document.body.style.background = (s as any).bg_gradient
+    document.body.style.backgroundColor = "transparent"
+  } else {
+    document.body.style.background = ""
+    document.body.style.backgroundColor = s.background
+  }
 
   // Font size on body
   document.body.style.fontSize = fontMap[s.font_size as keyof typeof fontMap] || "14px"
@@ -220,6 +229,20 @@ export function UserSettingsProvider({
     setSettings(prev => ({ ...prev, [key]: value }))
   }, [])
 
+  const updateAndSave = useCallback(async (key: keyof UserSettings, value: any) => {
+    const newSettings = { ...settings, [key]: value }
+    setSettings(newSettings)
+    applySettingsToDOM(newSettings)
+    setSaving(true)
+    await supabase.from("user_settings").upsert(
+      { user_id: userId, settings: newSettings, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    )
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
+  }, [userId, settings])
+
   const saveSettings = useCallback(async () => {
     setSaving(true)
     const { error } = await supabase.from("user_settings").upsert(
@@ -233,7 +256,7 @@ export function UserSettingsProvider({
   }, [userId, settings])
 
   return (
-    <Ctx.Provider value={{ settings, updateSetting, saveSettings, saving, saved, loaded }}>
+    <Ctx.Provider value={{ settings, updateSetting, updateAndSave, saveSettings, saving, saved, loaded }}>
       {children}
     </Ctx.Provider>
   )
