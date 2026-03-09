@@ -240,6 +240,17 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const urssaf = totalBrut * 0.138
   const beneficeNet = totalBrut - urssaf - totalCF - totalFrais
 
+
+  // Par paiement
+  const parPaiement = PAIEMENTS.map(p => {
+    const lignes = ventes.filter(v => v.paiement === p.id)
+    return {
+      ...p,
+      total: lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0),
+      qty: lignes.reduce((s, v) => s + v.quantite, 0),
+    }
+  }).filter(p => p.qty > 0)
+
   // Par jour
   const parJour = JOURS.map(jour => {
     const lignes = ventes.filter(v => v.jour === jour)
@@ -441,6 +452,22 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         </div>
       </div>
 
+
+        {/* Stats paiement */}
+        {parPaiement.length > 0 && (
+          <div className="flex gap-2 mt-2 overflow-x-auto">
+            {parPaiement.map(p => (
+              <div key={p.id} className="flex items-center gap-1.5 bg-zinc-900 rounded-xl px-3 py-1.5 shrink-0">
+                <span className="text-sm">{p.icon}</span>
+                <div>
+                  <p className="text-white text-xs font-bold">{p.total.toFixed(2)}€</p>
+                  <p className="text-zinc-600 text-[9px]">{p.label} · {p.qty} vente{p.qty > 1 ? "s" : ""}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
       {/* Bouton ajouter */}
       <div className="px-6 py-3 border-b border-zinc-900 flex items-center justify-between">
         <p className="text-zinc-500 text-xs">{ventes.length} vente{ventes.length > 1 ? "s" : ""} saisie{ventes.length > 1 ? "s" : ""}</p>
@@ -502,7 +529,8 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                           {PAIEMENTS.find(p => p.id === v.paiement)?.icon}
                         </span>
                       )}
-                      <>
+                      {selected.statut === "en_cours" && (
+                        <>
                           <button onClick={() => openEdit(v)}
                             className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
                             ✏️
@@ -512,6 +540,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                             <Trash2 size={11} />
                           </button>
                         </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -747,94 +776,6 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
       )}
     </div>
   )
-
-  // ═══ RAPPORT FINAL ═══
-  if (view === "rapport" && selected) return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center gap-3">
-        <button onClick={() => setView("detail")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-          <ChevronLeft size={16} />
-        </button>
-        <div>
-          <h1 className="text-white font-bold text-lg">📊 Rapport — {selected.nom}</h1>
-          <p className="text-zinc-500 text-xs">{formatDate(selected.date_debut)} → {formatDate(selected.date_fin)}{selected.lieu ? ` · ${selected.lieu}` : ""}</p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
-
-        {/* Totaux globaux */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2">💰 Résumé global</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "CA Brut total", value: `${totalBrut.toFixed(2)}€`, color: "#eab308", sub: `${totalQty} produits vendus` },
-              { label: "Coût fabrication", value: `${totalCF.toFixed(2)}€`, color: "#ef4444", sub: `${((totalCF / totalBrut) * 100 || 0).toFixed(1)}% du CA` },
-              { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e", sub: `${((totalMarge / totalBrut) * 100 || 0).toFixed(1)}% de marge` },
-              { label: "Marge / produit", value: `${totalQty > 0 ? (totalMarge / totalQty).toFixed(2) : "0.00"}€`, color: "#a855f7", sub: "moyenne par unité" },
-              { label: "Bénéfice net", value: `${beneficeNet.toFixed(2)}€`, color: beneficeNet >= 0 ? "#22c55e" : "#ef4444", sub: `Après URSSAF 13.8% + CF` },
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className="bg-zinc-800/50 rounded-xl p-3">
-                <p className="font-bold text-lg" style={{ color }}>{value}</p>
-                <p className="text-white text-xs font-semibold mt-0.5">{label}</p>
-                <p className="text-zinc-500 text-[10px] mt-0.5">{sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Par jour */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Calendar size={16} /> Par jour</h2>
-          <div className="space-y-3">
-            {parJour.filter(j => j.qty > 0).map(({ jour, brut, cf, qty }) => (
-              <div key={jour} className="bg-zinc-800/50 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
-                    <span className="text-white font-bold">{jour}</span>
-                    <span className="text-zinc-500 text-xs">{qty} vente{qty > 1 ? "s" : ""}</span>
-                  </div>
-                  <span className="font-bold" style={{ color: JOUR_COLORS[jour] }}>{brut.toFixed(2)}€</span>
-                </div>
-                <div className="flex items-center gap-1 h-2 rounded-full overflow-hidden bg-zinc-700">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${totalBrut > 0 ? (brut / totalBrut) * 100 : 0}%`, backgroundColor: JOUR_COLORS[jour] }} />
-                </div>
-                <div className="flex justify-between mt-1.5 text-xs text-zinc-500">
-                  <span>CF: {cf.toFixed(2)}€</span>
-                  <span className="text-green-400">Marge: {(brut - cf).toFixed(2)}€</span>
-                  <span>{totalBrut > 0 ? ((brut / totalBrut) * 100).toFixed(0) : 0}% du CA</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Par produit */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Package size={16} /> Top produits</h2>
-          <div className="space-y-2">
-            {parProduit.map(({ nom, qty, brut, cf }, i) => (
-              <div key={nom} className="bg-zinc-800/50 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                <span className="text-zinc-600 text-xs font-bold w-5 text-center">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{nom}</p>
-                  <p className="text-zinc-500 text-xs">{qty} unité{qty > 1 ? "s" : ""}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-yellow-400 font-bold text-sm">{brut.toFixed(2)}€</p>
-                  <p className="text-green-400 text-xs">+{(brut - cf).toFixed(2)}€</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  )
-
-
       {/* Modal édition vente */}
       {editVente && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -920,5 +861,118 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
           </div>
         </div>
       )}
+
+  // ═══ RAPPORT FINAL ═══
+  if (view === "rapport" && selected) return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
+      <div className="px-6 py-4 border-b border-zinc-900 flex items-center gap-3">
+        <button onClick={() => setView("detail")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+          <ChevronLeft size={16} />
+        </button>
+        <div>
+          <h1 className="text-white font-bold text-lg">📊 Rapport — {selected.nom}</h1>
+          <p className="text-zinc-500 text-xs">{formatDate(selected.date_debut)} → {formatDate(selected.date_fin)}{selected.lieu ? ` · ${selected.lieu}` : ""}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
+
+        {/* Totaux globaux */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+          <h2 className="text-white font-bold mb-4 flex items-center gap-2">💰 Résumé global</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "CA Brut total", value: `${totalBrut.toFixed(2)}€`, color: "#eab308", sub: `${totalQty} produits vendus` },
+              { label: "Coût fabrication", value: `${totalCF.toFixed(2)}€`, color: "#ef4444", sub: `${((totalCF / totalBrut) * 100 || 0).toFixed(1)}% du CA` },
+              { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e", sub: `${((totalMarge / totalBrut) * 100 || 0).toFixed(1)}% de marge` },
+              { label: "Marge / produit", value: `${totalQty > 0 ? (totalMarge / totalQty).toFixed(2) : "0.00"}€`, color: "#a855f7", sub: "moyenne par unité" },
+              { label: "Bénéfice net", value: `${beneficeNet.toFixed(2)}€`, color: beneficeNet >= 0 ? "#22c55e" : "#ef4444", sub: `Après URSSAF 13.8% + CF` },
+            ].map(({ label, value, color, sub }) => (
+              <div key={label} className="bg-zinc-800/50 rounded-xl p-3">
+                <p className="font-bold text-lg" style={{ color }}>{value}</p>
+                <p className="text-white text-xs font-semibold mt-0.5">{label}</p>
+                <p className="text-zinc-500 text-[10px] mt-0.5">{sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Par jour */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Calendar size={16} /> Par jour</h2>
+          <div className="space-y-3">
+            {parJour.filter(j => j.qty > 0).map(({ jour, brut, cf, qty }) => (
+              <div key={jour} className="bg-zinc-800/50 rounded-xl p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
+                    <span className="text-white font-bold">{jour}</span>
+                    <span className="text-zinc-500 text-xs">{qty} vente{qty > 1 ? "s" : ""}</span>
+                  </div>
+                  <span className="font-bold" style={{ color: JOUR_COLORS[jour] }}>{brut.toFixed(2)}€</span>
+                </div>
+                <div className="flex items-center gap-1 h-2 rounded-full overflow-hidden bg-zinc-700">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${totalBrut > 0 ? (brut / totalBrut) * 100 : 0}%`, backgroundColor: JOUR_COLORS[jour] }} />
+                </div>
+                <div className="flex justify-between mt-1.5 text-xs text-zinc-500">
+                  <span>CF: {cf.toFixed(2)}€</span>
+                  <span className="text-green-400">Marge: {(brut - cf).toFixed(2)}€</span>
+                  <span>{totalBrut > 0 ? ((brut / totalBrut) * 100).toFixed(0) : 0}% du CA</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+
+        {/* Par paiement */}
+        {parPaiement.length > 0 && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <h2 className="text-white font-bold mb-4 flex items-center gap-2">💳 Modes de paiement</h2>
+            <div className="space-y-2">
+              {parPaiement.map(p => (
+                <div key={p.id} className="bg-zinc-800/50 rounded-xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-2xl">{p.icon}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-white font-semibold text-sm">{p.label}</span>
+                      <span className="text-yellow-400 font-bold text-sm">{p.total.toFixed(2)}€</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${totalBrut > 0 ? (p.total / totalBrut) * 100 : 0}%` }} />
+                    </div>
+                    <p className="text-zinc-500 text-[10px] mt-1">{p.qty} vente{p.qty > 1 ? "s" : ""} · {totalBrut > 0 ? ((p.total / totalBrut) * 100).toFixed(0) : 0}% du CA</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Par produit */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Package size={16} /> Top produits</h2>
+          <div className="space-y-2">
+            {parProduit.map(({ nom, qty, brut, cf }, i) => (
+              <div key={nom} className="bg-zinc-800/50 rounded-xl px-3 py-2.5 flex items-center gap-3">
+                <span className="text-zinc-600 text-xs font-bold w-5 text-center">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold truncate">{nom}</p>
+                  <p className="text-zinc-500 text-xs">{qty} unité{qty > 1 ? "s" : ""}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-yellow-400 font-bold text-sm">{brut.toFixed(2)}€</p>
+                  <p className="text-green-400 text-xs">+{(brut - cf).toFixed(2)}€</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+
+
   return null
 }
