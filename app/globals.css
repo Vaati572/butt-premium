@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --bg: #0a0a0a;
+  --accent: #eab308;
 }
 
 @theme inline {
@@ -12,15 +14,110 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
+  background: var(--bg, #0a0a0a);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.3s ease, background 0.3s ease;
+}
+
+/* ══════════════════════════════════════════════
+   THEME OVERRIDES
+   Surcharge les bg Tailwind hardcodés pour
+   utiliser --bg défini par UserSettingsContext
+══════════════════════════════════════════════ */
+
+/* Fond principal des modules */
+.bg-\[\#0a0a0a\] {
+  background-color: var(--bg, #0a0a0a) !important;
+}
+
+/* Sidebar / headers de modules */
+.bg-\[\#111111\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 60%, white 5%) !important;
+}
+
+.bg-\[\#0d0d0d\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 75%, white 3%) !important;
+}
+
+.bg-\[\#0f0f0f\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 65%, white 4%) !important;
+}
+
+.bg-\[\#08080f\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 80%, white 2%) !important;
+}
+
+.bg-\[\#0d0d18\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 70%, white 4%) !important;
+}
+
+.bg-\[\#18181b\] {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 40%, white 9%) !important;
+}
+
+/* Cards principales */
+.bg-zinc-900 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 50%, white 7%) !important;
+}
+
+.bg-zinc-900\/80 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 55%, white 6%) !important;
+}
+
+/* Inputs / éléments surélevés */
+.bg-zinc-800 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 25%, white 12%) !important;
+}
+
+.bg-zinc-800\/50 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 35%, white 9%) !important;
+}
+
+.bg-zinc-800\/60 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 30%, white 10%) !important;
+}
+
+.bg-zinc-800\/80 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 20%, white 13%) !important;
+}
+
+/* Bordures */
+.border-zinc-900 {
+  border-color: color-mix(in srgb, var(--bg, #0a0a0a) 20%, white 14%) !important;
+}
+
+.border-zinc-800 {
+  border-color: color-mix(in srgb, var(--bg, #0a0a0a) 10%, white 20%) !important;
+}
+
+/* Modals / overlays */
+.bg-\[\#111111\]\/90 {
+  background-color: color-mix(in srgb, var(--bg, #0a0a0a) 60%, white 5%) !important;
+}
+
+/* Scrollbar custom */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--bg, #0a0a0a) 10%, white 20%);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--bg, #0a0a0a) 5%, white 30%);
+}
+
+/* Masque la scrollbar horizontale (nav thème 2) */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
