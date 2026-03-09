@@ -146,21 +146,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-
   // Load active convention
-  useEffect(() => {
-    if (!activeSociety) return
-    supabase.from("conventions")
-      .select("*").eq("society_id", activeSociety.id)
-      .eq("statut", "en_cours")
-      .order("date_debut", { ascending: false })
-      .limit(1)
-      .single()
-      .then(({ data }) => {
-        if (data) { setActiveConvention(data); setShowConvPopup(true) }
-      })
-  }, [activeSociety])
-
   useEffect(() => {
     if (!activeSociety) return
     supabase.from("conventions")
@@ -302,35 +288,35 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   const renderContent = () => {
     switch (activeTab) {
-      case "accueil":   return <AccueilModule         activeSociety={activeSociety} profile={profile} />
-      case "clients":   return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "accueil":    return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":    return <ClientsModule         activeSociety={activeSociety} profile={profile} />
       case "conventions":return <ConventionModule      activeSociety={activeSociety} profile={profile} />
-      case "stocks":    return <StocksModule          activeSociety={activeSociety} profile={profile} />
-      case "vente":     return <VenteModule           activeSociety={activeSociety} profile={profile} />
-      case "depenses":  return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
-      case "stats":     return <StatsModule           activeSociety={activeSociety} profile={profile} />
-      case "notes":      return <NotesModule      activeSociety={activeSociety} profile={profile} />
-    case "documents":  return <DocumentsModule  activeSociety={activeSociety} profile={profile} />
-    case "historique": return <HistoriqueModule activeSociety={activeSociety} profile={profile} />
-    case "contrats":   return <ContratsModule   activeSociety={activeSociety} profile={profile} />
-    case "pharmacies": return <PharmaciesModule activeSociety={activeSociety} profile={profile} />
-    case "commandes":  return <CommandesModule  activeSociety={activeSociety} profile={profile} />
-    case "playlists": return <PlaylistsModule activeSociety={activeSociety} profile={profile} />
-    case "tournees":  return <TourneesModule  activeSociety={activeSociety} profile={profile}
-        onLaunchOnMap={(t: any) => setActiveTournee(t)}
-        onSwitchToMap={() => setActiveTab("map")} />
-    case "prospects": return <ProspectsModule activeSociety={activeSociety} profile={profile}
-        onShowOnMap={(p: any) => setFocusProspect(p)}
-        onSwitchToMap={() => setActiveTab("map")}
-        onSwitchToTournees={() => setActiveTab("tournees")} />
-      case "map": return <MapModule activeSociety={activeSociety} profile={profile}
-        focusProspect={focusProspect}
-        activeTournee={activeTournee}
-        onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
-        onSwitchToProspects={() => setActiveTab("prospects")} />
-      case "messages":  return <MessagesModule        activeSociety={activeSociety} profile={profile} />
-      case "parametres":return <ParametresModule      activeSociety={activeSociety} profile={profile} />
-      case "admin":     return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      case "stocks":     return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":      return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":   return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":      return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":      return <NotesModule           activeSociety={activeSociety} profile={profile} />
+      case "documents":  return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
+      case "historique": return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
+      case "contrats":   return <ContratsModule        activeSociety={activeSociety} profile={profile} />
+      case "pharmacies": return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
+      case "commandes":  return <CommandesModule       activeSociety={activeSociety} profile={profile} />
+      case "playlists":  return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
+      case "tournees":   return <TourneesModule        activeSociety={activeSociety} profile={profile}
+          onLaunchOnMap={(t: any) => setActiveTournee(t)}
+          onSwitchToMap={() => setActiveTab("map")} />
+      case "prospects":  return <ProspectsModule       activeSociety={activeSociety} profile={profile}
+          onShowOnMap={(p: any) => setFocusProspect(p)}
+          onSwitchToMap={() => setActiveTab("map")}
+          onSwitchToTournees={() => setActiveTab("tournees")} />
+      case "map":        return <MapModule             activeSociety={activeSociety} profile={profile}
+          focusProspect={focusProspect}
+          activeTournee={activeTournee}
+          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
+          onSwitchToProspects={() => setActiveTab("prospects")} />
+      case "messages":   return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres": return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "admin":      return <AdminGate             activeSociety={activeSociety} profile={profile} />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -343,11 +329,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     }
   }
 
-  // Font size applied inline
   const fontSizeMap = { small: "13px", normal: "14px", large: "16px" }
   const baseFontSize = fontSizeMap[settings.font_size as keyof typeof fontSizeMap] || "14px"
 
-  // Card radius
   const radiusMap = { rounded: "12px", sharp: "4px", pill: "20px" }
   const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
@@ -360,6 +344,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     renderContent={renderContent}
     ACCENT={ACCENT}
     BG={BG}
+    BG_GRADIENT={BG_GRADIENT}
     baseFontSize={baseFontSize}
     cardRadius={cardRadius}
     unreadMessages={unreadMessages}
@@ -378,15 +363,17 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   />
 
   return (
-    <div className="h-screen text-white flex overflow-hidden" style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+    <div className="h-screen text-white flex overflow-hidden"
+      style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+
       {/* ═══════════ SIDEBAR ═══════════ */}
-      {/* ── SIDEBAR MOBILE : overlay + drawer ── */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* DESKTOP : sidebar normale */}
-      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden" style={{ backgroundColor: SIDEBAR_BG }}>
+      {/* DESKTOP sidebar */}
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden"
+        style={{ backgroundColor: SIDEBAR_BG }}>
 
         {/* Logo */}
         <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
@@ -408,24 +395,18 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                 const isActive = activeTab === tab.id
                 return (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5`}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5"
                     style={{
                       backgroundColor: isActive ? ACCENT + "18" : undefined,
                       color: isActive ? ACCENT : "#71717a",
                     }}
                     onMouseEnter={e => {
                       const el = e.currentTarget as HTMLElement
-                      if (!isActive) {
-                        el.style.backgroundColor = ACCENT + "12"
-                        el.style.color = ACCENT
-                      }
+                      if (!isActive) { el.style.backgroundColor = ACCENT + "12"; el.style.color = ACCENT }
                     }}
                     onMouseLeave={e => {
                       const el = e.currentTarget as HTMLElement
-                      if (!isActive) {
-                        el.style.backgroundColor = ""
-                        el.style.color = "#71717a"
-                      }
+                      if (!isActive) { el.style.backgroundColor = ""; el.style.color = "#71717a" }
                     }}>
                     {isActive && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: ACCENT }} />
@@ -508,23 +489,20 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </div>
       </aside>
 
-      {/* MOBILE : sidebar en drawer par-dessus le contenu */}
+      {/* MOBILE drawer */}
       {sidebarOpen && (
         <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
           style={{ backgroundColor: SIDEBAR_BG }}>
-          {/* Bouton fermer */}
           <button onClick={() => setSidebarOpen(false)}
             className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">
             ✕
           </button>
-          {/* Logo */}
           <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
             <div className="flex items-center gap-2.5">
               <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
               {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
             </div>
           </div>
-          {/* Navigation */}
           <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
             {visibleNav.map(({ section, items }) => (
               <div key={section}>
@@ -549,7 +527,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               </div>
             ))}
           </nav>
-          {/* Profil bas */}
           <div className="border-t border-zinc-900 p-3">
             <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
               <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
@@ -562,9 +539,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </aside>
       )}
 
-      {/* ── MAIN ─────────────────────────────── */}
+      {/* ── MAIN ── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
-        {/* Bouton hamburger principal */}
         <button
           onClick={() => setSidebarOpen(true)}
           className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
@@ -575,11 +551,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </button>
         {renderContent()}
 
-        {/* ── POPUP CONVENTION EN COURS ── */}
+        {/* POPUP CONVENTION EN COURS */}
         {showConvPopup && activeConvention && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
-              {/* Header animé */}
               <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
                 <div className="text-5xl mb-3">🎪</div>
                 <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
@@ -591,8 +566,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                   <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>
                 )}
               </div>
-
-              {/* Infos */}
               <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
                 <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
                   <span className="text-zinc-500 text-sm">Début</span>
@@ -607,8 +580,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                   </span>
                 </div>
               </div>
-
-              {/* Boutons */}
               <div className="px-6 pb-6 space-y-2">
                 <button
                   onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
@@ -644,10 +615,8 @@ export default function DashboardPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push("/"); return }
 
-      // Load profile
       let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
 
-      // Si pas de profil → le créer automatiquement
       if (!prof) {
         const nom = session.user.user_metadata?.full_name
           || session.user.user_metadata?.name
@@ -681,7 +650,6 @@ export default function DashboardPage() {
     </div>
   )
 
-  // Profil toujours manquant après tentative de création
   if (!profile) return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
       <p className="text-white font-bold text-lg">Problème de chargement</p>
@@ -709,7 +677,7 @@ export default function DashboardPage() {
 ══════════════════════════════════════════════ */
 function Theme2Layout({
   activeSociety, profile, activeTab, setActiveTab, visibleNav,
-  renderContent, ACCENT, BG, baseFontSize, cardRadius,
+  renderContent, ACCENT, BG, BG_GRADIENT, baseFontSize, cardRadius,
   unreadMessages, sidebarOpen, setSidebarOpen,
   onlineUsers, onlineCount, myStatus, showStatusMenu,
   setShowStatusMenu, statusMenuRef, logout,
@@ -717,7 +685,6 @@ function Theme2Layout({
 }: any) {
   const allTabs = visibleNav.flatMap((s: any) => s.items)
   const NEON = "#a855f7"
-  const NEON2 = "#06b6d4"
 
   return (
     <div className="h-screen text-white flex flex-col overflow-hidden"
@@ -732,7 +699,8 @@ function Theme2Layout({
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
             {activeSociety && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
                 <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: NEON }} />
                 <span className="text-xs font-bold" style={{ color: NEON }}>{activeSociety.name}</span>
               </div>
@@ -764,7 +732,7 @@ function Theme2Layout({
           </div>
         </div>
 
-        {/* Nav tabs - scrollable horizontally */}
+        {/* Nav tabs */}
         <nav className="flex overflow-x-auto gap-0.5 px-2 py-1.5 scrollbar-hide">
           {allTabs.map((tab: any) => {
             const isActive = activeTab === tab.id
