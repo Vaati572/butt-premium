@@ -177,6 +177,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const ACCENT = settings.accent_color || "#eab308"
   const BG = settings.background || "#0a0a0a"
   const SIDEBAR_BG = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
+  const APP_THEME = (settings as any).app_theme || "1"
 
   // Apply start_page when settings load
   useEffect(() => {
@@ -348,6 +349,32 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   // Card radius
   const radiusMap = { rounded: "12px", sharp: "4px", pill: "20px" }
   const cardRadius = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
+
+  if (APP_THEME === "2") return <Theme2Layout
+    activeSociety={activeSociety}
+    profile={profile}
+    activeTab={activeTab}
+    setActiveTab={setActiveTab}
+    visibleNav={visibleNav}
+    renderContent={renderContent}
+    ACCENT={ACCENT}
+    BG={BG}
+    baseFontSize={baseFontSize}
+    cardRadius={cardRadius}
+    unreadMessages={unreadMessages}
+    sidebarOpen={sidebarOpen}
+    setSidebarOpen={setSidebarOpen}
+    onlineUsers={onlineUsers}
+    onlineCount={onlineCount}
+    myStatus={myStatus}
+    showStatusMenu={showStatusMenu}
+    setShowStatusMenu={setShowStatusMenu}
+    statusMenuRef={statusMenuRef}
+    logout={logout}
+    showConvPopup={showConvPopup}
+    setShowConvPopup={setShowConvPopup}
+    activeConvention={activeConvention}
+  />
 
   return (
     <div className="h-screen text-white flex overflow-hidden" style={{ backgroundColor: BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
@@ -673,5 +700,128 @@ export default function DashboardPage() {
     <UserSettingsProvider userId={profile.id}>
       <InnerDashboard profile={profile} activeSociety={activeSociety} />
     </UserSettingsProvider>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   THEME 2 — NEON / NAVBAR HORIZONTALE
+══════════════════════════════════════════════ */
+function Theme2Layout({
+  activeSociety, profile, activeTab, setActiveTab, visibleNav,
+  renderContent, ACCENT, BG, baseFontSize, cardRadius,
+  unreadMessages, sidebarOpen, setSidebarOpen,
+  onlineUsers, onlineCount, myStatus, showStatusMenu,
+  setShowStatusMenu, statusMenuRef, logout,
+  showConvPopup, setShowConvPopup, activeConvention,
+}: any) {
+  const allTabs = visibleNav.flatMap((s: any) => s.items)
+  const NEON = "#a855f7"
+  const NEON2 = "#06b6d4"
+
+  return (
+    <div className="h-screen text-white flex flex-col overflow-hidden"
+      style={{ backgroundColor: "#050508", fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+
+      {/* ══ TOP NAVBAR ══ */}
+      <header className="shrink-0 border-b z-30"
+        style={{ backgroundColor: "#08080f", borderColor: NEON + "30" }}>
+
+        {/* Top bar: logo + société + user */}
+        <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: NEON + "20" }}>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+            {activeSociety && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: NEON }} />
+                <span className="text-xs font-bold" style={{ color: NEON }}>{activeSociety.name}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {onlineCount > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-green-400 text-xs font-semibold">{onlineCount} en ligne</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-black"
+                style={{ backgroundColor: NEON }}>
+                {profile?.nom?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+              <span className="text-zinc-300 text-sm font-medium hidden sm:block">{profile?.nom}</span>
+            </div>
+            {showStatusMenu && (
+              <div ref={statusMenuRef} className="absolute top-14 right-4 bg-zinc-900 border rounded-xl shadow-2xl z-50 overflow-hidden w-40"
+                style={{ borderColor: NEON + "30" }}>
+                <button onClick={() => { logout(); setShowStatusMenu(false) }}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-sm">
+                  🚪 Déconnexion
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Nav tabs - scrollable horizontally */}
+        <nav className="flex overflow-x-auto gap-0.5 px-2 py-1.5 scrollbar-hide">
+          {allTabs.map((tab: any) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 relative"
+                style={isActive
+                  ? { backgroundColor: NEON + "20", color: NEON, border: `1px solid ${NEON}50` }
+                  : { color: "#52525b", border: "1px solid transparent" }}>
+                {isActive && (
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full" style={{ backgroundColor: NEON }} />
+                )}
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {tab.id === "messages" && unreadMessages > 0 && (
+                  <span className="text-black text-[9px] font-black min-w-[14px] h-3.5 px-1 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: NEON }}>
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+      </header>
+
+      {/* ══ CONTENT ══ */}
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: "#050508" }}>
+        {renderContent()}
+      </main>
+
+      {/* Convention popup */}
+      {showConvPopup && activeConvention && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border"
+            style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40", boxShadow: `0 0 40px ${NEON}20` }}>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">🎪</span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: NEON }}>Convention en cours</p>
+                <h2 className="text-white font-bold text-lg">{activeConvention.nom}</h2>
+              </div>
+            </div>
+            {activeConvention.lieu && <p className="text-zinc-400 text-sm mb-4">📍 {activeConvention.lieu}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black"
+                style={{ backgroundColor: NEON }}>
+                📋 Aller à la convention
+              </button>
+              <button onClick={() => setShowConvPopup(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300">
+                Plus tard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
