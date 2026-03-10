@@ -67,7 +67,8 @@ function MouvementPanel({ item, profile, onClose, onDone }: {
 
     let newQty = item.quantite
     if (action === "Entrée") newQty = item.quantite + qty
-    else if (action === "Sortie") newQty = Math.max(0, item.quantite - qty)
+    // ✅ Sortie : pas de Math.max(0) → peut descendre en négatif
+    else if (action === "Sortie") newQty = item.quantite - qty
     else if (action === "Correction" || action === "Inventaire") newQty = qty
 
     await supabase.from("stock").update({
@@ -92,6 +93,15 @@ function MouvementPanel({ item, profile, onClose, onDone }: {
     onClose()
   }
 
+  const previewQty = quantite ? (() => {
+    const qty = parseFloat(quantite)
+    if (isNaN(qty)) return null
+    if (action === "Entrée") return item.quantite + qty
+    if (action === "Sortie") return item.quantite - qty
+    if (action === "Correction" || action === "Inventaire") return qty
+    return null
+  })() : null
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
@@ -107,9 +117,15 @@ function MouvementPanel({ item, profile, onClose, onDone }: {
           {/* Stock actuel */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
             <p className="text-[11px] text-zinc-500 uppercase tracking-wider mb-1">Stock actuel</p>
-            <p className={`text-3xl font-bold ${item.quantite <= item.seuil_alerte ? "text-red-400" : "text-yellow-500"}`}>
+            <p className={`text-3xl font-bold ${
+              item.quantite < 0 ? "text-red-500" :
+              item.quantite <= item.seuil_alerte ? "text-red-400" : "text-yellow-500"
+            }`}>
               {item.quantite}
             </p>
+            {item.quantite < 0 && (
+              <p className="text-[11px] text-red-400 font-semibold mt-1">⚠ Stock négatif</p>
+            )}
             {item.seuil_alerte > 0 && (
               <p className="text-[11px] text-zinc-600 mt-1">Seuil alerte : {item.seuil_alerte}</p>
             )}
@@ -150,11 +166,16 @@ function MouvementPanel({ item, profile, onClose, onDone }: {
               onChange={(e) => setQuantite(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-lg font-bold text-center focus:outline-none focus:border-yellow-500/60 transition-colors"
             />
-            {quantite && action === "Entrée" && (
-              <p className="text-xs text-green-400 mt-1 text-center">→ Nouveau stock : {item.quantite + parseFloat(quantite || "0")}</p>
-            )}
-            {quantite && action === "Sortie" && (
-              <p className="text-xs text-red-400 mt-1 text-center">→ Nouveau stock : {Math.max(0, item.quantite - parseFloat(quantite || "0"))}</p>
+            {/* Preview — affiche même si négatif */}
+            {previewQty !== null && (
+              <p className={`text-xs mt-1 text-center font-semibold ${
+                previewQty < 0 ? "text-red-500" :
+                action === "Entrée" ? "text-green-400" :
+                action === "Sortie" ? "text-red-400" : "text-blue-400"
+              }`}>
+                → Nouveau stock : {previewQty}
+                {previewQty < 0 && " (négatif — autorisé)"}
+              </p>
             )}
           </div>
 
@@ -234,7 +255,10 @@ function HistoryPanel({ societyId, onClose }: { societyId: string; onClose: () =
                 </span>
               </div>
               <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <span>{h.quantite_avant} → <span className="text-white font-semibold">{h.quantite_apres}</span></span>
+                <span className={h.quantite_apres < 0 ? "text-red-400" : ""}>
+                  {h.quantite_avant} → <span className={`font-semibold ${h.quantite_apres < 0 ? "text-red-400" : "text-white"}`}>{h.quantite_apres}</span>
+                  {h.quantite_apres < 0 && " ⚠"}
+                </span>
                 {h.notes && <span className="italic truncate">"{h.notes}"</span>}
               </div>
               <p className="text-[11px] text-zinc-700 mt-1">
@@ -318,7 +342,7 @@ function AddStockPanel({ societyId, onClose, onDone }: {
 
           <div>
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Quantité initiale</label>
-            <input type="number" min="0" step="0.001" value={quantite}
+            <input type="number" step="0.001" value={quantite}
               onChange={(e) => setQuantite(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60 transition-colors" />
           </div>
@@ -384,13 +408,15 @@ export default function StocksModule({ activeSociety, profile }: Props) {
 
   const filtered = stock.filter(item => {
     if (!showHidden && item.hidden) return false
-    if (filterAlert && item.quantite > item.seuil_alerte) return false
+    if (filterAlert && item.quantite > item.seuil_alerte && item.quantite >= 0) return false
     return item.produit_nom.toLowerCase().includes(search.toLowerCase())
   })
 
-  const alertCount = stock.filter(i => !i.hidden && i.seuil_alerte > 0 && i.quantite <= i.seuil_alerte).length
+  const alertCount  = stock.filter(i => !i.hidden && i.seuil_alerte > 0 && i.quantite <= i.seuil_alerte && i.quantite >= 0).length
+  // ✅ Stock ≤ 0 regroupe vide + négatif
+  const stockVide   = stock.filter(i => !i.hidden && i.quantite <= 0).length
+  const stockNegatif = stock.filter(i => !i.hidden && i.quantite < 0).length
   const totalProduits = stock.filter(i => !i.hidden).length
-  const stockVide = stock.filter(i => !i.hidden && i.quantite === 0).length
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
@@ -416,23 +442,45 @@ export default function StocksModule({ activeSociety, profile }: Props) {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          {[
-            { icon: Package, label: "Total produits", value: totalProduits, color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-zinc-800" },
-            { icon: AlertTriangle, label: "En alerte", value: alertCount, color: alertCount > 0 ? "text-red-400" : "text-zinc-500", bg: alertCount > 0 ? "bg-red-400/10" : "bg-zinc-800", border: alertCount > 0 ? "border-red-500/20" : "border-zinc-800" },
-            { icon: TrendingDown, label: "Stock vide", value: stockVide, color: stockVide > 0 ? "text-orange-400" : "text-zinc-500", bg: stockVide > 0 ? "bg-orange-400/10" : "bg-zinc-800", border: stockVide > 0 ? "border-orange-500/20" : "border-zinc-800" },
-          ].map(({ icon: Icon, label, value, color, bg, border }) => (
-            <div key={label} className={`bg-zinc-900 border ${border} rounded-2xl p-5`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
-                  <Icon size={16} className={color} />
-                </div>
-                <div>
-                  <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">{label}</p>
-                  <p className={`text-xl font-bold ${color}`}>{value}</p>
-                </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-yellow-500/10 rounded-lg flex items-center justify-center">
+                <Package size={16} className="text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Total produits</p>
+                <p className="text-xl font-bold text-yellow-500">{totalProduits}</p>
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className={`bg-zinc-900 border rounded-2xl p-5 ${alertCount > 0 ? "border-red-500/20" : "border-zinc-800"}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${alertCount > 0 ? "bg-red-400/10" : "bg-zinc-800"}`}>
+                <AlertTriangle size={16} className={alertCount > 0 ? "text-red-400" : "text-zinc-500"} />
+              </div>
+              <div>
+                <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">En alerte</p>
+                <p className={`text-xl font-bold ${alertCount > 0 ? "text-red-400" : "text-zinc-500"}`}>{alertCount}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ Stat "Stock ≤ 0" avec sous-indication négatif */}
+          <div className={`bg-zinc-900 border rounded-2xl p-5 ${stockVide > 0 ? "border-orange-500/20" : "border-zinc-800"}`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${stockVide > 0 ? "bg-orange-400/10" : "bg-zinc-800"}`}>
+                <TrendingDown size={16} className={stockVide > 0 ? "text-orange-400" : "text-zinc-500"} />
+              </div>
+              <div>
+                <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider">Stock ≤ 0</p>
+                <p className={`text-xl font-bold ${stockVide > 0 ? "text-orange-400" : "text-zinc-500"}`}>{stockVide}</p>
+                {stockNegatif > 0 && (
+                  <p className="text-[10px] text-red-400 font-semibold">{stockNegatif} négatif{stockNegatif > 1 ? "s" : ""}</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Filtres */}
@@ -485,14 +533,17 @@ export default function StocksModule({ activeSociety, profile }: Props) {
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {filtered.map((item) => {
-                  const enAlerte = item.seuil_alerte > 0 && item.quantite <= item.seuil_alerte
-                  const vide = item.quantite === 0
+                  const negatif   = item.quantite < 0
+                  const vide      = item.quantite === 0
+                  const enAlerte  = !negatif && item.seuil_alerte > 0 && item.quantite <= item.seuil_alerte
                   return (
                     <tr key={item.id} className={`hover:bg-zinc-800/40 transition-colors ${item.hidden ? "opacity-40" : ""}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                            enAlerte ? "bg-red-500/20 text-red-400" : "bg-yellow-500/20 text-yellow-500"
+                            negatif   ? "bg-red-500/20 text-red-500" :
+                            enAlerte  ? "bg-red-500/20 text-red-400" :
+                                        "bg-yellow-500/20 text-yellow-500"
                           }`}>
                             <Package size={14} />
                           </div>
@@ -501,7 +552,9 @@ export default function StocksModule({ activeSociety, profile }: Props) {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`text-lg font-bold ${
-                          vide ? "text-zinc-600" : enAlerte ? "text-red-400" : "text-white"
+                          negatif  ? "text-red-500" :
+                          vide     ? "text-zinc-600" :
+                          enAlerte ? "text-red-400" : "text-white"
                         }`}>
                           {item.quantite}
                         </span>
@@ -510,12 +563,23 @@ export default function StocksModule({ activeSociety, profile }: Props) {
                         <span className="text-zinc-500 text-sm">{item.seuil_alerte || "—"}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        {vide ? (
-                          <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2.5 py-1 rounded-full border border-zinc-700">Vide</span>
+                        {/* ✅ Badge négatif distinct */}
+                        {negatif ? (
+                          <span className="text-[11px] font-semibold text-red-500 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/30 animate-pulse">
+                            ⚠ Négatif
+                          </span>
+                        ) : vide ? (
+                          <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2.5 py-1 rounded-full border border-zinc-700">
+                            Vide
+                          </span>
                         ) : enAlerte ? (
-                          <span className="text-[11px] font-semibold text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full border border-red-400/20 animate-pulse">⚠ Alerte</span>
+                          <span className="text-[11px] font-semibold text-red-400 bg-red-400/10 px-2.5 py-1 rounded-full border border-red-400/20 animate-pulse">
+                            ⚠ Alerte
+                          </span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full border border-green-400/20">OK</span>
+                          <span className="text-[11px] font-semibold text-green-400 bg-green-400/10 px-2.5 py-1 rounded-full border border-green-400/20">
+                            OK
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-4">
