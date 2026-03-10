@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import {
   ShoppingCart, Plus, X, Search, User,
   Receipt, ChevronDown, Minus, Check, Package,
-  AlertTriangle, Pencil, Save, RotateCcw,
+  AlertTriangle, Pencil, Save, RotateCcw, Trash2,
 } from "lucide-react"
 
 interface Product { id: string; name: string; gamme: string; pv: number; cf: number }
@@ -32,55 +32,185 @@ const GAMMES = [
   { val: "Shopify",        label: "🛍️ Shopify",         active: "bg-green-500 text-black border-green-500 shadow-lg shadow-green-500/20",    hover: "hover:border-green-500/50",  gradient: "from-green-500/20",  iconBg: "bg-green-500/20",  iconColor: "text-green-500/60",  pvBg: "bg-green-500/15",  pvText: "text-green-400"  },
 ]
 
-/* ── HISTORIQUE ─────────────────────────────── */
-function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: () => void }) {
+/* ══════════════════════════════════════════════
+   HISTORIQUE PANEL — timeline + suppression
+══════════════════════════════════════════════ */
+function HistoriquePanel({ societyId, onClose, onDelete }: {
+  societyId: string; onClose: () => void; onDelete?: () => void
+}) {
   const [ventes, setVentes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => {
+  const [search, setSearch] = useState("")
+  const [filterPaiement, setFilterPaiement] = useState("tous")
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const loadVentes = () => {
+    setLoading(true)
     supabase.from("ventes").select("*, vente_items(*)")
-      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(100)
+      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => { setVentes(data || []); setLoading(false) })
-  }, [])
-  const totalCA = ventes.reduce((s, v) => s + Number(v.total_ttc), 0)
+  }
+  useEffect(() => { loadVentes() }, [])
+
+  const deleteVente = async (venteId: string) => {
+    if (!confirm("Supprimer cette vente ? Le CA sera mis à jour.")) return
+    setDeleting(venteId)
+    await supabase.from("vente_items").delete().eq("vente_id", venteId)
+    await supabase.from("ventes").delete().eq("id", venteId)
+    setVentes(prev => prev.filter(v => v.id !== venteId))
+    setDeleting(null)
+    onDelete?.()
+  }
+
+  const paiements = [...new Set(ventes.map(v => v.paiement).filter(Boolean))]
+
+  const filtered = ventes.filter(v => {
+    const q = search.toLowerCase()
+    const matchSearch = !search ||
+      v.client_nom?.toLowerCase().includes(q) ||
+      v.notes?.toLowerCase().includes(q) ||
+      v.paiement?.toLowerCase().includes(q) ||
+      v.vente_items?.some((i: any) => i.produit_nom?.toLowerCase().includes(q))
+    const matchPaiement = filterPaiement === "tous" || v.paiement === filterPaiement
+    return matchSearch && matchPaiement
+  })
+
+  const totalCA = filtered.reduce((s, v) => s + Number(v.total_ttc), 0)
+
+  // Grouper par date
+  const groups: Record<string, typeof filtered> = {}
+  filtered.forEach(v => {
+    const date = new Date(v.created_at).toLocaleDateString("fr-FR", {
+      weekday: "long", day: "numeric", month: "long"
+    })
+    if (!groups[date]) groups[date] = []
+    groups[date].push(v)
+  })
+
+  const paiementColor: Record<string, string> = {
+    "Espèces":       "#22c55e",
+    "Carte Bancaire":"#3b82f6",
+    "Virement":      "#a855f7",
+    "Chèque":        "#f97316",
+    "En attente":    "#ef4444",
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-zinc-800">
           <div>
-            <h3 className="text-base font-bold text-white">Historique des ventes</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{ventes.length} ventes — CA : <span className="text-yellow-500 font-bold">{totalCA.toFixed(2)}€</span></p>
+            <h3 className="text-base font-bold text-white">🕓 Historique des ventes</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              {filtered.length} vente{filtered.length > 1 ? "s" : ""} —{" "}
+              CA : <span className="text-yellow-500 font-bold">{totalCA.toFixed(2)}€</span>
+            </p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {loading
-            ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" /></div>
-            : ventes.length === 0
-              ? <div className="text-center py-12 text-zinc-600"><Receipt size={32} className="mx-auto mb-3 opacity-20" /><p className="text-sm">Aucune vente</p></div>
-              : ventes.map(v => (
-                <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-white text-sm font-semibold">{v.client_nom || "Passage"}</p>
-                      <p className="text-zinc-500 text-xs">{new Date(v.created_at).toLocaleString("fr-FR")}</p>
+
+        {/* Filtres */}
+        <div className="px-4 py-3 border-b border-zinc-800 flex gap-2">
+          <div className="relative flex-1">
+            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Client, produit, notes..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
+          </div>
+          <select value={filterPaiement} onChange={e => setFilterPaiement(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none shrink-0">
+            <option value="tous">Tous</option>
+            {paiements.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* Timeline */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-16 text-zinc-600">
+              <Receipt size={32} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm">Aucune vente trouvée</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(groups).map(([date, events]) => {
+                const dayCA = events.reduce((s, v) => s + Number(v.total_ttc), 0)
+                return (
+                  <div key={date}>
+                    {/* Séparateur date */}
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider capitalize">{date}</p>
+                      <span className="text-yellow-500 text-xs font-bold">{dayCA.toFixed(2)}€</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-yellow-500 font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
-                      <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">{v.paiement}</span>
+
+                    <div className="space-y-2">
+                      {events.map(v => {
+                        const color = paiementColor[v.paiement] || "#71717a"
+                        return (
+                          <div key={v.id} className="flex items-start gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 hover:border-zinc-700 transition-colors">
+                            <span className="text-xl shrink-0 mt-0.5">🛒</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <span className="text-white text-sm font-semibold">{v.client_nom || "Client de passage"}</span>
+                                    <span
+                                      className="text-xs px-2 py-0.5 rounded-md font-medium shrink-0"
+                                      style={{ backgroundColor: color + "20", color }}>
+                                      {v.paiement}
+                                    </span>
+                                  </div>
+                                  {v.notes && <p className="text-zinc-500 text-xs truncate">{v.notes}</p>}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-zinc-600 text-[10px]">
+                                      {new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                    {v.vente_items?.length > 0 && (
+                                      <span className="text-zinc-700 text-[10px]">
+                                        · {v.vente_items.length} article{v.vente_items.length > 1 ? "s" : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Détail articles */}
+                                  {v.vente_items?.length > 0 && (
+                                    <div className="mt-2 space-y-0.5">
+                                      {v.vente_items.map((item: any) => (
+                                        <div key={item.id} className="flex justify-between text-[11px] text-zinc-600">
+                                          <span>{item.produit_nom} ×{item.quantite}</span>
+                                          <span>{Number(item.total).toFixed(2)}€</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <span className="text-yellow-500 font-bold text-sm">{Number(v.total_ttc).toFixed(2)}€</span>
+                                  <button
+                                    onClick={() => deleteVente(v.id)}
+                                    disabled={deleting === v.id}
+                                    className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-colors">
+                                    {deleting === v.id
+                                      ? <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                                      : <Trash2 size={12} />}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                  {v.vente_items?.length > 0 && (
-                    <div className="space-y-0.5 mt-2 pt-2 border-t border-zinc-800">
-                      {v.vente_items.map((item: any) => (
-                        <div key={item.id} className="flex justify-between text-[11px] text-zinc-500">
-                          <span>{item.produit_nom} x{item.quantite}</span>
-                          <span>{Number(item.total).toFixed(2)}€</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -403,7 +533,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const gammeConfig = GAMMES.find(g => g.val === activeGamme) || GAMMES[0]
 
   /* ─────────────────────────────────────────────
-     CATALOGUE (partagé desktop + mobile)
+     CATALOGUE
   ───────────────────────────────────────────── */
   const Catalogue = (
     <div className="flex-1 flex flex-col overflow-hidden border-r border-zinc-900 min-w-0">
@@ -546,7 +676,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   )
 
   /* ─────────────────────────────────────────────
-     PANIER (partagé desktop + mobile)
+     PANIER
   ───────────────────────────────────────────── */
   const Panier = (
     <div className="flex-1 md:flex-none md:w-96 bg-[#111111] flex flex-col overflow-hidden">
@@ -716,16 +846,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         {mobileTab === "catalogue" ? Catalogue : Panier}
       </div>
 
-      {/* ── BARRE DE NAV MOBILE (fixe en bas) ── */}
+      {/* ── BARRE DE NAV MOBILE ── */}
       <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-[#111111]">
-        <button
-          onClick={() => setMobileTab("catalogue")}
+        <button onClick={() => setMobileTab("catalogue")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors ${mobileTab === "catalogue" ? "text-yellow-500" : "text-zinc-500"}`}>
           <Package size={22} />
           <span className="text-[10px] font-bold">Catalogue</span>
         </button>
-        <button
-          onClick={() => setMobileTab("panier")}
+        <button onClick={() => setMobileTab("panier")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors relative ${mobileTab === "panier" ? "text-yellow-500" : "text-zinc-500"}`}>
           <div className="relative">
             <ShoppingCart size={22} />
@@ -741,7 +869,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         </button>
       </div>
 
-      {showHistorique && <HistoriquePanel societyId={activeSociety.id} onClose={() => setShowHistorique(false)} />}
+      {showHistorique && (
+        <HistoriquePanel
+          societyId={activeSociety.id}
+          onClose={() => setShowHistorique(false)}
+          onDelete={loadData}
+        />
+      )}
       {showManuelle && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
       {showAddProduct && <AddProductPanel societyId={activeSociety.id} onClose={() => setShowAddProduct(false)} onDone={loadData} />}
     </div>
