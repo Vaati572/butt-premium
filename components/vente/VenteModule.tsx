@@ -23,8 +23,14 @@ const PORT_OPTIONS = [
   "10.48€ ( 1kg - 2kg )",
   "11€ ( 2kg - 3kg )",
 ]
-const DEFAULT_URSSAF_RATE = 0.138 // 13.8% par défaut
+const DEFAULT_URSSAF_RATE = 0.138
 const parsePort = (p: string) => { const m = p.match(/^([\d.,]+)€/); return m ? parseFloat(m[1].replace(",", ".")) : 0 }
+
+const GAMMES = [
+  { val: "Particuliers",   label: "👤 Particuliers",  active: "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20",  hover: "hover:border-yellow-500/50", gradient: "from-yellow-500/20", iconBg: "bg-yellow-500/20", iconColor: "text-yellow-500/60", pvBg: "bg-yellow-500/15", pvText: "text-yellow-400",  cardBg: "bg-green-500/20" },
+  { val: "Professionnels", label: "🏢 Professionnels", active: "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20",  hover: "hover:border-purple-500/50", gradient: "from-purple-500/20", iconBg: "bg-purple-500/20", iconColor: "text-purple-400/60", pvBg: "bg-purple-500/15", pvText: "text-purple-300", cardBg: "bg-purple-500/20" },
+  { val: "Shopify",        label: "🛍️ Shopify",        active: "bg-green-500 text-black border-green-500 shadow-lg shadow-green-500/20",    hover: "hover:border-green-500/50",  gradient: "from-green-500/20",  iconBg: "bg-green-500/20",  iconColor: "text-green-500/60",  pvBg: "bg-green-500/15",  pvText: "text-green-400",   cardBg: "bg-green-500/20"  },
+]
 
 /* ── HISTORIQUE ─────────────────────────────── */
 function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: () => void }) {
@@ -225,8 +231,15 @@ function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; on
           <div>
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Gamme</label>
             <div className="flex gap-2">
-              {["Particuliers", "Professionnels"].map(g => (
-                <button key={g} onClick={() => setGamme(g)} className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${gamme === g ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{g}</button>
+              {[
+                { val: "Particuliers",   color: "bg-yellow-500 text-black border-yellow-500" },
+                { val: "Professionnels", color: "bg-purple-500 text-white border-purple-500" },
+                { val: "Shopify",        color: "bg-green-500 text-black border-green-500" },
+              ].map(({ val, color }) => (
+                <button key={val} onClick={() => setGamme(val)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${gamme === val ? color : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+                  {val === "Shopify" ? "🛍️ Shopify" : val}
+                </button>
               ))}
             </div>
           </div>
@@ -300,7 +313,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(i => i.product_id === product.id)
-      // Use client custom price if available
       const prix = clientPrixMap[product.id] ?? product.pv
       if (existing) return prev.map(i => i.product_id === product.id ? { ...i, quantite: i.quantite + 1 } : i)
       return [...prev, { product_id: product.id, nom: product.name, gamme: product.gamme, quantite: 1, pv: prix, cf: product.cf }]
@@ -319,9 +331,9 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
   const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
   const totalTTC = totalHT + portVal
-  const urssaf = totalTTC * urssafRate                // 14% sur (PV + port)
+  const urssaf = totalTTC * urssafRate
   const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
-  const resultat = totalTTC - urssaf - cfTotal          // Résultat net final
+  const resultat = totalTTC - urssaf - cfTotal
 
   const saveBrouillon = () => {
     try { localStorage.setItem("brouillon_vente_" + activeSociety.id, JSON.stringify(cart)) } catch {}
@@ -341,7 +353,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
       society_id: activeSociety.id, user_id: profile.id,
       client_id: selectedClient?.id || null,
       client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : "Client de passage"),
-        created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
+      created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
       total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
     }).select().single()
     if (!error && vente) {
@@ -350,17 +362,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
         cf_unitaire: item.cf, total: item.pv * item.quantite,
       })))
-      // ── Déstockage auto via COMPOSITION ──────────────────────────
-      // Charge tout le stock de la société une seule fois
       const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
       const allStock = allStockData || []
 
       for (const item of cart) {
-        // Récupère le produit complet depuis Supabase
         const { data: fullProduct } = await supabase.from("products")
           .select("composition, in_stock").eq("id", item.product_id).single()
 
-        // Parse la composition (Supabase renvoie parfois une string JSON)
         let composition: Record<string, number> = {}
         if (fullProduct?.composition) {
           if (typeof fullProduct.composition === "string") {
@@ -373,15 +381,11 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         const compoEntries = Object.entries(composition)
 
         if (compoEntries.length > 0) {
-          // ── Produit composé : déstocke les composants ──
           for (const [compNom, qtyParUnite] of compoEntries) {
             const totalADeduire = item.quantite * Number(qtyParUnite)
-
-            // Cherche dans le stock par nom exact (insensible à la casse)
             const stockItem = allStock.find(
-              s => s.produit_nom.toLowerCase().trim() === compNom.toLowerCase().trim()
+              (s: any) => s.produit_nom.toLowerCase().trim() === compNom.toLowerCase().trim()
             )
-
             if (stockItem) {
               const newQty = stockItem.quantite - totalADeduire
               await supabase.from("stock")
@@ -398,13 +402,11 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                 quantite_apres: newQty,
                 notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${selectedClient?.nom || "passage"}`,
               })
-              // Met à jour allStock en mémoire pour les calculs suivants
               stockItem.quantite = newQty
             }
           }
         } else {
-          // ── Produit simple : déstocke directement ──
-          const stockItem = allStock.find(s => s.product_id === item.product_id)
+          const stockItem = allStock.find((s: any) => s.product_id === item.product_id)
           if (stockItem) {
             const newQty = stockItem.quantite - item.quantite
             await supabase.from("stock")
@@ -432,6 +434,9 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     }
     setSaving(false)
   }
+
+  // Couleurs dynamiques selon gamme active
+  const gammeConfig = GAMMES.find(g => g.val === activeGamme) || GAMMES[0]
 
   return (
     <div className="flex-1 flex overflow-hidden bg-[#0a0a0a]">
@@ -470,22 +475,17 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             ))}
           </div>
 
-          {/* Sélection gamme OBLIGATOIRE */}
+          {/* Sélection gamme */}
           <div className="flex gap-2">
-            {["Particuliers", "Professionnels"].map(g => (
-              <button key={g} onClick={() => setActiveGamme(activeGamme === g ? null : g)}
-                className={`flex-1 py-2.5 text-sm font-bold rounded-xl border transition-all duration-200 ${activeGamme === g
-                  ? g === "Particuliers"
-                    ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
-                    : "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20"
-                  : "text-zinc-400 border-zinc-800 bg-zinc-900 hover:border-zinc-600"
-                }`}>
-                {g === "Particuliers" ? "👤 Particuliers" : "🏢 Professionnels"}
+            {GAMMES.map(({ val, label, active }) => (
+              <button key={val} onClick={() => setActiveGamme(activeGamme === val ? null : val)}
+                className={`flex-1 py-2.5 text-sm font-bold rounded-xl border transition-all duration-200 ${activeGamme === val ? active : "text-zinc-400 border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}>
+                {label}
               </button>
             ))}
           </div>
 
-          {/* Recherche (visible seulement si gamme sélectionnée) */}
+          {/* Recherche */}
           {activeGamme && (
             <div className="relative">
               <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -503,24 +503,19 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : !activeGamme ? (
-            /* Écran d'accueil — aucune gamme sélectionnée */
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div className="text-5xl mb-4">🛒</div>
               <p className="text-white text-lg font-bold mb-2">Choisissez une gamme</p>
-              <p className="text-zinc-500 text-sm mb-8">Sélectionnez Particuliers ou Professionnels pour afficher le catalogue</p>
-              <div className="flex gap-4">
-                <button onClick={() => setActiveGamme("Particuliers")}
-                  className="flex flex-col items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-yellow-500/50 rounded-2xl p-6 transition-all hover:bg-zinc-800/60 group">
-                  <span className="text-4xl">👤</span>
-                  <p className="text-white font-bold">Particuliers</p>
-                  <p className="text-zinc-500 text-xs">{products.filter(p => p.gamme === "Particuliers").length} produits</p>
-                </button>
-                <button onClick={() => setActiveGamme("Professionnels")}
-                  className="flex flex-col items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 rounded-2xl p-6 transition-all hover:bg-zinc-800/60 group">
-                  <span className="text-4xl">🏢</span>
-                  <p className="text-white font-bold">Professionnels</p>
-                  <p className="text-zinc-500 text-xs">{products.filter(p => p.gamme === "Professionnels").length} produits</p>
-                </button>
+              <p className="text-zinc-500 text-sm mb-8">Sélectionnez une gamme pour afficher le catalogue</p>
+              <div className="flex gap-4 flex-wrap justify-center">
+                {GAMMES.map(({ val, label, hover }) => (
+                  <button key={val} onClick={() => setActiveGamme(val)}
+                    className={`flex flex-col items-center gap-3 bg-zinc-900 border border-zinc-800 ${hover} rounded-2xl p-6 transition-all hover:bg-zinc-800/60`}>
+                    <span className="text-4xl">{label.split(" ")[0]}</span>
+                    <p className="text-white font-bold">{val}</p>
+                    <p className="text-zinc-500 text-xs">{products.filter(p => p.gamme === val).length} produits</p>
+                  </button>
+                ))}
               </div>
             </div>
           ) : filteredProducts.length === 0 ? (
@@ -529,7 +524,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               <p className="text-sm">Aucun produit trouvé</p>
             </div>
           ) : (
-            /* Grille produits — style cartes larges */
             <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
               {filteredProducts.map(product => {
                 const inCart = cart.find(i => i.product_id === product.id)
@@ -547,46 +541,36 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                         : "bg-zinc-900 border-zinc-800 hover:border-yellow-500/30 hover:bg-zinc-800/60"
                     }`}>
 
-                    {/* Badge quantité panier */}
                     {inCart && (
                       <div className="absolute top-3 right-3 z-10 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black text-xs font-bold shadow-lg">
                         {inCart.quantite}
                       </div>
                     )}
 
-                    {/* Image / Avatar */}
-                    <div className={`w-full h-44 flex items-center justify-center relative overflow-hidden ${
-                      activeGamme === "Particuliers" ? "bg-gradient-to-br from-yellow-500/20 to-zinc-900" : "bg-gradient-to-br from-purple-500/20 to-zinc-900"
-                    }`}>
+                    <div className={`w-full h-44 flex items-center justify-center relative overflow-hidden bg-gradient-to-br ${gammeConfig.gradient} to-zinc-900`}>
                       {prod.avatar_url ? (
-                        <img src={prod.avatar_url} alt={product.name}
-                          className="w-full h-full object-cover" />
+                        <img src={prod.avatar_url} alt={product.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${
-                          activeGamme === "Particuliers" ? "bg-yellow-500/20" : "bg-purple-500/20"
-                        }`}>
-                          <Package size={36} className={activeGamme === "Particuliers" ? "text-yellow-500/60" : "text-purple-400/60"} />
+                        <div className={`w-20 h-20 rounded-2xl flex items-center justify-center ${gammeConfig.iconBg}`}>
+                          <Package size={36} className={gammeConfig.iconColor} />
                         </div>
                       )}
                     </div>
 
-                    {/* Infos produit */}
                     <div className="p-4">
                       <p className="text-white text-sm font-bold leading-tight mb-3">{product.name}</p>
 
-                      {/* Prix d'achat (CF) et prix de vente (PV) */}
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         <div className="bg-zinc-800 rounded-lg px-2.5 py-1.5">
                           <p className="text-zinc-500 text-[9px] uppercase tracking-wider font-semibold mb-0.5">Achat (CF)</p>
                           <p className="text-zinc-300 text-sm font-bold">{Number(product.cf).toFixed(2)}€</p>
                         </div>
-                        <div className={`rounded-lg px-2.5 py-1.5 ${activeGamme === "Particuliers" ? "bg-yellow-500/15" : "bg-purple-500/15"}`}>
+                        <div className={`rounded-lg px-2.5 py-1.5 ${gammeConfig.pvBg}`}>
                           <p className="text-zinc-500 text-[9px] uppercase tracking-wider font-semibold mb-0.5">Vente (PV)</p>
-                          <p className={`text-sm font-bold ${activeGamme === "Particuliers" ? "text-yellow-400" : "text-purple-300"}`}>{Number(product.pv).toFixed(2)}€</p>
+                          <p className={`text-sm font-bold ${gammeConfig.pvText}`}>{Number(product.pv).toFixed(2)}€</p>
                         </div>
                       </div>
 
-                      {/* Marge */}
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-zinc-600 text-[10px]">Marge</span>
                         <span className={`text-[11px] font-semibold ${marge >= 0 ? "text-green-400" : "text-red-400"}`}>
@@ -594,7 +578,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                         </span>
                       </div>
 
-                      {/* Composition si existe */}
                       {hasCompo && (
                         <div className="border-t border-zinc-800 pt-2 mt-1">
                           <p className="text-zinc-600 text-[9px] uppercase tracking-wider font-semibold mb-1.5">Contient</p>
@@ -640,14 +623,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                   <div className="max-h-48 overflow-y-auto">
                     {filteredClients.map(c => (
                       <button key={c.id} onClick={async () => {
-                      setSelectedClient(c)
-                      setShowClients(false)
-                      // Load custom prices for this client
-                      const { data } = await supabase.from("client_prix").select("*").eq("client_id", c.id)
-                      const map: Record<string, number> = {}
-                      ;(data || []).forEach((p: any) => { map[p.product_id] = p.prix })
-                      setClientPrixMap(map)
-                    }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
+                        setSelectedClient(c)
+                        setShowClients(false)
+                        const { data } = await supabase.from("client_prix").select("*").eq("client_id", c.id)
+                        const map: Record<string, number> = {}
+                        ;(data || []).forEach((p: any) => { map[p.product_id] = p.prix })
+                        setClientPrixMap(map)
+                      }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
                         <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
                       </button>
                     ))}
@@ -660,7 +642,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center shrink-0">
                 <User size={13} className="text-zinc-500" />
               </div>
-              <p className="text-zinc-400 text-sm">{typeVente === "Shopify" ? "Commande Shopify" : "Client de passage"}</p>
+              <p className="text-zinc-400 text-sm">{typeVente === "Shopify" ? "🛍️ Commande Shopify" : typeVente === "Pharmacie" ? "🏥 Pharmacie" : "Client de passage"}</p>
             </div>
           )}
         </div>
