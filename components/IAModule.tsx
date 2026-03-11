@@ -74,7 +74,7 @@ const CHAT_KEY = "ia_chat_history"
 // ═════════════════════════════════════════════
 async function callClaude(messages: { role: string; content: string }[], systemPrompt: string, useWebSearch = false) {
   const body: any = {
-    model: "claude-3-haiku-20240307",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 3000,
     system: systemPrompt,
     messages,
