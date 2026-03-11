@@ -482,7 +482,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "messages":   return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres": return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "admin":      return <AdminGate             activeSociety={activeSociety} profile={profile} />
-      case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} /> {/* ← AJOUT */}
+      case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
