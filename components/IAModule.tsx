@@ -90,7 +90,7 @@ async function callClaude(messages: { role: string; content: string }[], systemP
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `Erreur API ${res.status}`)
+    throw new Error(err?.error?.message || err?.error || `Erreur API ${res.status}`)
   }
 
   const data = await res.json()
