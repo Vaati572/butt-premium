@@ -7,7 +7,7 @@
 // page.tsx — ajouter dans sidebar :
 //   { id: "ia", label: "🤖 IA", icon: Sparkles }
 // page.tsx — ajouter dans renderContent() :
-//   case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} />
+//   case "ia": return <IAModule activeSociety={activeSociety} profile={profile} />
 // ──────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -73,9 +73,6 @@ const CHAT_KEY = "ia_chat_history"
 //  HELPER — appel API Claude
 // ═════════════════════════════════════════════
 async function callClaude(messages: { role: string; content: string }[], systemPrompt: string, useWebSearch = false) {
-  const apiKey = process.env.NEXT_PUBLIC_ANTHROPIC_KEY
-  if (!apiKey) throw new Error("Clé NEXT_PUBLIC_ANTHROPIC_KEY manquante dans Vercel")
-
   const body: any = {
     model: "claude-sonnet-4-20250514",
     max_tokens: 3000,
@@ -86,12 +83,10 @@ async function callClaude(messages: { role: string; content: string }[], systemP
     body.tools = [{ type: "web_search_20250305", name: "web_search" }]
   }
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/api/ia", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
   })
