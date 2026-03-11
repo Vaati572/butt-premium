@@ -74,13 +74,10 @@ const CHAT_KEY = "ia_chat_history"
 // ═════════════════════════════════════════════
 async function callClaude(messages: { role: string; content: string }[], systemPrompt: string, useWebSearch = false) {
   const body: any = {
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-5",
     max_tokens: 3000,
     system: systemPrompt,
     messages,
-  }
-  if (useWebSearch) {
-    body.tools = [{ type: "web_search_20250305", name: "web_search" }]
   }
 
   const res = await fetch("/api/ia", {
