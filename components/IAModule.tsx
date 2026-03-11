@@ -79,6 +79,9 @@ async function callClaude(messages: { role: string; content: string }[], systemP
     system: systemPrompt,
     messages,
   }
+  if (useWebSearch) {
+    body.tools = [{ type: "web_search_20250305", name: "web_search" }]
+  }
 
   const res = await fetch("/api/ia", {
     method: "POST",

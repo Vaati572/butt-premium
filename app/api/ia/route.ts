@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
       },
       body: JSON.stringify(body),
     })
@@ -23,16 +24,11 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errMsg = data?.error?.message || JSON.stringify(data)
-      console.error("Anthropic API error:", response.status, errMsg)
-      return NextResponse.json(
-        { error: `[${response.status}] ${errMsg}` },
-        { status: response.status }
-      )
+      return NextResponse.json({ error: `[${response.status}] ${errMsg}` }, { status: response.status })
     }
 
     return NextResponse.json(data)
   } catch (e: any) {
-    console.error("Route /api/ia error:", e)
     return NextResponse.json({ error: e.message || "Erreur serveur" }, { status: 500 })
   }
 }
