@@ -7,7 +7,7 @@
 // page.tsx — ajouter dans sidebar :
 //   { id: "ia", label: "🤖 IA", icon: Sparkles }
 // page.tsx — ajouter dans renderContent() :
-//   case "ia": return <IAModule activeSociety={activeSociety} profile={profile} />
+//   case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} />
 // ──────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from "react"
