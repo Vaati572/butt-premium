@@ -319,88 +319,15 @@ export default function ParametresModule({ activeSociety, profile }: Props) {
       </Section>
 
       <Section title="Fond de l'application" icon={Monitor} color="#a855f7" desc="Couleur d'arrière-plan principale">
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          {[
-            { color: "#0a0a0a", label: "Noir" },
-            { color: "#050505", label: "Nuit" },
-            { color: "#050508", label: "Nuit bleue" },
-            { color: "#0d0d12", label: "Minuit" },
-            { color: "#0d1117", label: "GitHub" },
-            { color: "#0f0e17", label: "Violet nuit" },
-            { color: "#111827", label: "Ardoise" },
-            { color: "#1a1a2e", label: "Indigo nuit" },
-            { color: "#0d1b2a", label: "Océan nuit" },
-            { color: "#1a0a0a", label: "Rouge nuit" },
-            { color: "#0a1a0a", label: "Forêt nuit" },
-            { color: "#1c1c1c", label: "Anthracite" },
-          ].map(({ color, label }) => (
-            <button key={color} onClick={() => updateAndSave("background", color)}
-              className="h-12 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-0.5"
-              style={{
-                backgroundColor: color,
-                borderColor: us.background === color ? ACCENT : "#27272a",
-                boxShadow: us.background === color ? `0 0 0 2px ${ACCENT}40` : "none"
-              }}>
-              {us.background === color && <Check size={10} className="text-white" />}
-              <span className="text-[9px] text-zinc-500">{label}</span>
+        <div className="grid grid-cols-6 gap-2">
+          {BG_OPTIONS.map(c => (
+            <button key={c} onClick={() => set("background", c)}
+              className={`h-10 rounded-xl border-2 transition-all ${us.background === c ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : "border-zinc-700 hover:border-zinc-500"}`}
+              style={{ backgroundColor: c }}>
+              {us.background === c && <Check size={12} className="text-white mx-auto" />}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3 bg-zinc-800/50 rounded-xl p-3">
-          <label className="text-zinc-400 text-xs font-semibold shrink-0">Couleur personnalisée</label>
-          <div className="flex items-center gap-2 flex-1">
-            <label className="w-9 h-9 rounded-lg border-2 border-zinc-600 cursor-pointer overflow-hidden hover:border-zinc-400 transition-colors"
-              style={{ backgroundColor: us.background }}>
-              <input type="color" value={us.background} onChange={e => updateAndSave("background", e.target.value)} className="sr-only" />
-            </label>
-            <input value={us.background} onChange={e => set("background", e.target.value)} onBlur={e => updateAndSave("background", e.target.value)}
-              placeholder="#0a0a0a"
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-yellow-500/60" />
-          </div>
-          <div className="w-8 h-8 rounded-lg shrink-0" style={{ backgroundColor: us.background }} />
-        </div>
-      </Section>
-
-
-      <Section title="Dégradé d'arrière-plan" icon={Palette} color="#06b6d4" desc="Optionnel — remplace la couleur unie">
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          {[
-            { label: "Aucun", value: "" },
-            { label: "Violet nuit", value: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)" },
-            { label: "Océan nuit", value: "linear-gradient(135deg, #050508 0%, #0d1b2a 100%)" },
-            { label: "Rouge sombre", value: "linear-gradient(135deg, #0a0a0a 0%, #1a0808 100%)" },
-            { label: "Forêt sombre", value: "linear-gradient(135deg, #050508 0%, #081a0d 100%)" },
-            { label: "Or nuit", value: "linear-gradient(135deg, #0a0a0a 0%, #1a1200 100%)" },
-            { label: "Aurora", value: "linear-gradient(135deg, #050508 0%, #0d1b2a 50%, #1a0a2e 100%)" },
-            { label: "Néon cyan", value: "linear-gradient(135deg, #050508 0%, #001a1a 100%)" },
-          ].map(g => {
-            const current = (us as any).bg_gradient || ""
-            const isActive = current === g.value
-            return (
-              <button key={g.label} onClick={() => updateAndSave("bg_gradient" as any, g.value)}
-                className="h-14 rounded-xl border-2 flex items-center justify-center transition-all relative overflow-hidden"
-                style={{
-                  background: g.value || "#18181b",
-                  borderColor: isActive ? ACCENT : "#27272a",
-                  boxShadow: isActive ? `0 0 0 2px ${ACCENT}40` : "none"
-                }}>
-                {isActive && (
-                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-black text-[9px] font-black"
-                    style={{ backgroundColor: ACCENT }}>✓</span>
-                )}
-                <span className="text-xs font-semibold text-white/80 drop-shadow">{g.label}</span>
-              </button>
-            )
-          })}
-        </div>
-        <div className="flex items-center gap-3 bg-zinc-800/50 rounded-xl p-3">
-          <label className="text-zinc-400 text-xs font-semibold shrink-0">CSS personnalisé</label>
-          <input value={(us as any).bg_gradient || ""} onChange={e => set("bg_gradient" as any, e.target.value)}
-            onBlur={e => updateAndSave("bg_gradient" as any, e.target.value)}
-            placeholder="linear-gradient(135deg, #0a0a0a, #1a0a2e)"
-            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-yellow-500/60" />
-        </div>
-        <p className="text-zinc-600 text-[10px] mt-1">Si un dégradé est actif, il remplace la couleur unie ci-dessus.</p>
       </Section>
 
       <Section title="Style des cartes" icon={Layout} color="#a855f7" desc="Arrondi des coins dans l'interface">
