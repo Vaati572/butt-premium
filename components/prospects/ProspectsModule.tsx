@@ -36,6 +36,7 @@ export interface Prospect {
   prochaine_action_date: string
   tags: string[]
   assigned_to: string | null
+  horaires_ouverture: string
   created_at: string
 }
 
@@ -60,7 +61,7 @@ const EMPTY: Omit<Prospect, "id" | "created_at"> & { source_autre?: string } = {
   nom: "", entreprise: "", poste: "", tel: "", email: "",
   adresse: "", cp: "", ville: "", latitude: null, longitude: null,
   statut: "a_faire", priorite: "normale", source: "", notes: "",
-  prochaine_action: "", prochaine_action_date: "", tags: [], assigned_to: null,
+  prochaine_action: "", prochaine_action_date: "", tags: [], assigned_to: null, horaires_ouverture: "",
   source_autre: "",
 }
 
@@ -419,6 +420,11 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                       </p>
                     )}
                     {p.tel && <p className="text-zinc-500 text-xs flex items-center gap-1.5"><Phone size={10} />{p.tel}</p>}
+                    {p.horaires_ouverture && (
+                      <p className="text-blue-400/80 text-xs flex items-center gap-1.5 truncate">
+                        <span className="shrink-0">🕐</span>{p.horaires_ouverture}
+                      </p>
+                    )}
                     {p.prochaine_action && (
                       <p className="text-yellow-500/80 text-xs flex items-center gap-1.5 truncate">
                         <Calendar size={10} className="shrink-0" />{p.prochaine_action}
@@ -517,6 +523,14 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                   </div>
                 ))}
               </div>
+
+              {/* Horaires */}
+              {viewing.horaires_ouverture && (
+                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3">
+                  <p className="text-blue-400/70 text-[10px] uppercase tracking-wider mb-1.5">🕐 Horaires d'ouverture</p>
+                  <p className="text-blue-200 text-sm whitespace-pre-wrap">{viewing.horaires_ouverture}</p>
+                </div>
+              )}
 
               {/* Adresse */}
               {viewing.adresse && (
@@ -741,6 +755,15 @@ export default function ProspectsModule({ activeSociety, profile, onShowOnMap, o
                     className={`w-full bg-zinc-800 border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none ${errors.prochaine_action_date ? "border-red-500" : "border-zinc-700 focus:border-yellow-500/60"}`} />
                   {errors.prochaine_action_date && <p className="text-red-400 text-[10px] mt-1">⚠ {errors.prochaine_action_date}</p>}
                 </div>
+              </div>
+
+              {/* Horaires d'ouverture */}
+              <div>
+                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">🕐 Horaires d'ouverture</label>
+                <textarea value={(form as any).horaires_ouverture || ""} onChange={e => setForm(f => ({ ...f, horaires_ouverture: e.target.value } as any))}
+                  rows={2} placeholder={"Lun-Ven : 9h00 - 18h00\nSam : 9h00 - 12h00"}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500/40 resize-none" />
+                <p className="text-zinc-600 text-[10px] mt-1">Utile pour organiser tes tournées</p>
               </div>
 
               {/* Notes */}
