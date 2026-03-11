@@ -24,6 +24,7 @@ import ConventionModule from "@/components/conventions/ConventionModule"
 import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
+import IAModule from "@/components/IAModule" // ← AJOUT
 
 const ADMIN_PIN = "18072209"
 
@@ -79,6 +80,7 @@ const ALL_NAV = [
     { id: "prospects",  label: "Prospects",          icon: "🎯" },
     { id: "tournees",   label: "Tournées",           icon: "🛣️" },
     { id: "map",        label: "Map & Tournées",     icon: "🗺️" },
+    { id: "ia",         label: "IA",                 icon: "🤖" }, // ← AJOUT
   ]},
   { section: "Système", items: [
     { id: "admin",      label: "Admin",              icon: "🔒" },
@@ -165,8 +167,6 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
     <div className="fixed bottom-6 right-6 z-[100] w-80">
       <div className="bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
         style={{ boxShadow: `0 8px 40px ${ACCENT}20, 0 0 0 1px ${ACCENT}15` }}>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80"
           style={{ background: `linear-gradient(135deg, ${ACCENT}15, transparent)` }}>
           <div className="flex items-center gap-2.5">
@@ -190,8 +190,6 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
             ✕
           </button>
         </div>
-
-        {/* Notif list */}
         <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800/50">
           {notifs.slice(0, 5).map((n, i) => (
             <div key={i} className="px-4 py-2.5 hover:bg-zinc-800/30 transition-colors cursor-default">
@@ -226,8 +224,6 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
             </div>
           )}
         </div>
-
-        {/* Footer */}
         <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
           <button onClick={onGoToMessages}
             className="flex-1 py-2 rounded-xl text-black font-bold text-xs transition-all hover:brightness-110 active:scale-95"
@@ -239,8 +235,6 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
             Plus tard
           </button>
         </div>
-
-        {/* Progress bar */}
         <div className="h-0.5 bg-zinc-800">
           <div className="h-full rounded-full transition-all duration-50"
             style={{ width: `${progress}%`, backgroundColor: ACCENT }} />
@@ -282,7 +276,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     if (settings.start_page) setActiveTab(settings.start_page)
   }, [settings.start_page])
 
-  // Load active convention
   useEffect(() => {
     if (!activeSociety) return
     supabase.from("conventions")
@@ -293,7 +286,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
   }, [activeSociety])
 
-  // ── CHECK UNREAD ON LOGIN ────────────────────
   useEffect(() => {
     if (!profile || !activeSociety) return
     const check = async () => {
@@ -347,14 +339,12 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       }))
 
       if (notifs.length > 0) {
-        // Delay slightly so the app has time to render first
         setTimeout(() => { setUnreadNotifs(notifs); setShowUnreadPopup(true) }, 1200)
       }
     }
     check()
   }, [profile, activeSociety])
 
-  // Presence setup
   useEffect(() => {
     if (!profile || !activeSociety) return
     let channel: ReturnType<typeof supabase.channel> | null = null
@@ -380,7 +370,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     }
   }, [profile, activeSociety])
 
-  // Unread badge
   useEffect(() => {
     if (!profile || !activeSociety) return
     const countUnread = () => {
@@ -461,6 +450,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const myCfg       = PRESENCE[myStatus]
   const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
 
+  // ── RENDER CONTENT ──────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case "accueil":    return <AccueilModule         activeSociety={activeSociety} profile={profile} />
@@ -492,6 +482,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "messages":   return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres": return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "admin":      return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} /> {/* ← AJOUT */}
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -509,7 +500,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const radiusMap    = { rounded: "12px", sharp: "4px", pill: "20px" }
   const cardRadius   = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
-  // Shared popup render (works for both themes)
   const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
     <UnreadMessagesPopup
       notifs={unreadNotifs}
@@ -704,7 +694,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </button>
         {renderContent()}
 
-        {/* POPUP CONVENTION */}
         {showConvPopup && activeConvention && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -745,7 +734,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         )}
       </main>
 
-      {/* UNREAD MESSAGES POPUP */}
       {unreadPopup}
     </div>
   )
