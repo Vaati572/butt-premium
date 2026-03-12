@@ -247,6 +247,25 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
 /* ══════════════════════════════════════════════
    INNER DASHBOARD
 ══════════════════════════════════════════════ */
+/* ── ACCESS DENIED PANEL ──────────────────────────────── */
+function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className="text-center p-8 max-w-sm">
+        <div className="w-24 h-24 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-6">
+          <span className="text-5xl">🚫</span>
+        </div>
+        <h2 className="text-white text-xl font-bold mb-2">Accès non autorisé</h2>
+        <p className="text-zinc-500 text-sm mb-4">
+          Tu n&apos;as pas la permission d&apos;accéder à l&apos;onglet{" "}
+          <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.
+        </p>
+        <p className="text-zinc-700 text-xs">Contacte un administrateur pour obtenir l&apos;accès.</p>
+      </div>
+    </div>
+  )
+}
+
 function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
   const { settings } = useUserSettings()
   const [activeTab, setActiveTab]           = useState(settings.start_page || "vente")
@@ -442,16 +461,25 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     await supabase.auth.signOut(); router.push("/")
   }
 
+  // ALL tabs visible — restricted ones shown in red with lock
   const visibleNav = ALL_NAV.map(section => ({
     ...section,
-    items: section.items.filter(tab => !settings.hidden_tabs.includes(tab.id))
+    items: section.items.map(tab => ({
+      ...tab,
+      restricted: settings.hidden_tabs.includes(tab.id),
+    }))
   })).filter(section => section.items.length > 0)
 
   const myCfg       = PRESENCE[myStatus]
   const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
 
   // ── RENDER CONTENT ──────────────────────────
+  const allTabsFlat = ALL_NAV.flatMap(s => s.items)
+  const activeTabMeta = allTabsFlat.find(t => t.id === activeTab)
+  const isActiveTabRestricted = settings.hidden_tabs.includes(activeTab)
+
   const renderContent = () => {
+    if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
     switch (activeTab) {
       case "accueil":    return <AccueilModule         activeSociety={activeSociety} profile={profile} />
       case "clients":    return <ClientsModule         activeSociety={activeSociety} profile={profile} />
@@ -559,12 +587,16 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                 return (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5"
-                    style={{ backgroundColor: isActive ? ACCENT + "18" : undefined, color: isActive ? ACCENT : "#71717a" }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = ACCENT + "12"; el.style.color = ACCENT } }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = ""; el.style.color = "#71717a" } }}>
-                    {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: ACCENT }} />}
+                    style={{
+                      backgroundColor: isActive ? (tab.restricted ? "#ef444418" : ACCENT + "18") : undefined,
+                      color: tab.restricted ? (isActive ? "#ef4444" : "#7f1d1d") : (isActive ? ACCENT : "#71717a")
+                    }}
+                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = tab.restricted ? "#ef444412" : ACCENT + "12"; el.style.color = tab.restricted ? "#ef4444" : ACCENT } }}
+                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = ""; el.style.color = tab.restricted ? "#7f1d1d" : "#71717a" } }}>
+                    {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT }} />}
                     <span className="text-sm">{tab.icon}</span>
                     <span className="flex-1 truncate">{tab.label}</span>
+                    {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
                     {tab.id === "messages" && unreadMessages > 0 && (
                       <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: ACCENT }}>

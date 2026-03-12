@@ -30,6 +30,7 @@ const GAMMES = [
   { val: "Particuliers",   label: "👤 Particuliers",   active: "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20",  hover: "hover:border-yellow-500/50", gradient: "from-yellow-500/20", iconBg: "bg-yellow-500/20", iconColor: "text-yellow-500/60", pvBg: "bg-yellow-500/15", pvText: "text-yellow-400"  },
   { val: "Professionnels", label: "🏢 Professionnels", active: "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20",  hover: "hover:border-purple-500/50", gradient: "from-purple-500/20", iconBg: "bg-purple-500/20", iconColor: "text-purple-400/60", pvBg: "bg-purple-500/15", pvText: "text-purple-300" },
   { val: "Shopify",        label: "🛍️ Shopify",         active: "bg-green-500 text-black border-green-500 shadow-lg shadow-green-500/20",    hover: "hover:border-green-500/50",  gradient: "from-green-500/20",  iconBg: "bg-green-500/20",  iconColor: "text-green-500/60",  pvBg: "bg-green-500/15",  pvText: "text-green-400"  },
+  { val: "Convention",     label: "🎪 Convention",      active: "bg-orange-500 text-black border-orange-500 shadow-lg shadow-orange-500/20",  hover: "hover:border-orange-500/50", gradient: "from-orange-500/20", iconBg: "bg-orange-500/20", iconColor: "text-orange-500/60", pvBg: "bg-orange-500/15", pvText: "text-orange-400" },
 ]
 
 /* ── HISTORIQUE ─────────────────────────────── */
@@ -692,7 +693,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             <div className="flex justify-between text-xs text-zinc-600"><span>Coût fabrication</span><span>-{cfTotal.toFixed(2)}€</span></div>
             {fraisColisVal > 0 && <div className="flex justify-between text-xs text-red-400/80"><span>Frais colis</span><span>-{fraisColisVal.toFixed(2)}€</span></div>}
             <div className={`flex justify-between text-sm font-bold border-t border-zinc-800 pt-1.5 ${resultat >= 0 ? "text-green-400" : "text-red-400"}`}>
-              <span>Résultat net</span><span>{resultat.toFixed(2)}€</span>
+              <span>Résultat net</span><span>{resultat.toFixed(3)}€</span>
             </div>
             <div className="flex justify-between text-base font-bold text-white border-t border-zinc-800 pt-1.5">
               <span>TOTAL CLIENT</span><span className="text-yellow-500 text-lg">{totalTTC.toFixed(2)}€</span>

@@ -63,7 +63,12 @@ const TYPES_RECHERCHE = [
   { id: "esthetique",  label: "💅 Esthétique",         query: "salon esthétique institut de beauté" },
   { id: "pharmacie",   label: "💊 Pharmacie",          query: "pharmacie" },
   { id: "coiffure",    label: "✂️ Coiffure",            query: "salon de coiffure" },
-  { id: "spa",         label: "🧖 Spa / Bien-être",    query: "spa bien-être massage" },
+  { id: "spa",         label: "🧖 Spa/Bien-être",       query: "spa centre bien-être" },
+  { id: "bio",         label: "🌿 Salon BIO",           query: "salon bio produits naturels boutique bio cosmétiques bio" },
+  { id: "naturo",      label: "🌱 Naturopathie",        query: "naturopathe praticien bien-être médecine naturelle" },
+  { id: "gym",         label: "💪 Salle de sport",      query: "salle de sport fitness gym musculation" },
+  { id: "yoga",        label: "🧘 Yoga / Pilates",      query: "studio yoga pilates cours bien-être" },
+  { id: "medecine",    label: "⚕️ Médecine douce",      query: "ostéopathe chiropracteur acupuncteur médecine douce" },
 ]
 
 const AUTO_KEY = "ia_prospection_auto"
@@ -382,7 +387,7 @@ Réponds en français, de façon concise et utile. Pour les emails ou messages, 
 function ProspectionIA({ activeSociety, profile }: Props) {
   const [ville, setVille] = useState("")
   const [typeRecherche, setTypeRecherche] = useState(TYPES_RECHERCHE[0])
-  const [maxProspects] = useState(20)
+  const [maxProspects, setMaxProspects] = useState(20)
   const [results, setResults] = useState<ProspectResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -391,7 +396,10 @@ function ProspectionIA({ activeSociety, profile }: Props) {
   const [showAutoConfig, setShowAutoConfig] = useState(false)
   const [autoVille, setAutoVille] = useState("")
   const [autoType, setAutoType] = useState(TYPES_RECHERCHE[0])
-  const [autoConfig, setAutoConfig] = useState<{ ville: string; type: string; lastRun: string } | null>(null)
+  const [autoConfig, setAutoConfig] = useState<{ ville: string; type: string; lastRun: string; frequence?: string; rayon?: string; villes?: string } | null>(null)
+  const [autoFrequence, setAutoFrequence] = useState("7") // jours
+  const [autoRayon, setAutoRayon] = useState("ville")
+  const [autoVilles, setAutoVilles] = useState("")
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
 
   // Charger prospects existants pour détection doublons
@@ -414,7 +422,8 @@ function ProspectionIA({ activeSociety, profile }: Props) {
         // Vérifier si auto-run nécessaire (7 jours)
         const last = new Date(cfg.lastRun)
         const next = new Date(last)
-        next.setDate(next.getDate() + 7)
+        const jours = parseInt(cfg.frequence || "7")
+        next.setDate(next.getDate() + jours)
         if (new Date() >= next && cfg.ville) {
           setVille(cfg.ville)
           setTypeRecherche(TYPES_RECHERCHE.find(t => t.id === cfg.type) || TYPES_RECHERCHE[0])
@@ -433,6 +442,7 @@ function ProspectionIA({ activeSociety, profile }: Props) {
     setError("")
     setResults([])
 
+    const rayonLabel = targetType.id === "ville" ? "centre-ville de" : "dans l\'agglomération de"
     const prompt = `Recherche sur internet les ${maxProspects} meilleurs ${targetType.query} situés à ${targetVille} en France.
 
 Pour chaque établissement, fournis TOUTES ces informations :
@@ -539,12 +549,22 @@ IMPORTANT :
   }
 
   const sauvegarderAutoConfig = () => {
-    if (!autoVille.trim()) return
-    const cfg = { ville: autoVille, type: autoType.id, lastRun: new Date(0).toISOString() }
+    const villes = autoVilles.trim() || autoVille.trim()
+    if (!villes) return
+    const cfg = { 
+      ville: autoVille.trim() || autoVilles.split(",")[0].trim(), 
+      type: autoType.id, 
+      lastRun: new Date(0).toISOString(),
+      frequence: autoFrequence,
+      rayon: autoRayon,
+      villes: autoVilles,
+    }
     localStorage.setItem(`${AUTO_KEY}_${activeSociety.id}`, JSON.stringify(cfg))
     setAutoConfig(cfg)
     setShowAutoConfig(false)
-    alert(`✅ Recherche auto configurée : ${autoType.label} à ${autoVille} — se relancera chaque semaine`)
+    const jours = parseInt(autoFrequence)
+    const freq = jours === 1 ? "chaque jour" : jours === 7 ? "chaque semaine" : `tous les ${jours} jours`
+    alert(`✅ Recherche auto : ${autoType.label} — ${freq}`)
   }
 
   const selectedCount = results.filter(r => r._selected && !r._imported && !r._doublon).length
@@ -601,7 +621,10 @@ IMPORTANT :
           <div className="md:col-span-1">
             <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-1.5">Max résultats</label>
             <div className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5">
-              <span className="text-yellow-500 font-bold text-sm">{maxProspects}</span>
+              <select value={maxProspects} onChange={e => setMaxProspects(Number(e.target.value))}
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-yellow-500 font-bold text-sm focus:outline-none">
+                {[5,10,15,20,30,50].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
               <span className="text-zinc-500 text-xs">prospects maximum</span>
             </div>
           </div>
@@ -625,13 +648,14 @@ IMPORTANT :
 
         {/* Config auto */}
         {showAutoConfig && (
-          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 space-y-3">
-            <p className="text-zinc-300 text-sm font-semibold flex items-center gap-2"><Calendar size={13} className="text-purple-400" />Recherche automatique hebdomadaire</p>
-            <p className="text-zinc-500 text-xs">S'active automatiquement à chaque ouverture de cet onglet, 7 jours après la dernière recherche.</p>
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 space-y-4">
+            <p className="text-zinc-300 text-sm font-semibold flex items-center gap-2"><Calendar size={13} className="text-purple-400" />Recherche automatique</p>
+            <p className="text-zinc-500 text-xs">S'active automatiquement à chaque ouverture selon la fréquence choisie.</p>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Ville</label>
-                <input value={autoVille} onChange={e => setAutoVille(e.target.value)} placeholder="Ville auto..."
+                <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Ville principale</label>
+                <input value={autoVille} onChange={e => setAutoVille(e.target.value)} placeholder="Ex: Metz..."
                   className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
               </div>
               <div>
@@ -642,10 +666,41 @@ IMPORTANT :
                 </select>
               </div>
             </div>
+
+            <div>
+              <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-1">Multi-villes <span className="normal-case text-zinc-600 font-normal">(séparées par virgule)</span></label>
+              <input value={autoVilles} onChange={e => setAutoVilles(e.target.value)} placeholder="Ex: Metz, Nancy, Thionville..."
+                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+            </div>
+
+            <div>
+              <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-2">Fréquence</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {[["1","Jour"],["3","3j"],["7","Semaine"],["14","2 sem."],["30","Mois"]].map(([v,l]) => (
+                  <button key={v} onClick={() => setAutoFrequence(v)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${autoFrequence===v ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:border-zinc-400"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-zinc-500 text-[10px] uppercase tracking-wider mb-2">Rayon de recherche</label>
+              <div className="flex gap-1.5">
+                {[["ville","Centre-ville"],["agglo","Agglomération"],["dept","Département"]].map(([v,l]) => (
+                  <button key={v} onClick={() => setAutoRayon(v)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${autoRayon===v ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-700 text-zinc-400 border-zinc-600 hover:border-zinc-400"}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {autoConfig && (
               <p className="text-zinc-500 text-xs">Dernier run : {new Date(autoConfig.lastRun).getFullYear() < 2000 ? "Jamais" : new Date(autoConfig.lastRun).toLocaleDateString("fr-FR")}</p>
             )}
-            <button onClick={sauvegarderAutoConfig} disabled={!autoVille.trim()}
+            <button onClick={sauvegarderAutoConfig} disabled={!autoVille.trim() && !autoVilles.trim()}
               className="w-full py-2 rounded-lg text-white font-semibold text-sm disabled:opacity-40 transition-colors"
               style={{ backgroundColor: "#a855f730", border: "1px solid #a855f750", color: "#c084fc" }}>
               Enregistrer la config auto
