@@ -12,7 +12,15 @@ const MOIS_SHORT = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct
 export default function StatsModule({ activeSociety, profile }: Props) {
   const { settings } = useUserSettings()
   const ACCENT = settings.accent_color || "#eab308"
-  const urssafRate = Number((settings as any).urssaf_rate ?? (settings as any).urssaf_rate_global ?? 0.138)
+  const [urssafRate, setUrssafRate] = useState(0.138)
+
+  useEffect(() => {
+    if (!activeSociety?.id) return
+    // Charge le taux URSSAF global depuis la table settings (même logique que VenteModule)
+    supabase.from("settings").select("value")
+      .eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single()
+      .then(({ data }) => { if (data?.value != null) setUrssafRate(Number(data.value)) })
+  }, [activeSociety?.id])
 
   const [year, setYear] = useState(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)

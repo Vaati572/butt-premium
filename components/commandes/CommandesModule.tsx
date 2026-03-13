@@ -126,6 +126,10 @@ function NouvelleCommandePanel({
     }
 
     setSaving(false)
+    if (error) {
+      alert("Erreur lors de la commande : " + error.message + "\nVérifie que la migration SQL a bien été exécutée dans Supabase.")
+      return
+    }
     onDone()
     onClose()
   }
@@ -288,6 +292,39 @@ const STATUS_CONFIG: Record<CommStatus, { label: string; color: string; bg: stri
   annulé:     { label: "Annulé",     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"  },
 }
 
+/* ── STOCK DISPLAY ───────────────────────── */
+function StockDisplay({ societyId }: { societyId: string }) {
+  const [stock, setStock] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from("stock").select("*")
+      .eq("society_id", societyId)
+      .order("produit_nom")
+      .then(({ data }) => { setStock(data || []); setLoading(false) })
+  }, [societyId])
+
+  if (loading) return <div className="text-zinc-600 text-sm text-center py-2">Chargement...</div>
+  if (stock.length === 0) return <div className="text-zinc-600 text-sm text-center py-2">Aucun produit en stock</div>
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      {stock.filter(s => !s.is_labo).map(s => {
+        const neg = s.quantite < 0
+        const alert = !neg && s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte
+        return (
+          <div key={s.id} className={`bg-zinc-800 border rounded-xl px-3 py-2 ${neg ? "border-red-500/30" : alert ? "border-orange-500/30" : "border-zinc-700"}`}>
+            <p className="text-zinc-400 text-[11px] truncate mb-0.5">{s.produit_nom}</p>
+            <p className={`text-lg font-black ${neg ? "text-red-500" : s.quantite === 0 ? "text-zinc-600" : alert ? "text-orange-400" : "text-white"}`}>
+              {s.quantite}{s.unite ? <span className="text-xs font-normal text-zinc-600 ml-0.5">{s.unite}</span> : ""}
+            </p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function FournisseurModule({ activeSociety, profile }: Props) {
   const [commandes, setCommandes]           = useState<any[]>([])
   const [loading, setLoading]               = useState(true)
@@ -343,6 +380,17 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
           <div>
             <h1 className="text-2xl font-bold text-white">🏭 Fournisseurs</h1>
             <p className="text-zinc-500 text-sm mt-0.5">Gestion des commandes & stocks</p>
+          </div>
+        </div>
+
+        {/* Stock société actuel */}
+        <div className="mb-6 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <p className="text-white font-bold text-sm">📦 Stock société</p>
+            <p className="text-zinc-500 text-xs">Mis à jour en temps réel</p>
+          </div>
+          <div className="p-4">
+            <StockDisplay societyId={activeSociety.id} />
           </div>
         </div>
 

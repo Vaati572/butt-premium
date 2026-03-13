@@ -312,10 +312,10 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
     setLoading(true)
-    const { data } = await supabase.from("conventions")
-      .select("*")
-      .eq("society_id", activeSociety.id)
-      .order("date_debut", { ascending: false })
+    // Try ordering by date_debut, fallback to created_at
+    let query = supabase.from("conventions").select("*").eq("society_id", activeSociety.id)
+    const { data, error } = await query.order("created_at", { ascending: false })
+    if (error) console.error("Convention load error:", error)
     setConventions(data || [])
     setLoading(false)
   }, [activeSociety?.id])
