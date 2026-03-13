@@ -1,252 +1,499 @@
 "use client"
-import { useEffect, useState } from "react"
+
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import { Plus, X, Search, Trash2, Pencil, Eye, Package, Truck, CheckCircle, Clock, AlertCircle } from "lucide-react"
+import { Plus, X, Package, Truck, ChevronDown, Trash2, CheckCircle2, Clock, Search } from "lucide-react"
 
-interface Commande {
-  id: string; numero: string; fournisseur: string; statut: string
-  produits: { nom: string; qte: number; prix_unitaire: number }[]
-  total: number; date_commande: string; date_livraison: string | null
-  notes: string; user_nom: string; created_at: string
-}
+interface Props { activeSociety: any; profile: any }
 
-const STATUTS = [
-  { id: "brouillon",  label: "Brouillon",    color: "#71717a", icon: Clock },
-  { id: "envoyee",    label: "Envoyée",      color: "#3b82f6", icon: Truck },
-  { id: "en_cours",   label: "En transit",   color: "#f97316", icon: Package },
-  { id: "recue",      label: "Reçue",        color: "#22c55e", icon: CheckCircle },
-  { id: "annulee",    label: "Annulée",      color: "#ef4444", icon: AlertCircle },
+// Fournisseurs définis
+const FOURNISSEURS = [
+  {
+    id: "tiny_tube",
+    nom: "Tiny Tube",
+    emoji: "🧴",
+    color: "#3b82f6",
+    description: "Fournisseur de contenants",
+    produits: [
+      { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
+      { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
+      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "20ml",             prix_defaut: 0 },
+      { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
+    ],
+    // Tiny Tube: commande pots → met à jour stock Ludivine
+    targetFournisseur: "ludivine",
+  },
+  {
+    id: "ludivine",
+    nom: "Ludivine (Labo)",
+    emoji: "🔬",
+    color: "#a855f7",
+    description: "Laboratoire de fabrication",
+    produits: [
+      { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
+      { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
+      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "20ml",             prix_defaut: 0 },
+      { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
+    ],
+    targetFournisseur: null, // commande chez Ludivine → met à jour stock principal
+  },
+  {
+    id: "claudia",
+    nom: "Claudia",
+    emoji: "🌸",
+    color: "#ec4899",
+    description: "Savons & soins — 4€/pièce",
+    produits: [
+      { id: "milky",      nom: "Milky",      stock_produit: "Milky",      prix_defaut: 4 },
+      { id: "white_soap", nom: "White Soap", stock_produit: "White Soap", prix_defaut: 4 },
+    ],
+    targetFournisseur: null, // toujours → stock principal
+  },
 ]
 
-const EMPTY_PRODUIT = { nom: "", qte: 1, prix_unitaire: 0 }
-const EMPTY = { numero: "", fournisseur: "", statut: "brouillon", produits: [{ ...EMPTY_PRODUIT }], date_commande: new Date().toISOString().split("T")[0], date_livraison: "", notes: "" }
+type CommStatus = "en_attente" | "reçu" | "annulé"
 
-export default function CommandesModule({ activeSociety, profile }: { activeSociety: any; profile: any }) {
-  const [commandes, setCommandes] = useState<Commande[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [filterStatut, setFilterStatut] = useState("tous")
-  const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<Commande | null>(null)
-  const [viewing, setViewing] = useState<Commande | null>(null)
-  const [form, setForm] = useState<typeof EMPTY>({ ...EMPTY })
-  const [saving, setSaving] = useState(false)
+interface Commande {
+  id: string
+  fournisseur_id: string
+  produit_nom: string
+  stock_produit: string
+  quantite: number
+  prix_unitaire: number
+  frais_livraison: number
+  total: number
+  statut: CommStatus
+  date_commande: string
+  date_reception?: string
+  notes?: string
+  society_id: string
+}
 
-  useEffect(() => { load() }, [activeSociety])
+/* ── PANEL NOUVELLE COMMANDE ──────────────── */
+function NouvelleCommandePanel({
+  societyId, profile, fournisseur, onClose, onDone
+}: { societyId: string; profile: any; fournisseur: typeof FOURNISSEURS[0]; onClose: () => void; onDone: () => void }) {
+  const [produitId, setProduitId]     = useState(fournisseur.produits[0]?.id || "")
+  const [quantite, setQuantite]       = useState("")
+  const [prixUnit, setPrixUnit]       = useState(String(fournisseur.produits[0]?.prix_defaut || ""))
+  const [fraisLiv, setFraisLiv]       = useState("0")
+  const [dateCmd, setDateCmd]         = useState(new Date().toISOString().split("T")[0])
+  const [notes, setNotes]             = useState("")
+  const [saving, setSaving]           = useState(false)
 
-  const load = async () => {
+  const produitInfo = fournisseur.produits.find(p => p.id === produitId)
+  const qty     = parseFloat(quantite) || 0
+  const prix    = parseFloat(prixUnit)  || (fournisseur.id === "claudia" ? 4 : 0)
+  const frais   = parseFloat(fraisLiv)  || 0
+  const total   = qty * prix + frais
+
+  const handleSave = async () => {
+    if (!produitInfo || qty <= 0) return
+    setSaving(true)
+
+    const realPrix = fournisseur.id === "claudia" ? 4 : prix
+
+    // Save to commandes table
+    const { data: cmd, error } = await supabase.from("commandes").insert({
+      society_id: societyId,
+      user_id: profile.id,
+      fournisseur: fournisseur.nom,
+      fournisseur_id: fournisseur.id,
+      produit_nom: produitInfo.nom,
+      stock_produit: produitInfo.stock_produit,
+      quantite: qty,
+      prix_unitaire: realPrix,
+      frais_livraison: frais,
+      total: qty * realPrix + frais,
+      statut: "en_attente",
+      date_commande: dateCmd,
+      notes,
+    }).select().single()
+
+    if (!error && cmd) {
+      // Logic selon fournisseur
+      if (fournisseur.id === "tiny_tube") {
+        // Tiny Tube: commande pots → stock Ludivine (stock_labo)
+        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Commande Tiny Tube — ${produitInfo.nom}`, "labo")
+      } else if (fournisseur.id === "ludivine") {
+        // Ludivine commande pots → retire du stock Ludivine, ajoute au stock principal
+        await updateStockByName(societyId, produitInfo.stock_produit, -qty, profile.id, `Sortie Labo Ludivine — ${produitInfo.nom}`, "labo")
+        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Réception Ludivine — ${produitInfo.nom}`, "main")
+      } else if (fournisseur.id === "claudia") {
+        // Claudia: ajoute au stock principal directement
+        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Commande Claudia — ${produitInfo.nom}`, "main")
+      }
+    }
+
+    setSaving(false)
+    onDone()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-800"
+          style={{ background: `linear-gradient(135deg, ${fournisseur.color}10, transparent)` }}>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider mb-0.5" style={{ color: fournisseur.color }}>
+              {fournisseur.emoji} {fournisseur.nom}
+            </p>
+            <h3 className="text-base font-bold text-white">Nouvelle commande</h3>
+            <p className="text-zinc-600 text-xs mt-0.5">{fournisseur.description}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+
+        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+          {/* Produit */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Produit</label>
+            <select value={produitId} onChange={e => {
+              setProduitId(e.target.value)
+              const p = fournisseur.produits.find(pp => pp.id === e.target.value)
+              if (p && fournisseur.id === "claudia") setPrixUnit("4")
+              else if (p) setPrixUnit(String(p.prix_defaut))
+            }} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60">
+              {fournisseur.produits.map(p => (
+                <option key={p.id} value={p.id}>{p.nom}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quantité */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Quantité</label>
+            <input type="number" min="1" step="1" placeholder="0" value={quantite}
+              onChange={e => setQuantite(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60"/>
+          </div>
+
+          {/* Prix unitaire */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">
+              Prix unitaire (€) {fournisseur.id === "claudia" && <span className="text-pink-400">— fixe 4€</span>}
+            </label>
+            <input type="number" min="0" step="0.01" placeholder="0.00"
+              value={fournisseur.id === "claudia" ? "4" : prixUnit}
+              onChange={e => { if (fournisseur.id !== "claudia") setPrixUnit(e.target.value) }}
+              readOnly={fournisseur.id === "claudia"}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60 disabled:opacity-50"/>
+          </div>
+
+          {/* Frais livraison */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Frais de livraison (€)</label>
+            <input type="number" min="0" step="0.01" placeholder="0.00" value={fraisLiv}
+              onChange={e => setFraisLiv(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+          </div>
+
+          {/* Date */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Date de commande</label>
+            <input type="date" value={dateCmd} onChange={e => setDateCmd(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Notes</label>
+            <input type="text" placeholder="Informations supplémentaires..." value={notes}
+              onChange={e => setNotes(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+          </div>
+
+          {/* Total preview */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Produits</span>
+                <span>{(qty * (fournisseur.id==="claudia"?4:prix)).toFixed(2)}€</span>
+              </div>
+              <div className="flex justify-between text-xs text-zinc-400">
+                <span>Livraison</span>
+                <span>{frais.toFixed(2)}€</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold border-t border-zinc-800 pt-2 mt-2" style={{ color: fournisseur.color }}>
+                <span>Total</span>
+                <span>{total.toFixed(2)}€</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stock info */}
+          {produitInfo && (
+            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-500">
+              <p className="font-semibold text-zinc-400 mb-1">Impact stock :</p>
+              {fournisseur.id === "tiny_tube" && <p>→ +{qty||0} {produitInfo.stock_produit} dans le <span className="text-purple-400">stock Ludivine</span></p>}
+              {fournisseur.id === "ludivine" && <><p>→ -{qty||0} {produitInfo.stock_produit} du <span className="text-purple-400">stock Ludivine</span></p><p>→ +{qty||0} {produitInfo.stock_produit} dans votre <span className="text-yellow-400">stock principal</span></p></>}
+              {fournisseur.id === "claudia" && <p>→ +{qty||0} {produitInfo.stock_produit} dans votre <span className="text-yellow-400">stock principal</span></p>}
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-zinc-800 space-y-3">
+          <button onClick={handleSave} disabled={saving || !quantite || qty <= 0}
+            className="w-full font-bold py-3 rounded-xl text-black text-sm disabled:opacity-40 flex items-center justify-center gap-2"
+            style={{ backgroundColor: fournisseur.color }}>
+            {saving ? "Enregistrement..." : `✓ Passer la commande`}
+          </button>
+          <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">Annuler</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Helper: update stock by name ─────────── */
+async function updateStockByName(
+  societyId: string,
+  produitNom: string,
+  delta: number,
+  userId: string,
+  notes: string,
+  target: "main" | "labo"
+) {
+  // Find stock entry matching name (case-insensitive)
+  const { data: allStock } = await supabase.from("stock")
+    .select("*").eq("society_id", societyId)
+  const item = (allStock || []).find((s: any) =>
+    s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim() &&
+    (target === "labo" ? s.is_labo === true : !s.is_labo)
+  ) || (allStock || []).find((s: any) =>
+    s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim()
+  )
+
+  if (item) {
+    const newQty = item.quantite + delta
+    await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", item.id)
+    await supabase.from("stock_history").insert({
+      society_id: societyId,
+      product_id: item.product_id || item.id,
+      produit_nom: item.produit_nom,
+      user_id: userId,
+      action: delta > 0 ? "Entrée" : "Sortie",
+      quantite: Math.abs(delta),
+      quantite_avant: item.quantite,
+      quantite_apres: newQty,
+      notes,
+    })
+  }
+}
+
+const STATUS_CONFIG: Record<CommStatus, { label: string; color: string; bg: string; border: string }> = {
+  en_attente: { label: "En attente", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20" },
+  reçu:       { label: "Reçu",       color: "text-green-400",  bg: "bg-green-400/10",  border: "border-green-400/20" },
+  annulé:     { label: "Annulé",     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"  },
+}
+
+export default function FournisseurModule({ activeSociety, profile }: Props) {
+  const [commandes, setCommandes]           = useState<any[]>([])
+  const [loading, setLoading]               = useState(true)
+  const [activeFourn, setActiveFourn]       = useState<typeof FOURNISSEURS[0] | null>(null)
+  const [filterFourn, setFilterFourn]       = useState("all")
+  const [filterStatus, setFilterStatus]     = useState("all")
+  const [search, setSearch]                 = useState("")
+
+  const load = useCallback(async () => {
+    if (!activeSociety?.id) return
     setLoading(true)
-    const { data } = await supabase.from("commandes").select("*").eq("society_id", activeSociety.id).order("created_at", { ascending: false })
+    const { data } = await supabase.from("commandes")
+      .select("*")
+      .eq("society_id", activeSociety.id)
+      .order("date_commande", { ascending: false })
     setCommandes(data || [])
     setLoading(false)
-  }
+  }, [activeSociety?.id])
 
-  const calcTotal = (produits: typeof EMPTY.produits) => produits.reduce((s, p) => s + (p.qte * p.prix_unitaire), 0)
+  useEffect(() => { load() }, [load])
 
-  const openCreate = () => {
-    const num = `CMD-${Date.now().toString().slice(-6)}`
-    setForm({ ...EMPTY, numero: num }); setEditing(null); setShowForm(true)
-  }
-  const openEdit = (c: Commande) => { setForm({ ...c, date_livraison: c.date_livraison || "", produits: c.produits || [{ ...EMPTY_PRODUIT }] } as any); setEditing(c); setShowForm(true) }
-
-  const save = async () => {
-    if (!form.fournisseur.trim()) return
-    setSaving(true)
-    const total = calcTotal(form.produits)
-    const payload = {
-      numero: form.numero,
-      fournisseur: form.fournisseur,
-      statut: form.statut,
-      produits: form.produits,
-      total,
-      date_commande: form.date_commande || null,
-      date_livraison: form.date_livraison || null,
-      notes: form.notes,
-      user_nom: profile.nom || "",
-      society_id: activeSociety.id,
-    }
-    let error: any = null
-    if (editing) {
-      const res = await supabase.from("commandes").update(payload).eq("id", editing.id)
-      error = res.error
-    } else {
-      const res = await supabase.from("commandes").insert(payload)
-      error = res.error
-    }
-    setSaving(false)
-    if (error) { alert("Erreur: " + error.message); return }
-    setShowForm(false); load()
-  }
-
-  const remove = async (id: string) => {
-    if (!confirm("Supprimer cette commande ?")) return
-    await supabase.from("commandes").delete().eq("id", id)
-    if (viewing?.id === id) setViewing(null)
+  const markAsReceived = async (cmd: any) => {
+    await supabase.from("commandes").update({
+      statut: "reçu",
+      date_reception: new Date().toISOString(),
+    }).eq("id", cmd.id)
     load()
   }
 
-  const updateStatut = async (id: string, statut: string) => {
-    await supabase.from("commandes").update({ statut }).eq("id", id); load()
-    if (viewing?.id === id) setViewing(v => v ? { ...v, statut } : v)
+  const deleteCommande = async (id: string) => {
+    if (!confirm("Supprimer cette commande ?")) return
+    await supabase.from("commandes").delete().eq("id", id)
+    setCommandes(prev => prev.filter(c => c.id !== id))
   }
 
-  const addProduit = () => setForm(f => ({ ...f, produits: [...f.produits, { ...EMPTY_PRODUIT }] }))
-  const removeProduit = (i: number) => setForm(f => ({ ...f, produits: f.produits.filter((_, idx) => idx !== i) }))
-  const updateProduit = (i: number, field: string, value: any) => setForm(f => ({ ...f, produits: f.produits.map((p, idx) => idx === i ? { ...p, [field]: value } : p) }))
-
-  const getStatut = (id: string) => STATUTS.find(s => s.id === id) || STATUTS[0]
-
   const filtered = commandes.filter(c => {
-    const matchSearch = !search || c.numero?.toLowerCase().includes(search.toLowerCase()) || c.fournisseur?.toLowerCase().includes(search.toLowerCase())
-    const matchStatut = filterStatut === "tous" || c.statut === filterStatut
-    return matchSearch && matchStatut
+    if (filterFourn !== "all" && c.fournisseur_id !== filterFourn) return false
+    if (filterStatus !== "all" && c.statut !== filterStatus) return false
+    if (search && !c.produit_nom?.toLowerCase().includes(search.toLowerCase()) &&
+        !c.fournisseur?.toLowerCase().includes(search.toLowerCase())) return false
+    return true
   })
 
-  const totalEnCours = commandes.filter(c => ["envoyee", "en_cours"].includes(c.statut)).reduce((s, c) => s + (c.total || 0), 0)
+  const totalEnAttente = commandes.filter(c => c.statut === "en_attente").reduce((s: number, c: any) => s + Number(c.total||0), 0)
+  const totalRecu      = commandes.filter(c => c.statut === "reçu").reduce((s: number, c: any) => s + Number(c.total||0), 0)
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center justify-between">
-        <div>
-          <h1 className="text-white font-bold text-xl">📋 Commandes</h1>
-          <p className="text-zinc-500 text-xs mt-0.5">{commandes.length} commande{commandes.length > 1 ? "s" : ""}{totalEnCours > 0 && <span className="text-orange-400 font-semibold ml-2">· {totalEnCours.toFixed(2)}€ en transit</span>}</p>
+    <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
+      <div className="p-6 max-w-5xl mx-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-white">🏭 Fournisseurs</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">Gestion des commandes & stocks</p>
+          </div>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold bg-yellow-500 hover:bg-yellow-400 transition-colors"><Plus size={14} /> Nouvelle</button>
-      </div>
 
-      <div className="px-6 py-2 flex gap-2 overflow-x-auto border-b border-zinc-900">
-        <button onClick={() => setFilterStatut("tous")} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition-all ${filterStatut === "tous" ? "bg-zinc-700 text-white border-zinc-600" : "border-zinc-800 text-zinc-500"}`}>Toutes · {commandes.length}</button>
-        {STATUTS.map(s => (
-          <button key={s.id} onClick={() => setFilterStatut(s.id)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition-all"
-            style={filterStatut === s.id ? { backgroundColor: s.color + "20", color: s.color, borderColor: s.color + "50" } : { borderColor: "#27272a", color: "#71717a" }}>
-            {commandes.filter(c => c.statut === s.id).length} {s.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="px-6 py-3 border-b border-zinc-900">
-        <div className="relative"><Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher par numéro ou fournisseur..." className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" /></div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (<div className="flex items-center justify-center h-40"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" /></div>)
-        : filtered.length === 0 ? (
-          <div className="text-center py-20"><p className="text-4xl mb-3">📋</p><p className="text-zinc-400 font-semibold">Aucune commande</p><button onClick={openCreate} className="mt-4 px-4 py-2 rounded-xl text-black text-sm font-bold bg-yellow-500">+ Nouvelle commande</button></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {filtered.map(c => {
-              const sc = getStatut(c.statut)
-              const Icon = sc.icon
-              return (
-                <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 hover:border-zinc-700 transition-all group">
-                  <div className="flex items-start justify-between mb-2">
-                    <div><p className="text-white font-bold text-sm">{c.numero}</p><p className="text-zinc-500 text-xs">{c.fournisseur}</p></div>
-                    <span className="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg" style={{ backgroundColor: sc.color + "20", color: sc.color }}><Icon size={10} />{sc.label}</span>
+        {/* Fournisseur cards - Commander */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {FOURNISSEURS.map(f => {
+            const count = commandes.filter(c => c.fournisseur_id === f.id && c.statut === "en_attente").length
+            return (
+              <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 hover:border-zinc-700 transition-colors">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-2xl mb-1">{f.emoji}</p>
+                    <h3 className="text-white font-bold">{f.nom}</h3>
+                    <p className="text-zinc-500 text-xs">{f.description}</p>
                   </div>
-                  <div className="text-white font-black text-lg mb-1">{Number(c.total || 0).toFixed(2)}€</div>
-                  <p className="text-zinc-600 text-xs mb-1">{c.produits?.length || 0} produit{(c.produits?.length || 0) > 1 ? "s" : ""}</p>
-                  <p className="text-zinc-600 text-xs">{new Date(c.date_commande).toLocaleDateString("fr-FR")}{c.date_livraison && ` → ${new Date(c.date_livraison).toLocaleDateString("fr-FR")}`}</p>
-                  <div className="flex gap-1.5 pt-3 border-t border-zinc-800 mt-3">
-                    <button onClick={() => setViewing(c)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs"><Eye size={11} /> Voir</button>
-                    <button onClick={() => openEdit(c)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs"><Pencil size={11} /> Éditer</button>
-                    <button onClick={() => remove(c.id)} className="ml-auto w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={11} className="text-red-400" /></button>
-                  </div>
+                  {count > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-full text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
+                      {count} en attente
+                    </span>
+                  )}
                 </div>
-              )
-            })}
+
+                <div className="space-y-1 mb-4">
+                  {f.produits.map(p => (
+                    <p key={p.id} className="text-zinc-600 text-xs">• {p.nom}</p>
+                  ))}
+                </div>
+
+                <button onClick={() => setActiveFourn(f)}
+                  className="w-full py-2.5 rounded-xl font-bold text-sm text-black flex items-center justify-center gap-2 hover:brightness-110 transition"
+                  style={{ backgroundColor: f.color }}>
+                  <Plus size={14}/> Commander
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">En attente</p>
+            <p className="text-yellow-400 text-xl font-bold">{totalEnAttente.toFixed(2)}€</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">Reçu (total)</p>
+            <p className="text-green-400 text-xl font-bold">{totalRecu.toFixed(2)}€</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="relative flex-1 min-w-[140px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+          </div>
+          <select value={filterFourn} onChange={e => setFilterFourn(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+            <option value="all">Tous fournisseurs</option>
+            {FOURNISSEURS.map(f => <option key={f.id} value={f.id}>{f.emoji} {f.nom}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+            <option value="all">Tous statuts</option>
+            <option value="en_attente">En attente</option>
+            <option value="reçu">Reçus</option>
+            <option value="annulé">Annulés</option>
+          </select>
+        </div>
+
+        {/* Commandes list */}
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-24 text-zinc-600">
+            <Truck size={40} className="mx-auto mb-4 opacity-20"/>
+            <p className="text-sm">Aucune commande</p>
+            <p className="text-xs mt-2">Créez votre première commande via les cartes ci-dessus</p>
+          </div>
+        ) : (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  {["Fournisseur","Produit","Qté","Prix unit.","Frais liv.","Total","Statut","Date","Actions"].map(h => (
+                    <th key={h} className="px-4 py-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider text-left">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {filtered.map(cmd => {
+                  const fourn = FOURNISSEURS.find(f => f.id === cmd.fournisseur_id)
+                  const sCfg = STATUS_CONFIG[cmd.statut as CommStatus] || STATUS_CONFIG.en_attente
+                  return (
+                    <tr key={cmd.id} className="hover:bg-zinc-800/30 transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span>{fourn?.emoji || "📦"}</span>
+                          <span className="text-zinc-300 text-sm font-medium" style={{ color: fourn?.color }}>
+                            {cmd.fournisseur}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-white text-sm">{cmd.produit_nom}</td>
+                      <td className="px-4 py-3 text-white text-sm font-bold">{cmd.quantite}</td>
+                      <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.prix_unitaire||0).toFixed(2)}€</td>
+                      <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.frais_livraison||0).toFixed(2)}€</td>
+                      <td className="px-4 py-3 text-yellow-400 text-sm font-bold">{Number(cmd.total||0).toFixed(2)}€</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[11px] font-bold px-2 py-1 rounded-full border ${sCfg.color} ${sCfg.bg} ${sCfg.border}`}>
+                          {sCfg.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 text-xs">
+                        {new Date(cmd.date_commande).toLocaleDateString("fr-FR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {cmd.statut === "en_attente" && (
+                            <button onClick={() => markAsReceived(cmd)}
+                              className="p-1.5 text-green-400 hover:text-green-300 bg-green-400/10 rounded-lg hover:bg-green-400/20 transition-colors"
+                              title="Marquer comme reçu">
+                              <CheckCircle2 size={13}/>
+                            </button>
+                          )}
+                          <button onClick={() => deleteCommande(cmd.id)}
+                            className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10">
+                            <Trash2 size={13}/>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* Detail modal */}
-      {viewing && !showForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <div><p className="text-white font-bold">{viewing.numero}</p><p className="text-zinc-500 text-sm">{viewing.fournisseur}</p></div>
-              <div className="flex gap-2">
-                <button onClick={() => openEdit(viewing)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white"><Pencil size={13} /></button>
-                <button onClick={() => setViewing(null)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white"><X size={13} /></button>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              {/* Statut buttons */}
-              <div>
-                <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Statut</p>
-                <div className="flex gap-2 flex-wrap">
-                  {STATUTS.map(s => (
-                    <button key={s.id} onClick={() => updateStatut(viewing.id, s.id)} className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                      style={viewing.statut === s.id ? { backgroundColor: s.color + "20", color: s.color, borderColor: s.color + "50" } : { borderColor: "#27272a", color: "#71717a" }}>
-                      {viewing.statut === s.id && "✓ "}{s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Produits */}
-              <div>
-                <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Produits commandés</p>
-                <div className="space-y-1">
-                  {(viewing.produits || []).map((p, i) => (
-                    <div key={i} className="flex items-center justify-between bg-zinc-900 rounded-xl px-3 py-2">
-                      <span className="text-zinc-200 text-sm">{p.nom}</span>
-                      <span className="text-zinc-400 text-sm">×{p.qte} · {(p.qte * p.prix_unitaire).toFixed(2)}€</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 flex items-center justify-between">
-                <span className="text-zinc-400 font-semibold">Total</span>
-                <span className="text-yellow-400 font-black text-xl">{Number(viewing.total || 0).toFixed(2)}€</span>
-              </div>
-              {viewing.notes && <div className="bg-zinc-900 rounded-xl p-3"><p className="text-zinc-600 text-[10px] mb-2">Notes</p><p className="text-zinc-300 text-sm">{viewing.notes}</p></div>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Form modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="text-white font-bold">{editing ? "Modifier la commande" : "Nouvelle commande"}</h2>
-              <button onClick={() => setShowForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white"><X size={14} /></button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">N° commande</label><input value={form.numero} onChange={e => setForm(f => ({ ...f, numero: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
-                <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Fournisseur <span className="text-red-400">*</span></label><input value={form.fournisseur} onChange={e => setForm(f => ({ ...f, fournisseur: e.target.value }))} placeholder="Nom du fournisseur" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" /></div>
-                <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Date commande</label><input type="date" value={form.date_commande} onChange={e => setForm(f => ({ ...f, date_commande: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
-                <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Date livraison prévue</label><input type="date" value={form.date_livraison} onChange={e => setForm(f => ({ ...f, date_livraison: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" /></div>
-                <div className="col-span-2"><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Statut</label><select value={form.statut} onChange={e => setForm(f => ({ ...f, statut: e.target.value }))} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">{STATUTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select></div>
-              </div>
-
-              {/* Produits */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-zinc-500 text-[11px] uppercase tracking-wider">Produits</label>
-                  <button onClick={addProduit} className="text-xs text-yellow-400 hover:text-yellow-300 font-semibold">+ Ajouter</button>
-                </div>
-                <div className="space-y-2">
-                  {form.produits.map((p, i) => (
-                    <div key={i} className="flex gap-2 items-center">
-                      <input value={p.nom} onChange={e => updateProduit(i, "nom", e.target.value)} placeholder="Produit" className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                      <input type="number" value={p.qte} onChange={e => updateProduit(i, "qte", Number(e.target.value))} placeholder="Qté" className="w-16 bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60" />
-                      <input type="number" value={p.prix_unitaire} onChange={e => updateProduit(i, "prix_unitaire", Number(e.target.value))} placeholder="€" className="w-20 bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60" />
-                      {form.produits.length > 1 && <button onClick={() => removeProduit(i)} className="w-7 h-7 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0"><X size={11} className="text-red-400" /></button>}
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-end mt-2">
-                  <span className="text-yellow-400 font-black text-lg">Total: {calcTotal(form.produits).toFixed(2)}€</span>
-                </div>
-              </div>
-
-              <div><label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Informations complémentaires..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" /></div>
-              <button onClick={save} disabled={saving || !form.fournisseur.trim()} className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">{saving ? "Enregistrement..." : editing ? "Mettre à jour" : "Créer la commande"}</button>
-            </div>
-          </div>
-        </div>
+      {activeFourn && (
+        <NouvelleCommandePanel
+          societyId={activeSociety.id}
+          profile={profile}
+          fournisseur={activeFourn}
+          onClose={() => setActiveFourn(null)}
+          onDone={load}
+        />
       )}
     </div>
   )

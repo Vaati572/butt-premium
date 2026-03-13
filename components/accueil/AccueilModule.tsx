@@ -1,519 +1,474 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import {
-  TrendingUp, ShoppingCart, AlertTriangle, Target,
-  FileText, Star, Users, Trophy, Zap, Settings,
-  RefreshCw, X, Check, Package,
-} from "lucide-react"
+import { useUserSettings } from "@/lib/UserSettingsContext"
+import { TrendingUp, TrendingDown, Package, AlertTriangle, Target, BarChart2, X, ChevronRight } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
 
-const ALL_WIDGETS = [
-  { key: "ca_jour",          label: "💰 CA du jour",           desc: "Chiffre d'affaires aujourd'hui" },
-  { key: "nb_ventes",        label: "🛒 Ventes du jour",       desc: "Nombre de ventes passées" },
-  { key: "net_jour",         label: "📈 Net URSSAF",           desc: "CA net après charges" },
-  { key: "ca_mois",          label: "📅 CA du mois",           desc: "Chiffre d'affaires ce mois" },
-  { key: "stock_alerte",     label: "⚠ Stocks critiques",     desc: "Produits sous le seuil d'alerte" },
-  { key: "objectif",         label: "🎯 Objectif mensuel",     desc: "Progression vers l'objectif CA" },
-  { key: "memo",             label: "📝 Mon mémo",             desc: "Mémo partagé avec l'équipe" },
-  { key: "favoris",          label: "⭐ Accès rapide",         desc: "Tes produits favoris" },
-  { key: "derniers_clients", label: "👤 Derniers clients",     desc: "Clients vus aujourd'hui" },
-  { key: "top_produits",     label: "🏆 Top produits",         desc: "Produits les plus vendus ce mois" },
-  { key: "activite_session", label: "⚡ Activité session",     desc: "Résumé de ta session en cours" },
-  { key: "nb_prospects",     label: "🎯 Prospects actifs",     desc: "Nombre de prospects en cours" },
-  { key: "ventes_semaine",   label: "📊 CA semaine",           desc: "Chiffre d'affaires cette semaine" },
-  { key: "marge_jour",       label: "💹 Marge du jour",        desc: "Marge brute après coût de fabrication" },
-]
+const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
 
-const DEFAULT_WIDGETS = ["ca_jour", "nb_ventes", "stock_alerte", "memo", "favoris", "objectif"]
+function today() {
+  const d = new Date()
+  return d.toISOString().split("T")[0]
+}
+function startOfWeek() {
+  const d = new Date()
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  d.setDate(diff)
+  return d.toISOString().split("T")[0]
+}
+function startOfMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`
+}
 
-const URSSAF = 0.14
+/* ── STOCK CRITIQUE POPUP ──────────────────── */
+function StockCritiquePopup({ items, onClose }: { items: any[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#111111] border border-red-500/30 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} className="text-red-400" />
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-base">⚠️ Stocks critiques</h2>
+            <p className="text-zinc-500 text-xs mt-0.5">{items.length} produit{items.length>1?"s":""} nécessite{items.length>1?"nt":""} une attention immédiate</p>
+          </div>
+          <button onClick={onClose} className="ml-auto text-zinc-600 hover:text-white"><X size={16}/></button>
+        </div>
+        <div className="px-6 pb-2 space-y-2 max-h-60 overflow-y-auto">
+          {items.map((item: any) => (
+            <div key={item.id} className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5">
+              <span className="text-white text-sm font-medium">{item.produit_nom}</span>
+              <span className={`text-sm font-bold ${item.quantite < 0 ? "text-red-500" : "text-orange-400"}`}>
+                {item.quantite} {item.unite||"u."}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="px-6 pb-6 pt-4">
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-sm hover:bg-red-500/30 transition-colors">
+            Compris
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-/* ── PANEL CONFIG ────────────────────────────── */
-function ConfigPanel({ activeWidgets, objectif, memo, onSave, onClose }: {
-  activeWidgets: string[]
-  objectif: number
-  memo: string
-  onSave: (widgets: string[], obj: number, memo: string) => void
-  onClose: () => void
-}) {
-  const [selected, setSelected] = useState<string[]>(activeWidgets)
-  const [obj, setObj] = useState(objectif.toString())
-  const [memoText, setMemoText] = useState(memo)
+/* ── VENTE DETAIL POPUP ────────────────────── */
+function VenteDetailPopup({ vente, onClose }: { vente: any; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-zinc-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-white font-bold text-base">{vente.client_nom || "Client de passage"}</h2>
+            <p className="text-zinc-500 text-xs mt-0.5">{new Date(vente.created_at).toLocaleString("fr-FR")}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-600 hover:text-white"><X size={18}/></button>
+        </div>
+        <div className="px-6 py-4 space-y-2">
+          {(vente.vente_items || []).map((item: any) => (
+            <div key={item.id} className="flex items-center justify-between">
+              <span className="text-zinc-300 text-sm">{item.produit_nom} <span className="text-zinc-600">×{item.quantite}</span></span>
+              <span className="text-white text-sm font-semibold">{Number(item.total).toFixed(2)}€</span>
+            </div>
+          ))}
+        </div>
+        <div className="px-6 pb-4 border-t border-zinc-800 pt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400 text-sm">Total</span>
+            <span className="text-yellow-500 text-lg font-bold">{Number(vente.total_ttc).toFixed(2)}€</span>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-zinc-600 text-xs">Paiement</span>
+            <span className="text-zinc-400 text-xs bg-zinc-800 px-2 py-0.5 rounded-full">{vente.paiement}</span>
+          </div>
+          {vente.notes && (
+            <p className="text-zinc-600 text-xs mt-2 italic">{vente.notes}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const toggle = (key: string) => {
-    setSelected(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
-  }
+export default function AccueilModule({ activeSociety, profile }: Props) {
+  const { settings } = useUserSettings()
+  const ACCENT = settings.accent_color || "#eab308"
+
+  // URSSAF — always read from settings (global)
+  const urssafRate = Number((settings as any).urssaf_rate ?? (settings as any).urssaf_rate_global ?? 0.138)
+
+  const [loading, setLoading]               = useState(true)
+  const [ventesAujourd, setVentesAujourd]   = useState<any[]>([])
+  const [ventesWeek, setVentesWeek]         = useState<any[]>([])
+  const [ventesMois, setVentesMois]         = useState<any[]>([])
+  const [stockAlerts, setStockAlerts]       = useState<any[]>([])
+  const [showStockPopup, setShowStockPopup] = useState(false)
+  const [selectedVente, setSelectedVente]   = useState<any>(null)
+  const [memo, setMemo]                     = useState("")
+  const [editMemo, setEditMemo]             = useState(false)
+  const [memoInput, setMemoInput]           = useState("")
+  const [objectifMensuel, setObjectifMensuel] = useState(0)
+  const [showStockPopupShown, setShowStockPopupShown] = useState(false)
+
+  const MEMO_KEY = `accueil_memo_${activeSociety?.id}_${profile?.id}`
+  const OBJ_KEY  = `accueil_objectif_${activeSociety?.id}`
+
+  useEffect(() => {
+    try {
+      setMemo(localStorage.getItem(MEMO_KEY) || "")
+      setObjectifMensuel(Number(localStorage.getItem(OBJ_KEY)) || 3000)
+    } catch {}
+  }, [MEMO_KEY, OBJ_KEY])
+
+  const load = useCallback(async () => {
+    if (!activeSociety?.id) return
+    setLoading(true)
+
+    const todayStr = today()
+    const weekStr  = startOfWeek()
+    const monthStr = startOfMonth()
+
+    const todayStart = todayStr + "T00:00:00"
+    const todayEnd   = todayStr + "T23:59:59"
+
+    const [
+      { data: vA },
+      { data: vW },
+      { data: vM },
+      { data: stk },
+    ] = await Promise.all([
+      supabase.from("ventes").select("*, vente_items(*)")
+        .eq("society_id", activeSociety.id)
+        .gte("created_at", todayStart).lte("created_at", todayEnd)
+        .order("created_at", { ascending: false }),
+      supabase.from("ventes").select("total_ttc")
+        .eq("society_id", activeSociety.id)
+        .gte("created_at", weekStr),
+      supabase.from("ventes").select("total_ttc, total_ht")
+        .eq("society_id", activeSociety.id)
+        .gte("created_at", monthStr),
+      supabase.from("stock").select("*")
+        .eq("society_id", activeSociety.id),
+    ])
+
+    setVentesAujourd(vA || [])
+    setVentesWeek(vW || [])
+    setVentesMois(vM || [])
+
+    // Stock alerts: négatif ou <= seuil
+    const alerts = (stk || []).filter((s: any) =>
+      s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte)
+    )
+    setStockAlerts(alerts)
+
+    // Show stock popup on first load if there are alerts
+    if (alerts.length > 0 && !showStockPopupShown) {
+      setTimeout(() => setShowStockPopup(true), 800)
+      setShowStockPopupShown(true)
+    }
+
+    setLoading(false)
+  }, [activeSociety?.id])
+
+  useEffect(() => { load() }, [load])
+
+  // Calculations
+  const caToday   = ventesAujourd.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
+  const caSemaine = ventesWeek.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
+  const caMois    = ventesMois.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
+  const netUrssaf = caToday * (1 - urssafRate)
+  const netMois   = caMois * (1 - urssafRate)
+
+  // Marge du jour — safe: avoid NaN when cf is null
+  const margeToday = ventesAujourd.reduce((s, v) => {
+    const items = v.vente_items || []
+    const marge = items.reduce((ms: number, it: any) => {
+      const cf = Number(it.cf_unitaire ?? 0)
+      return ms + (Number(it.pv_unitaire ?? 0) - cf) * Number(it.quantite ?? 0)
+    }, 0)
+    return s + marge
+  }, 0)
+
+  const progressPct = Math.min(100, (caMois / (objectifMensuel || 1)) * 100)
+
+  if (loading) return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: ACCENT }} />
+    </div>
+  )
+
+  const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div>
-            <h3 className="text-base font-bold text-white">⚙ Configurer l'accueil</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Choisis les widgets à afficher</p>
-          </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+    <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
+      <div className="p-6 max-w-5xl mx-auto space-y-6">
 
-          {/* Widgets */}
+        {/* Header */}
+        <div className="flex items-center justify-between">
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Widgets</label>
-            <div className="space-y-2">
-              {ALL_WIDGETS.map(w => (
-                <button key={w.key} onClick={() => toggle(w.key)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors text-left ${selected.includes(w.key) ? "bg-yellow-500/10 border-yellow-500/40" : "bg-zinc-800 border-zinc-700 hover:border-zinc-600"}`}>
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center border shrink-0 transition-colors ${selected.includes(w.key) ? "bg-yellow-500 border-yellow-500" : "border-zinc-600"}`}>
-                    {selected.includes(w.key) && <Check size={12} className="text-black" />}
+            <h1 className="text-2xl font-bold text-white">🏠 Accueil</h1>
+            <p className="text-zinc-500 text-sm mt-0.5 capitalize">{todayLabel}</p>
+          </div>
+          <button onClick={load} className="text-zinc-500 hover:text-white text-xl transition-colors">↻</button>
+        </div>
+
+        {/* Top KPIs */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: ACCENT+"20" }}>
+                <TrendingUp size={15} style={{ color: ACCENT }} />
+              </div>
+              <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-wider">CA aujourd'hui</p>
+            </div>
+            <p className="text-3xl font-black" style={{ color: ACCENT }}>{caToday.toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-1">Mois : {caMois.toFixed(2)}€</p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <TrendingUp size={15} className="text-green-400" />
+              </div>
+              <p className="text-zinc-500 text-[11px] font-bold uppercase tracking-wider">Net URSSAF</p>
+            </div>
+            <p className="text-3xl font-black text-green-400">{netUrssaf.toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-1">Après {(urssafRate*100).toFixed(1)}% de charges</p>
+          </div>
+        </div>
+
+        {/* Objectif mensuel + CA semaine */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-zinc-400 text-sm font-semibold flex items-center gap-2">
+                <Target size={14} style={{ color: ACCENT }} /> Objectif mensuel
+              </p>
+              <button
+                onClick={() => {
+                  const v = prompt("Objectif mensuel (€) :", String(objectifMensuel))
+                  if (v && !isNaN(Number(v))) {
+                    const n = Number(v)
+                    setObjectifMensuel(n)
+                    try { localStorage.setItem(OBJ_KEY, String(n)) } catch {}
+                  }
+                }}
+                className="text-zinc-600 hover:text-zinc-400 text-[10px] underline"
+              >
+                Modifier
+              </button>
+            </div>
+            <div className="flex items-end justify-between mb-2">
+              <span className="text-zinc-300 text-sm">{caMois.toFixed(0)}€</span>
+              <span className="text-zinc-600 text-xs">/ {objectifMensuel}€</span>
+            </div>
+            <div className="w-full bg-zinc-800 rounded-full h-2 mb-2">
+              <div className="h-2 rounded-full transition-all duration-700"
+                style={{ width: `${progressPct}%`, backgroundColor: ACCENT }} />
+            </div>
+            <p className="font-bold text-sm" style={{ color: ACCENT }}>{progressPct.toFixed(0)}% atteint</p>
+            <p className="text-zinc-600 text-xs">Il reste {Math.max(0, objectifMensuel - caMois).toFixed(0)}€ à faire</p>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart2 size={14} className="text-blue-400" />
+              <p className="text-zinc-400 text-sm font-semibold">CA de la semaine</p>
+            </div>
+            <p className="text-3xl font-black text-blue-400">{caSemaine.toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-1">{ventesWeek.length} vente{ventesWeek.length>1?"s":""} cette semaine</p>
+          </div>
+        </div>
+
+        {/* Mémo + Marge + Stocks critiques */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          {/* Mémo */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-zinc-400 text-sm font-semibold">📝 Mon mémo du jour</p>
+              <button onClick={() => { setEditMemo(true); setMemoInput(memo) }}
+                className="text-zinc-600 hover:text-zinc-400 text-[10px] underline">
+                {memo ? "Modifier" : "Créer"}
+              </button>
+            </div>
+            {editMemo ? (
+              <div className="space-y-2">
+                <textarea value={memoInput} onChange={e => setMemoInput(e.target.value)} rows={3}
+                  placeholder="Notes du jour..." autoFocus
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    setMemo(memoInput); setEditMemo(false)
+                    try { localStorage.setItem(MEMO_KEY, memoInput) } catch {}
+                  }} className="flex-1 py-1.5 rounded-lg text-xs font-bold text-black" style={{ backgroundColor: ACCENT }}>
+                    Sauvegarder
+                  </button>
+                  <button onClick={() => setEditMemo(false)} className="px-3 py-1.5 rounded-lg text-xs bg-zinc-800 text-zinc-400">Annuler</button>
+                </div>
+              </div>
+            ) : memo ? (
+              <p className="text-zinc-300 text-sm whitespace-pre-wrap leading-relaxed">{memo}</p>
+            ) : (
+              <p className="text-zinc-600 text-sm italic">Aucun mémo — configure-le via ✏ Créer</p>
+            )}
+          </div>
+
+          {/* Marge du jour */}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <TrendingUp size={14} className="text-emerald-400" />
+              </div>
+              <p className="text-zinc-400 text-sm font-semibold">Marge du jour</p>
+            </div>
+            <p className={`text-3xl font-black ${margeToday >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+              {isNaN(margeToday) ? "—" : `${margeToday.toFixed(2)}€`}
+            </p>
+            <p className="text-zinc-600 text-xs mt-1">Après coût de fabrication</p>
+          </div>
+
+          {/* Stocks critiques */}
+          <div
+            onClick={() => stockAlerts.length > 0 && setShowStockPopup(true)}
+            className={`bg-zinc-900 border rounded-2xl p-5 ${stockAlerts.length > 0 ? "border-red-500/30 cursor-pointer hover:bg-zinc-800/50 transition-colors" : "border-zinc-800"}`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${stockAlerts.length > 0 ? "bg-red-500/10" : "bg-zinc-800"}`}>
+                  <AlertTriangle size={14} className={stockAlerts.length > 0 ? "text-red-400" : "text-zinc-600"} />
+                </div>
+                <p className="text-zinc-400 text-sm font-semibold">
+                  Stocks critiques{stockAlerts.length > 0 ? ` (${stockAlerts.length})` : ""}
+                </p>
+              </div>
+              {stockAlerts.length > 0 && <ChevronRight size={14} className="text-red-400" />}
+            </div>
+            {stockAlerts.length === 0 ? (
+              <p className="text-zinc-600 text-sm">✅ Tous les stocks sont OK</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stockAlerts.slice(0, 4).map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <span className="text-zinc-300 text-xs truncate">{s.produit_nom}</span>
+                    <span className={`text-xs font-bold ${s.quantite < 0 ? "text-red-500" : "text-orange-400"}`}>
+                      {s.quantite} {s.unite||"u."}
+                    </span>
                   </div>
-                  <div>
-                    <p className="text-white text-sm font-medium">{w.label}</p>
-                    <p className="text-zinc-500 text-[11px]">{w.desc}</p>
+                ))}
+                {stockAlerts.length > 4 && <p className="text-zinc-600 text-[10px]">+ {stockAlerts.length-4} autres</p>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ventes du jour */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+            <p className="text-white font-bold">🛒 Ventes du jour</p>
+            <p className="text-zinc-500 text-xs">{ventesAujourd.length} vente{ventesAujourd.length>1?"s":""} — {caToday.toFixed(2)}€</p>
+          </div>
+          {ventesAujourd.length === 0 ? (
+            <div className="px-6 py-8 text-center text-zinc-600">
+              <p className="text-3xl mb-2">📭</p>
+              <p className="text-sm">Aucune vente aujourd'hui</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-800">
+              {ventesAujourd.map(v => (
+                <button key={v.id} onClick={() => setSelectedVente(v)}
+                  className="w-full flex items-center justify-between px-6 py-3 hover:bg-zinc-800/40 transition-colors text-left group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-black"
+                      style={{ backgroundColor: ACCENT }}>
+                      {(v.client_nom||"P").charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-medium">{v.client_nom || "Client de passage"}</p>
+                      <p className="text-zinc-500 text-xs">{new Date(v.created_at).toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })} — {v.paiement}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="font-bold" style={{ color: ACCENT }}>{Number(v.total_ttc).toFixed(2)}€</p>
+                    <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                   </div>
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Objectif mensuel */}
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Objectif CA mensuel (€)</label>
-            <input type="number" value={obj} onChange={e => setObj(e.target.value)} placeholder="5000"
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-          </div>
-
-          {/* Mémo */}
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Mon mémo du jour</label>
-            <textarea value={memoText} onChange={e => setMemoText(e.target.value)} rows={4}
-              placeholder="Rappels, notes, objectifs du jour..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" />
-          </div>
+          )}
         </div>
-        <div className="p-5 border-t border-zinc-800 space-y-3">
-          <button onClick={() => onSave(selected, parseFloat(obj) || 5000, memoText)}
-            className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
-            <Check size={15} /> Appliquer
-          </button>
-          <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">
-            Annuler
-          </button>
-        </div>
+
+        {/* CA par mois (mini graph) */}
+        <MonthlyMiniChart societyId={activeSociety.id} accent={ACCENT} />
+
       </div>
+
+      {showStockPopup && stockAlerts.length > 0 && (
+        <StockCritiquePopup items={stockAlerts} onClose={() => setShowStockPopup(false)} />
+      )}
+      {selectedVente && (
+        <VenteDetailPopup vente={selectedVente} onClose={() => setSelectedVente(null)} />
+      )}
     </div>
   )
 }
 
-/* ── WIDGET CARD ─────────────────────────────── */
-function WidgetCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-zinc-800">
-        <p className="text-sm font-bold text-zinc-300">{title}</p>
-      </div>
-      <div className="p-5">{children}</div>
-    </div>
-  )
-}
-
-/* ── MAIN ───────────────────────────────────── */
-export default function AccueilModule({ activeSociety, profile }: Props) {
+/* ── MINI CHART CA mensuel ─────────────────── */
+function MonthlyMiniChart({ societyId, accent }: { societyId: string; accent: string }) {
+  const [data, setData] = useState<number[]>(new Array(12).fill(0))
   const [loading, setLoading] = useState(true)
-  const [showConfig, setShowConfig] = useState(false)
 
-  // Config utilisateur
-  const [activeWidgets, setActiveWidgets] = useState<string[]>(DEFAULT_WIDGETS)
-  const [objectif, setObjectif] = useState(5000)
-  const [memo, setMemo] = useState("")
+  useEffect(() => {
+    const year = new Date().getFullYear()
+    supabase.from("ventes")
+      .select("created_at, total_ttc")
+      .eq("society_id", societyId)
+      .gte("created_at", `${year}-01-01`)
+      .lte("created_at", `${year}-12-31`)
+      .then(({ data: ventes }) => {
+        const monthly = new Array(12).fill(0)
+        ;(ventes || []).forEach((v: any) => {
+          const m = new Date(v.created_at).getMonth()
+          monthly[m] += Number(v.total_ttc || 0)
+        })
+        setData(monthly)
+        setLoading(false)
+      })
+  }, [societyId])
 
-  // Données
-  const [ventesJour, setVentesJour] = useState<any[]>([])
-  const [ventesMois, setVentesMois] = useState<any[]>([])
-  const [stockAlerts, setStockAlerts] = useState<any[]>([])
-  const [topProduits, setTopProduits] = useState<{ nom: string; qty: number }[]>([])
-  const [products, setProducts] = useState<any[]>([])
-  const [ventesSemaine, setVentesSemaine] = useState<any[]>([])
-  const [nbProspects, setNbProspects] = useState(0)
-
-  useEffect(() => { if (activeSociety && profile) { loadPrefs(); loadData() } }, [activeSociety, profile])
-
-  const loadPrefs = async () => {
-    try {
-      const { data } = await supabase.from("user_prefs").select("value")
-        .eq("user_id", profile.id).eq("key", "accueil_prefs").single()
-      if (data?.value) {
-        const prefs = data.value
-        if (prefs.widgets) setActiveWidgets(prefs.widgets)
-        if (prefs.objectif) setObjectif(prefs.objectif)
-        if (prefs.memo !== undefined) setMemo(prefs.memo)
-      } else {
-        // fallback localStorage
-        const raw = localStorage.getItem(`accueil_prefs_${profile.id}`)
-        if (raw) {
-          const prefs = JSON.parse(raw)
-          if (prefs.widgets) setActiveWidgets(prefs.widgets)
-          if (prefs.objectif) setObjectif(prefs.objectif)
-          if (prefs.memo !== undefined) setMemo(prefs.memo)
-        }
-      }
-    } catch {}
-  }
-
-  const savePrefs = async (widgets: string[], obj: number, memoText: string) => {
-    const prefs = { widgets, objectif: obj, memo: memoText }
-    try {
-      await supabase.from("user_prefs").upsert(
-        { user_id: profile.id, key: "accueil_prefs", value: prefs },
-        { onConflict: "user_id,key" }
-      )
-      // also save to localStorage as backup
-      localStorage.setItem(`accueil_prefs_${profile.id}`, JSON.stringify(prefs))
-    } catch {}
-    setActiveWidgets(widgets)
-    setObjectif(obj)
-    setMemo(memoText)
-    setShowConfig(false)
-  }
-
-  const loadData = async () => {
-    setLoading(true)
-    const today = new Date(); today.setHours(0, 0, 0, 0)
-    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-
-    const [{ data: vJour }, { data: vMois }, { data: stock }, { data: prods }, { data: vItems }] = await Promise.all([
-      supabase.from("ventes").select("*, vente_items(*)").eq("society_id", activeSociety.id).gte("created_at", today.toISOString()),
-      supabase.from("ventes").select("total_ttc").eq("society_id", activeSociety.id).gte("created_at", firstOfMonth.toISOString()),
-      supabase.from("stock").select("*").eq("society_id", activeSociety.id),
-      supabase.from("products").select("id, name, gamme, pv, avatar_url").eq("society_id", activeSociety.id),
-      supabase.from("vente_items").select("produit_nom, quantite, vente_id").in(
-        "vente_id",
-        (await supabase.from("ventes").select("id").eq("society_id", activeSociety.id).gte("created_at", firstOfMonth.toISOString())).data?.map(v => v.id) || []
-      ),
-    ])
-
-    setVentesJour(vJour || [])
-    setVentesMois(vMois || [])
-    setProducts(prods || [])
-
-    // Stocks en alerte
-    const alerts = (stock || []).filter(s => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
-    setStockAlerts(alerts)
-
-    // Top produits du mois
-    const counts: Record<string, number> = {}
-    for (const item of (vItems || [])) {
-      counts[item.produit_nom] = (counts[item.produit_nom] || 0) + item.quantite
-    }
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([nom, qty]) => ({ nom, qty }))
-    setTopProduits(sorted)
-
-    setLoading(false)
-  }
-
-  // Calculs KPI
-  const caJour = ventesJour.reduce((s, v) => s + Number(v.total_ttc), 0)
-  const caMois = ventesMois.reduce((s, v) => s + Number(v.total_ttc), 0)
-  const netJour = caJour - caJour * URSSAF
-  const nbVentes = ventesJour.length
-  const caSemaine = ventesSemaine.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
-  const margeJour = ventesJour.reduce((s, v) => {
-    const items = v.vente_items || []
-    return s + items.reduce((si: number, i: any) => si + ((i.pv - i.cf) * i.quantite), 0)
-  }, 0)
-  const pctObjectif = objectif > 0 ? Math.min(100, caMois / objectif * 100) : 0
-
-  // Salutation
-  const hour = new Date().getHours()
-  const salut = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir"
-  const dateStr = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
-
-  const isActive = (key: string) => activeWidgets.includes(key)
-
-  // Clients du jour (uniques)
-  const clientsJour = Array.from(new Map(ventesJour.map(v => [v.client_nom, v])).values()).slice(0, 5)
-
-  // Produits favoris (10 premiers du catalogue)
-  const produitsFavoris = products.slice(0, 8)
-
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
-      <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
+  const max = Math.max(...data, 1)
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
-      <div className="p-8 max-w-6xl mx-auto">
-
-        {/* Header salutation */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-yellow-500">{salut}, {profile.username?.split(" ")[0]} 👋</h1>
-            <p className="text-zinc-500 mt-1 capitalize">{dateStr}</p>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={loadData}
-              className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">
-              <RefreshCw size={13} /> Actualiser
-            </button>
-            <button onClick={() => setShowConfig(true)}
-              className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">
-              <Settings size={13} /> Configurer
-            </button>
-          </div>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+      <p className="text-white font-bold text-sm mb-4">📊 CA par mois — {new Date().getFullYear()}</p>
+      {loading ? (
+        <div className="h-24 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: accent }} />
         </div>
-
-        {/* KPI rapides — toujours visibles */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {isActive("ca_jour") && (
-            <div className="bg-zinc-900 border border-yellow-500/20 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center">
-                  <TrendingUp size={15} className="text-yellow-500" />
-                </div>
-                <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">CA aujourd'hui</p>
+      ) : (
+        <div className="flex items-end gap-1 h-24">
+          {data.map((val, i) => (
+            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <div className="w-full rounded-t-sm transition-all duration-700 relative group"
+                style={{ height: `${(val / max) * 80}px`, backgroundColor: val > 0 ? accent : "#27272a", minHeight: "4px" }}>
+                {val > 0 && (
+                  <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-zinc-800 text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    {val.toFixed(0)}€
+                  </div>
+                )}
               </div>
-              <p className="text-3xl font-bold text-yellow-500">{caJour.toFixed(2)}€</p>
-              <p className="text-zinc-600 text-xs mt-1">Mois : {caMois.toFixed(2)}€</p>
+              <p className="text-zinc-600 text-[9px]">{["J","F","M","A","M","J","J","A","S","O","N","D"][i]}</p>
             </div>
-          )}
-          {isActive("nb_ventes") && (
-            <div className="bg-zinc-900 border border-blue-500/20 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
-                  <ShoppingCart size={15} className="text-blue-400" />
-                </div>
-                <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Ventes du jour</p>
-              </div>
-              <p className="text-3xl font-bold text-blue-400">{nbVentes}</p>
-              <p className="text-zinc-600 text-xs mt-1">{nbVentes === 0 ? "Aucune vente" : nbVentes === 1 ? "1 vente passée" : `${nbVentes} ventes passées`}</p>
-            </div>
-          )}
-          {isActive("net_jour") && (
-            <div className="bg-zinc-900 border border-green-500/20 rounded-2xl p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center">
-                  <TrendingUp size={15} className="text-green-400" />
-                </div>
-                <p className="text-zinc-400 text-xs font-semibold uppercase tracking-wider">Net URSSAF</p>
-              </div>
-              <p className="text-3xl font-bold text-green-400">{netJour.toFixed(2)}€</p>
-              <p className="text-zinc-600 text-xs mt-1">Après {(URSSAF * 100).toFixed(0)}% de charges</p>
-            </div>
-          )}
+          ))}
         </div>
-
-        {/* Grille 2 colonnes pour les widgets */}
-        <div className="grid grid-cols-2 gap-5">
-
-          {/* OBJECTIF */}
-          {isActive("objectif") && (
-            <WidgetCard title="🎯 Objectif mensuel">
-              <div className="flex justify-between mb-2">
-                <span className="text-zinc-400 text-sm">{caMois.toFixed(0)}€</span>
-                <span className="text-zinc-500 text-sm">/ {objectif.toFixed(0)}€</span>
-              </div>
-              <div className="w-full bg-zinc-800 rounded-full h-3 mb-2 overflow-hidden">
-                <div className={`h-3 rounded-full transition-all duration-500 ${pctObjectif >= 100 ? "bg-green-500" : "bg-yellow-500"}`}
-                  style={{ width: `${pctObjectif}%` }} />
-              </div>
-              <p className={`text-sm font-bold ${pctObjectif >= 100 ? "text-green-400" : "text-yellow-500"}`}>
-                {pctObjectif.toFixed(0)}% atteint
-                {pctObjectif >= 100 && " 🎉"}
-              </p>
-              {pctObjectif < 100 && (
-                <p className="text-zinc-600 text-xs mt-1">Il reste {(objectif - caMois).toFixed(0)}€ à faire</p>
-              )}
-            </WidgetCard>
-          )}
-
-          {/* STOCKS CRITIQUES */}
-          {isActive("stock_alerte") && (
-            <WidgetCard title={`⚠ Stocks critiques (${stockAlerts.length})`}>
-              {stockAlerts.length === 0 ? (
-                <div className="flex items-center gap-2 text-green-400">
-                  <Check size={16} />
-                  <p className="text-sm font-semibold">Tout est OK !</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {stockAlerts.slice(0, 6).map(s => (
-                    <div key={s.id} className="flex justify-between items-center">
-                      <span className="text-zinc-300 text-sm">{s.produit_nom}</span>
-                      <span className={`text-sm font-bold ${s.quantite < 0 ? "text-red-400" : "text-orange-400"}`}>
-                        {s.quantite} u.
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WidgetCard>
-          )}
-
-          {/* MÉMO */}
-          {isActive("memo") && (
-            <WidgetCard title="📝 Mon mémo du jour">
-              {memo.trim() ? (
-                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-line">{memo}</p>
-              ) : (
-                <div>
-                  <p className="text-zinc-600 text-sm italic mb-3">Aucun mémo — configure-le via ⚙ Configurer</p>
-                </div>
-              )}
-              <button onClick={() => setShowConfig(true)}
-                className="mt-3 text-yellow-500 text-xs hover:underline">
-                ✏ Modifier le mémo
-              </button>
-            </WidgetCard>
-          )}
-
-          {/* ACCÈS RAPIDE PRODUITS */}
-          {isActive("favoris") && (
-            <WidgetCard title="⭐ Accès rapide — Produits">
-              {produitsFavoris.length === 0 ? (
-                <p className="text-zinc-600 text-sm italic">Aucun produit disponible</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {produitsFavoris.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2">
-                      {p.avatar_url ? (
-                        <img src={p.avatar_url} alt={p.name} className="w-5 h-5 rounded-md object-cover" />
-                      ) : (
-                        <Package size={12} className="text-yellow-500" />
-                      )}
-                      <span className="text-white text-xs font-semibold">{p.name}</span>
-                      <span className="text-yellow-500 text-xs">{Number(p.pv).toFixed(2)}€</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WidgetCard>
-          )}
-
-          {/* DERNIERS CLIENTS DU JOUR */}
-          {isActive("derniers_clients") && (
-            <WidgetCard title="👤 Clients du jour">
-              {clientsJour.length === 0 ? (
-                <p className="text-zinc-600 text-sm italic">Aucun client aujourd'hui</p>
-              ) : (
-                <div className="space-y-2">
-                  {clientsJour.map((v, i) => (
-                    <div key={i} className="flex justify-between items-center py-1.5 border-b border-zinc-800 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-yellow-500/10 rounded-lg flex items-center justify-center shrink-0">
-                          <Users size={12} className="text-yellow-500" />
-                        </div>
-                        <span className="text-zinc-300 text-sm">{v.client_nom}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-yellow-500 text-sm font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
-                        <p className="text-zinc-600 text-[10px]">{new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WidgetCard>
-          )}
-
-          {/* TOP PRODUITS DU MOIS */}
-          {isActive("top_produits") && (
-            <WidgetCard title="🏆 Top produits ce mois">
-              {topProduits.length === 0 ? (
-                <p className="text-zinc-600 text-sm italic">Pas encore de données ce mois</p>
-              ) : (
-                <div className="space-y-2">
-                  {topProduits.map((p, i) => (
-                    <div key={p.nom} className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 text-center ${i === 0 ? "text-yellow-500" : i === 1 ? "text-zinc-400" : i === 2 ? "text-orange-600" : "text-zinc-600"}`}>
-                        {i + 1}
-                      </span>
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-0.5">
-                          <span className="text-zinc-300 text-sm truncate">{p.nom}</span>
-                          <span className="text-yellow-500 text-sm font-bold ml-2 shrink-0">{p.qty} u.</span>
-                        </div>
-                        <div className="w-full bg-zinc-800 rounded-full h-1.5">
-                          <div className="bg-yellow-500 h-1.5 rounded-full" style={{ width: `${(p.qty / topProduits[0].qty) * 100}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </WidgetCard>
-          )}
-
-          {/* CA MOIS */}
-          {isActive("ca_mois") && (
-            <WidgetCard title="📅 CA du mois">
-              <p className="text-3xl font-bold text-yellow-500">{caMois.toFixed(2)}€</p>
-              <p className="text-zinc-500 text-sm mt-1">{ventesJour.length > 0 ? `${ventesJour.length} vente(s) aujourd'hui` : "Aucune vente aujourd'hui"}</p>
-            </WidgetCard>
-          )}
-
-          {/* CA SEMAINE */}
-          {isActive("ventes_semaine") && (
-            <WidgetCard title="📊 CA de la semaine">
-              <p className="text-3xl font-bold text-blue-400">{caSemaine.toFixed(2)}€</p>
-              <p className="text-zinc-500 text-sm mt-1">{ventesSemaine.length} vente{ventesSemaine.length > 1 ? "s" : ""} cette semaine</p>
-            </WidgetCard>
-          )}
-
-          {/* PROSPECTS ACTIFS */}
-          {isActive("nb_prospects") && (
-            <WidgetCard title="🎯 Prospects actifs">
-              <p className="text-3xl font-bold text-orange-400">{nbProspects}</p>
-              <p className="text-zinc-500 text-sm mt-1">En cours de démarchage</p>
-            </WidgetCard>
-          )}
-
-          {/* MARGE DU JOUR */}
-          {isActive("marge_jour") && (
-            <WidgetCard title="💹 Marge du jour">
-              <p className={`text-3xl font-bold ${margeJour >= 0 ? "text-green-400" : "text-red-400"}`}>{margeJour.toFixed(2)}€</p>
-              <p className="text-zinc-500 text-sm mt-1">Après coût de fabrication</p>
-            </WidgetCard>
-          )}
-
-          {/* ACTIVITÉ SESSION */}
-          {isActive("activite_session") && (
-            <WidgetCard title="⚡ Activité de la session">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-zinc-800 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-yellow-500">{nbVentes}</p>
-                  <p className="text-zinc-500 text-xs mt-0.5">Ventes</p>
-                </div>
-                <div className="bg-zinc-800 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-yellow-500">{caJour.toFixed(0)}€</p>
-                  <p className="text-zinc-500 text-xs mt-0.5">CA généré</p>
-                </div>
-                <div className="bg-zinc-800 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-green-400">{netJour.toFixed(0)}€</p>
-                  <p className="text-zinc-500 text-xs mt-0.5">Net URSSAF</p>
-                </div>
-                <div className="bg-zinc-800 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-blue-400">{clientsJour.length}</p>
-                  <p className="text-zinc-500 text-xs mt-0.5">Clients</p>
-                </div>
-              </div>
-            </WidgetCard>
-          )}
-
-        </div>
-      </div>
-
-      {showConfig && (
-        <ConfigPanel
-          activeWidgets={activeWidgets}
-          objectif={objectif}
-          memo={memo}
-          onSave={savePrefs}
-          onClose={() => setShowConfig(false)}
-        />
       )}
     </div>
   )

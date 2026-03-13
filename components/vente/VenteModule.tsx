@@ -5,11 +5,12 @@ import { supabase } from "@/lib/supabase"
 import {
   ShoppingCart, Plus, X, Search, User,
   Receipt, ChevronDown, Minus, Check, Package,
-  AlertTriangle, Pencil, Save, RotateCcw,
+  AlertTriangle, Pencil, Save, RotateCcw, Trash2,
 } from "lucide-react"
 
 interface Product { id: string; name: string; gamme: string; pv: number; cf: number }
 interface Client { id: string; nom: string; contrat: string; telephone?: string }
+interface Pharmacie { id: string; nom: string; ville?: string; telephone?: string }
 interface CartItem { product_id: string; nom: string; gamme: string; quantite: number; pv: number; cf: number }
 interface Props { activeSociety: any; profile: any }
 
@@ -34,51 +35,114 @@ const GAMMES = [
 ]
 
 /* ── HISTORIQUE ─────────────────────────────── */
-function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: () => void }) {
+function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; profile: any; onClose: () => void }) {
   const [ventes, setVentes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  useEffect(() => {
+  const [editVente, setEditVente] = useState<any>(null)
+  const [editFields, setEditFields] = useState<{ clientNom: string; paiement: string; notes: string }>({ clientNom: "", paiement: "", notes: "" })
+  const [search, setSearch] = useState("")
+
+  const loadVentes = () => {
+    setLoading(true)
     supabase.from("ventes").select("*, vente_items(*)")
-      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(100)
+      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => { setVentes(data || []); setLoading(false) })
-  }, [])
-  const totalCA = ventes.reduce((s, v) => s + Number(v.total_ttc), 0)
+  }
+  useEffect(() => { loadVentes() }, [])
+
+  const deleteVente = async (id: string) => {
+    if (!confirm("Supprimer cette vente ? Le stock ne sera pas restauré.")) return
+    await supabase.from("vente_items").delete().eq("vente_id", id)
+    await supabase.from("ventes").delete().eq("id", id)
+    setVentes(prev => prev.filter(v => v.id !== id))
+  }
+
+  const saveEdit = async () => {
+    await supabase.from("ventes").update({
+      client_nom: editFields.clientNom,
+      paiement: editFields.paiement,
+      notes: editFields.notes,
+    }).eq("id", editVente.id)
+    setEditVente(null)
+    loadVentes()
+  }
+
+  const filtered = search
+    ? ventes.filter(v => (v.client_nom||"").toLowerCase().includes(search.toLowerCase()) || (v.notes||"").toLowerCase().includes(search.toLowerCase()))
+    : ventes
+  const totalCA = filtered.reduce((s, v) => s + Number(v.total_ttc), 0)
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
           <div>
             <h3 className="text-base font-bold text-white">Historique des ventes</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{ventes.length} ventes — CA : <span className="text-yellow-500 font-bold">{totalCA.toFixed(2)}€</span></p>
+            <p className="text-xs text-zinc-500 mt-0.5">{filtered.length} ventes — CA : <span className="text-yellow-500 font-bold">{totalCA.toFixed(2)}€</span></p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+        </div>
+        <div className="px-4 py-2 border-b border-zinc-900">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none" />
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loading
             ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" /></div>
-            : ventes.length === 0
+            : filtered.length === 0
               ? <div className="text-center py-12 text-zinc-600"><Receipt size={32} className="mx-auto mb-3 opacity-20" /><p className="text-sm">Aucune vente</p></div>
-              : ventes.map(v => (
-                <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <p className="text-white text-sm font-semibold">{v.client_nom || "Passage"}</p>
-                      <p className="text-zinc-500 text-xs">{new Date(v.created_at).toLocaleString("fr-FR")}</p>
+              : filtered.map(v => (
+                <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 group">
+                  {editVente?.id === v.id ? (
+                    <div className="space-y-2">
+                      <input value={editFields.clientNom} onChange={e => setEditFields(p => ({...p, clientNom: e.target.value}))}
+                        placeholder="Client" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {["Espèces","Carte Bancaire","Virement","Chèque","En attente"].map(p => (
+                          <button key={p} onClick={() => setEditFields(prev => ({...prev, paiement: p}))}
+                            className={`px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${editFields.paiement===p ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-700 text-zinc-400 border-zinc-600"}`}>{p}</button>
+                        ))}
+                      </div>
+                      <input value={editFields.notes} onChange={e => setEditFields(p => ({...p, notes: e.target.value}))}
+                        placeholder="Notes" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
+                      <div className="flex gap-2">
+                        <button onClick={saveEdit} className="flex-1 py-1.5 bg-yellow-500 text-black font-bold rounded-lg text-xs">Sauvegarder</button>
+                        <button onClick={() => setEditVente(null)} className="px-3 py-1.5 bg-zinc-700 text-zinc-300 rounded-lg text-xs">Annuler</button>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-yellow-500 font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
-                      <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">{v.paiement}</span>
-                    </div>
-                  </div>
-                  {v.vente_items?.length > 0 && (
-                    <div className="space-y-0.5 mt-2 pt-2 border-t border-zinc-800">
-                      {v.vente_items.map((item: any) => (
-                        <div key={item.id} className="flex justify-between text-[11px] text-zinc-500">
-                          <span>{item.produit_nom} x{item.quantite}</span>
-                          <span>{Number(item.total).toFixed(2)}€</span>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-white text-sm font-semibold">{v.client_nom || "Passage"}</p>
+                          <p className="text-zinc-500 text-xs">{new Date(v.created_at).toLocaleString("fr-FR")}</p>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex items-start gap-2">
+                          <div className="text-right">
+                            <p className="text-yellow-500 font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
+                            <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">{v.paiement}</span>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => { setEditVente(v); setEditFields({ clientNom: v.client_nom||"", paiement: v.paiement||"Espèces", notes: v.notes||"" }) }}
+                              className="p-1 text-zinc-400 hover:text-white"><Pencil size={12}/></button>
+                            <button onClick={() => deleteVente(v.id)} className="p-1 text-red-500 hover:text-red-400"><Trash2 size={12}/></button>
+                          </div>
+                        </div>
+                      </div>
+                      {v.vente_items?.length > 0 && (
+                        <div className="space-y-0.5 mt-2 pt-2 border-t border-zinc-800">
+                          {v.vente_items.map((item: any) => (
+                            <div key={item.id} className="flex justify-between text-[11px] text-zinc-500">
+                              <span>{item.produit_nom} x{item.quantite}</span>
+                              <span>{Number(item.total).toFixed(2)}€</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
@@ -259,6 +323,7 @@ function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; on
 export default function VenteModule({ activeSociety, profile }: Props) {
   const [products, setProducts] = useState<Product[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [pharmacies, setPharmacies] = useState<any[]>([])
   const [urssafRate, setUrssafRate] = useState(DEFAULT_URSSAF_RATE)
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState("")
@@ -288,14 +353,16 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   const loadData = async () => {
     setLoading(true)
-    const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }] = await Promise.all([
+    const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }, { data: pharmas }] = await Promise.all([
       supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
       supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
       supabase.from("stock").select("*").eq("society_id", activeSociety.id),
       supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
+      supabase.from("pharmacies").select("id, nom, ville, telephone").eq("society_id", activeSociety.id).order("nom"),
     ])
     setProducts(prods || [])
     setClients(cls || [])
+    setPharmacies(pharmas || [])
     if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
     const alerts = (stockData || [])
       .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
@@ -308,7 +375,9 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && p.gamme === activeGamme)
     : []
 
-  const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(searchClient.toLowerCase()))
+  const filteredClients = typeVente === "Pharmacie"
+    ? pharmacies.filter((p: any) => p.nom.toLowerCase().includes(searchClient.toLowerCase())).map((p: any) => ({ id: p.id, nom: p.nom, contrat: p.ville || "Pharmacie", telephone: p.telephone }))
+    : clients.filter(c => c.nom.toLowerCase().includes(searchClient.toLowerCase()))
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -354,7 +423,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     const { data: vente, error } = await supabase.from("ventes").insert({
       society_id: activeSociety.id, user_id: profile.id,
       client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : "Client de passage"),
+      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : typeVente === "Convention" ? "Convention" : "Client de passage"),
       created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
       total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
     }).select().single()
@@ -554,7 +623,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const Panier = (
     <div className="flex-1 md:flex-none md:w-96 bg-[#111111] flex flex-col overflow-hidden">
       <div className="p-4 border-b border-zinc-800">
-        {typeVente === "Clients" ? (
+        {(typeVente === "Clients" || typeVente === "Pharmacie") ? (
           <div className="relative">
             <button onClick={() => setShowClients(!showClients)}
               className="w-full flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 hover:border-yellow-500/40 transition-colors">
@@ -643,6 +712,24 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
       {cart.length > 0 && (
         <div className="border-t border-zinc-800 p-4 space-y-3">
+          {/* TARIF PERSO — applique les prix client/pharmacie sauvegardés */}
+          {selectedClient && cart.length > 0 && (
+            <button onClick={async () => {
+              const { data: prixData } = await supabase.from("client_prix").select("*").eq("client_id", selectedClient.id)
+              if (prixData && prixData.length > 0) {
+                const map: Record<string, number> = {}
+                prixData.forEach((p: any) => { map[p.product_id] = p.prix })
+                setClientPrixMap(map)
+                setCart(prev => prev.map(item => map[item.product_id] != null ? { ...item, pv: map[item.product_id] } : item))
+                alert(`✅ Tarifs de ${selectedClient.nom} appliqués`)
+              } else {
+                alert(`Aucun tarif personnalisé trouvé pour ${selectedClient.nom}`)
+              }
+            }}
+              className="w-full py-2 rounded-xl text-sm font-bold border border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors flex items-center justify-center gap-2">
+              💰 Appliquer tarif perso de {selectedClient.nom}
+            </button>
+          )}
           <div className="flex gap-2">
             <div className="flex-1">
               <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">PORT</label>
@@ -685,13 +772,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             )}
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-1">
-            <div className="flex justify-between text-xs text-zinc-400"><span>CA Brut</span><span>{totalHT.toFixed(2)}€</span></div>
-            {portVal > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>Port</span><span>+{portVal.toFixed(2)}€</span></div>}
-            <div className="flex justify-between text-xs text-zinc-500 border-t border-zinc-800 pt-1"><span>Sous-total</span><span>{totalTTC.toFixed(2)}€</span></div>
-            <div className="flex justify-between text-xs text-zinc-600"><span>URSSAF ({(urssafRate * 100).toFixed(1)}%)</span><span>-{urssaf.toFixed(2)}€</span></div>
-            <div className="flex justify-between text-xs text-orange-400/80"><span>Après URSSAF</span><span>{(totalTTC - urssaf).toFixed(2)}€</span></div>
-            <div className="flex justify-between text-xs text-zinc-600"><span>Coût fabrication</span><span>-{cfTotal.toFixed(2)}€</span></div>
-            {fraisColisVal > 0 && <div className="flex justify-between text-xs text-red-400/80"><span>Frais colis</span><span>-{fraisColisVal.toFixed(2)}€</span></div>}
+            <div className="flex justify-between text-xs text-zinc-400"><span>CA Brut</span><span>{totalHT.toFixed(3)}€</span></div>
+            {portVal > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>Port</span><span>+{portVal.toFixed(3)}€</span></div>}
+            <div className="flex justify-between text-xs text-zinc-500 border-t border-zinc-800 pt-1"><span>Sous-total</span><span>{totalTTC.toFixed(3)}€</span></div>
+            <div className="flex justify-between text-xs text-zinc-600"><span>URSSAF ({(urssafRate * 100).toFixed(1)}%)</span><span>-{urssaf.toFixed(3)}€</span></div>
+            <div className="flex justify-between text-xs text-orange-400/80"><span>Après URSSAF</span><span>{(totalTTC - urssaf).toFixed(3)}€</span></div>
+            <div className="flex justify-between text-xs text-zinc-600"><span>Coût fabrication</span><span>-{cfTotal.toFixed(3)}€</span></div>
+            {fraisColisVal > 0 && <div className="flex justify-between text-xs text-red-400/80"><span>Frais colis</span><span>-{fraisColisVal.toFixed(3)}€</span></div>}
             <div className={`flex justify-between text-sm font-bold border-t border-zinc-800 pt-1.5 ${resultat >= 0 ? "text-green-400" : "text-red-400"}`}>
               <span>Résultat net</span><span>{resultat.toFixed(3)}€</span>
             </div>
@@ -752,7 +839,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         </button>
       </div>
 
-      {showHistorique && <HistoriquePanel societyId={activeSociety.id} onClose={() => setShowHistorique(false)} />}
+      {showHistorique && <HistoriquePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowHistorique(false)} />}
       {showManuelle && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
       {showAddProduct && <AddProductPanel societyId={activeSociety.id} onClose={() => setShowAddProduct(false)} onDone={loadData} />}
     </div>

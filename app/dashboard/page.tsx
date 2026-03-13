@@ -62,7 +62,7 @@ const ALL_NAV = [
     { id: "stocks",      label: "Stock",             icon: "📦" },
   ]},
   { section: "Gestion", items: [
-    { id: "commandes",  label: "Commandes",          icon: "📋" },
+    { id: "commandes",  label: "Fournisseurs",        icon: "🏭" },
     { id: "depenses",   label: "Dépenses & Offerts", icon: "💸" },
     { id: "contrats",   label: "Contrats",           icon: "📑" },
     { id: "pharmacies", label: "Pharmacies",         icon: "🏥" },
@@ -297,9 +297,12 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   useEffect(() => {
     if (!activeSociety) return
+    // Check conventions that are ACTUALLY running today (based on real dates, not just statut)
+    const todayStr = new Date().toISOString().split("T")[0]
     supabase.from("conventions")
       .select("*").eq("society_id", activeSociety.id)
-      .eq("statut", "en_cours")
+      .lte("date_debut", todayStr)
+      .gte("date_fin", todayStr)
       .order("date_debut", { ascending: false })
       .limit(1).single()
       .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })

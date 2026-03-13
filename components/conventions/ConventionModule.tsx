@@ -1,345 +1,467 @@
 "use client"
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { Plus, X, ChevronLeft, Trash2, FileText, Package, Clock, Calendar } from "lucide-react"
 
-interface Convention {
-  id: string; nom: string; lieu: string
-  date_debut: string; date_fin: string
-  statut: string; notes: string; created_at: string
-}
-interface ConventionVente {
-  id: string; convention_id: string
-  produit_nom: string; produit_id: string | null
-  client_nom: string
-  quantite: number; prix_unitaire: number; cout_fab: number
-  jour: string; heure: string; paiement: string; created_at: string
-}
-interface ConventionFrais {
-  id: string; convention_id: string
-  label: string; montant: number; created_at: string
-}
-interface Product { id: string; name: string; pv: number; cf: number; gamme: string }
+import { useEffect, useState, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { useUserSettings } from "@/lib/UserSettingsContext"
+import { Plus, X, Calendar, MapPin, Euro, Package, ShoppingCart, Check, Pencil, Trash2, ChevronRight } from "lucide-react"
+
 interface Props { activeSociety: any; profile: any }
 
-const JOURS = ["Vendredi", "Samedi", "Dimanche"]
+/* ── VENTE CONVENTION PANEL ───────────────── */
+function VenteConventionPanel({
+  societyId, profile, convention, onClose, onDone
+}: { societyId: string; profile: any; convention: any; onClose: () => void; onDone: () => void }) {
+  const { settings } = useUserSettings()
+  const urssafRate = Number((settings as any).urssaf_rate ?? 0.138)
 
-const JOUR_COLORS: Record<string, string> = {
-  Vendredi:  "#3b82f6",
-  Samedi:    "#a855f7",
-  Dimanche:  "#f97316",
+  const [tab, setTab] = useState<"catalogue" | "libre">("catalogue")
+  const [products, setProducts] = useState<any[]>([])
+  const [cart, setCart] = useState<{ id: string; nom: string; pv: number; qty: number }[]>([])
+  const [paiement, setPaiement] = useState("Espèces")
+  const [clientNom, setClientNom] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  // Libre mode
+  const [libreItems, setLibreItems] = useState([{ produit: "", qty: 1, pv: 0 }])
+  const [libreClientNom, setLibreClientNom] = useState("")
+  const [librePaiement, setLibrePaiement] = useState("Espèces")
+
+  useEffect(() => {
+    supabase.from("products").select("*")
+      .eq("society_id", societyId).eq("gamme", "Convention")
+      .order("name")
+      .then(({ data }) => setProducts(data || []))
+  }, [societyId])
+
+  const addToCart = (p: any) => {
+    setCart(prev => {
+      const ex = prev.find(i => i.id === p.id)
+      if (ex) return prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i)
+      return [...prev, { id: p.id, nom: p.name, pv: Number(p.pv), qty: 1 }]
+    })
+  }
+
+  const totalCart = cart.reduce((s, i) => s + i.pv * i.qty, 0)
+  const totalLibre = libreItems.reduce((s, i) => s + i.pv * i.qty, 0)
+
+  const saveVente = async (items: { nom: string; pv: number; qty: number }[], total: number, client: string, pmt: string) => {
+    setSaving(true)
+    const { data: vente } = await supabase.from("ventes").insert({
+      society_id: societyId,
+      user_id: profile.id,
+      client_nom: client || "Convention",
+      total_ht: total, port: 0, remise: 0, total_ttc: total,
+      paiement: pmt,
+      notes: `Convention : ${convention.nom}`,
+      gamme: "Convention",
+    }).select().single()
+
+    if (vente) {
+      await supabase.from("vente_items").insert(items.map(i => ({
+        vente_id: vente.id,
+        produit_nom: i.nom,
+        quantite: i.qty,
+        pv_unitaire: i.pv,
+        cf_unitaire: 0,
+        total: i.pv * i.qty,
+        gamme: "Convention",
+      })))
+    }
+    setSaving(false)
+    setSuccess(true)
+    setTimeout(() => { setSuccess(false); setCart([]); setLibreItems([{ produit: "", qty: 1, pv: 0 }]) }, 2000)
+    onDone()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-zinc-800">
+          <div>
+            <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">🎪 {convention.nom}</p>
+            <h3 className="text-white font-bold text-base">Nouvelle vente</h3>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-zinc-800">
+          {([["catalogue", "📦 Catalogue Convention"], ["libre", "✏️ Vente libre"]] as const).map(([val, lbl]) => (
+            <button key={val} onClick={() => setTab(val)}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${tab===val ? "text-orange-400 border-b-2 border-orange-400" : "text-zinc-500 hover:text-zinc-300"}`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {tab === "catalogue" ? (
+            <div className="p-4 space-y-4">
+              {/* Products catalogue */}
+              {products.length === 0 ? (
+                <div className="text-center py-8 text-zinc-600">
+                  <Package size={32} className="mx-auto mb-2 opacity-20"/>
+                  <p className="text-sm">Aucun produit dans la gamme "Convention"</p>
+                  <p className="text-xs mt-1">Créez des produits avec la gamme Convention dans l'onglet Admin</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {products.map(p => {
+                    const inCart = cart.find(i => i.id === p.id)
+                    return (
+                      <button key={p.id} onClick={() => addToCart(p)}
+                        className={`relative text-left rounded-xl border p-3 transition-all ${inCart ? "border-orange-500/50 bg-orange-500/10" : "border-zinc-800 bg-zinc-900 hover:border-orange-500/30"}`}>
+                        {inCart && (
+                          <span className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center text-[10px] font-black text-black">
+                            {inCart.qty}
+                          </span>
+                        )}
+                        <p className="text-white text-sm font-semibold truncate mb-1">{p.name}</p>
+                        <p className="text-orange-400 font-bold text-sm">{Number(p.pv).toFixed(2)}€</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Cart */}
+              {cart.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+                  {cart.map(item => (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <span className="text-zinc-300 text-sm flex-1 truncate">{item.nom}</span>
+                      <div className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1">
+                        <button onClick={() => setCart(prev => prev.map(i => i.id===item.id ? {...i, qty: Math.max(1,i.qty-1)} : i))} className="text-zinc-400 hover:text-white w-4">-</button>
+                        <span className="text-white text-sm w-4 text-center">{item.qty}</span>
+                        <button onClick={() => setCart(prev => prev.map(i => i.id===item.id ? {...i, qty: i.qty+1} : i))} className="text-zinc-400 hover:text-white w-4">+</button>
+                      </div>
+                      <span className="text-orange-400 text-sm font-bold w-16 text-right">{(item.pv*item.qty).toFixed(2)}€</span>
+                      <button onClick={() => setCart(prev => prev.filter(i => i.id !== item.id))} className="text-red-500 hover:text-red-400"><X size={13}/></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cart.length > 0 && (
+                <div className="space-y-3">
+                  <input value={clientNom} onChange={e => setClientNom(e.target.value)}
+                    placeholder="Nom du client (optionnel)"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {["Espèces","Carte Bancaire","Virement","Chèque"].map(p => (
+                      <button key={p} onClick={() => setPaiement(p)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${paiement===p ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                    <span className="text-zinc-400 text-sm">Total</span>
+                    <span className="text-orange-400 text-xl font-black">{totalCart.toFixed(2)}€</span>
+                  </div>
+                  <button
+                    onClick={() => saveVente(cart.map(i => ({ nom: i.nom, pv: i.pv, qty: i.qty })), totalCart, clientNom, paiement)}
+                    disabled={saving || success}
+                    className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${success ? "bg-green-500 text-white" : "bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40"}`}>
+                    {success ? <><Check size={16}/> Enregistrée !</> : saving ? "..." : <><ShoppingCart size={15}/> Valider {totalCart.toFixed(2)}€</>}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Vente libre */
+            <div className="p-4 space-y-4">
+              <p className="text-zinc-500 text-xs">Sélectionne un produit de la gamme Particuliers avec un tarif personnalisé</p>
+              <div className="space-y-2">
+                {libreItems.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input value={item.produit} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,produit:e.target.value}:p))}
+                      placeholder="Produit" className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"/>
+                    <input type="number" min="1" value={item.qty} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,qty:parseInt(e.target.value)||1}:p))}
+                      className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
+                    <input type="number" min="0" step="0.01" value={item.pv} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,pv:parseFloat(e.target.value)||0}:p))}
+                      placeholder="Prix" className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
+                    <button onClick={() => setLibreItems(prev => prev.filter((_,j)=>j!==i))} className="text-red-500 hover:text-red-400"><X size={13}/></button>
+                  </div>
+                ))}
+                <button onClick={() => setLibreItems(prev => [...prev, { produit:"", qty:1, pv:0 }])}
+                  className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 font-semibold">
+                  <Plus size={12}/> Ajouter un article
+                </button>
+              </div>
+
+              {libreItems.some(i => i.produit.trim() && i.pv > 0) && (
+                <div className="space-y-3">
+                  <input value={libreClientNom} onChange={e => setLibreClientNom(e.target.value)}
+                    placeholder="Nom du client (optionnel)"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {["Espèces","Carte Bancaire","Virement","Chèque"].map(p => (
+                      <button key={p} onClick={() => setLibrePaiement(p)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${librePaiement===p ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{p}</button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                    <span className="text-zinc-400 text-sm">Total</span>
+                    <span className="text-orange-400 text-xl font-black">{totalLibre.toFixed(2)}€</span>
+                  </div>
+                  <button
+                    onClick={() => saveVente(
+                      libreItems.filter(i => i.produit.trim() && i.pv > 0).map(i => ({ nom: i.produit, pv: i.pv, qty: i.qty })),
+                      totalLibre, libreClientNom, librePaiement
+                    )}
+                    disabled={saving || success}
+                    className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${success ? "bg-green-500 text-white" : "bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40"}`}>
+                    {success ? <><Check size={16}/> Enregistrée !</> : <><ShoppingCart size={15}/> Valider {totalLibre.toFixed(2)}€</>}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
-const PAIEMENTS = [
-  { id: "especes", label: "Espèces", icon: "💵" },
-  { id: "cb", label: "CB", icon: "💳" },
-  { id: "virement", label: "Virement", icon: "🏦" },
-  { id: "cheque", label: "Chèque", icon: "📝" },
-  { id: "mixte", label: "Mixte", icon: "🔀" },
-]
+/* ── FORM CONVENTION ──────────────────────── */
+function ConventionForm({ societyId, profile, convention, onClose, onDone }: { societyId: string; profile: any; convention?: any; onClose: () => void; onDone: () => void }) {
+  const [nom, setNom]           = useState(convention?.nom || "")
+  const [lieu, setLieu]         = useState(convention?.lieu || "")
+  const [dateDebut, setDateDebut] = useState(convention?.date_debut || "")
+  const [dateFin, setDateFin]   = useState(convention?.date_fin || "")
+  const [budget, setBudget]     = useState(String(convention?.budget || ""))
+  const [notes, setNotes]       = useState(convention?.notes || "")
+  const [saving, setSaving]     = useState(false)
 
+  const save = async () => {
+    if (!nom.trim() || !dateDebut || !dateFin) return
+    setSaving(true)
+    const data = {
+      society_id: societyId, user_id: profile.id,
+      nom, lieu, date_debut: dateDebut, date_fin: dateFin,
+      budget: parseFloat(budget) || 0, notes,
+      statut: "planifiee",
+    }
+    if (convention?.id) await supabase.from("conventions").update(data).eq("id", convention.id)
+    else await supabase.from("conventions").insert(data)
+    setSaving(false); onDone(); onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+          <h3 className="text-base font-bold text-white">{convention ? "Modifier" : "Nouvelle"} convention</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
+          {[
+            { label: "Nom de la convention", value: nom, set: setNom, placeholder: "Ex: Japan Expo 2025" },
+            { label: "Lieu", value: lieu, set: setLieu, placeholder: "Ex: Paris Le Bourget, Hall 5" },
+            { label: "Budget (€)", value: budget, set: setBudget, placeholder: "0", type: "number" },
+          ].map(({ label, value, set, placeholder, type = "text" }) => (
+            <div key={label}>
+              <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
+              <input type={type} value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-orange-500/60"/>
+            </div>
+          ))}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Date début", value: dateDebut, set: setDateDebut },
+              { label: "Date fin", value: dateFin, set: setDateFin },
+            ].map(({ label, value, set }) => (
+              <div key={label}>
+                <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
+                <input type="date" value={value} onChange={e => set(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500/60"/>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
+          </div>
+        </div>
+        <div className="p-6 border-t border-zinc-800 space-y-3">
+          <button onClick={save} disabled={saving || !nom.trim() || !dateDebut || !dateFin}
+            className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm">
+            {saving ? "Sauvegarde..." : convention ? "Modifier" : "Créer la convention"}
+          </button>
+          <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">Annuler</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   MAIN
+══════════════════════════════════════════════ */
 export default function ConventionModule({ activeSociety, profile }: Props) {
-  const [view, setView] = useState<"list" | "detail" | "rapport">("list")
-  const [conventions, setConventions] = useState<Convention[]>([])
-  const [selected, setSelected] = useState<Convention | null>(null)
-  const [ventes, setVentes] = useState<ConventionVente[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const [conventions, setConventions]   = useState<any[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [showForm, setShowForm]         = useState(false)
+  const [editConv, setEditConv]         = useState<any>(null)
+  const [venteConv, setVenteConv]       = useState<any>(null)
+  const [filter, setFilter]             = useState<"all" | "active" | "upcoming" | "past">("all")
 
-  // Formulaire convention
-  const [showConvForm, setShowConvForm] = useState(false)
-  const [convForm, setConvForm] = useState({ nom: "", lieu: "", date_debut: "", date_fin: "", notes: "" })
-  const [savingConv, setSavingConv] = useState(false)
-
-  // Formulaire vente (panier multi-produits)
-  const [showVenteForm, setShowVenteForm] = useState(false)
-  const [panier, setPanier] = useState<Array<{
-    produit_nom: string; produit_id: string
-    prix_unitaire: string; cout_fab: string; quantite: number
-  }>>([])
-  const [venteGlobal, setVenteGlobal] = useState({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
-  const [editVente, setEditVente] = useState<ConventionVente | null>(null)
-  const [editForm, setEditForm] = useState({ produit_nom: "", client_nom: "", quantite: 1, prix_unitaire: "", cout_fab: "", jour: "Vendredi", heure: "", paiement: "especes" })
-  const [savingVente, setSavingVente] = useState(false)
-  const [searchProd, setSearchProd] = useState("")
-  const [panierSearch, setPanierSearch] = useState("")
-  const [frais, setFrais] = useState<ConventionFrais[]>([])
-  const [showFraisForm, setShowFraisForm] = useState(false)
-  const [fraisForm, setFraisForm] = useState({ label: "", montant: "" })
-
-  useEffect(() => { loadConventions() }, [activeSociety])
-  useEffect(() => { loadProducts() }, [activeSociety])
-  useEffect(() => { if (selected) { loadVentes(selected.id); loadFrais(selected.id) } }, [selected])
-
-  const loadConventions = async () => {
+  const load = useCallback(async () => {
+    if (!activeSociety?.id) return
     setLoading(true)
     const { data } = await supabase.from("conventions")
-      .select("*").eq("society_id", activeSociety.id)
+      .select("*")
+      .eq("society_id", activeSociety.id)
       .order("date_debut", { ascending: false })
     setConventions(data || [])
     setLoading(false)
-  }
+  }, [activeSociety?.id])
 
-  const loadProducts = async () => {
-    const { data } = await supabase.from("products")
-      .select("id, name, pv, cf, gamme")
-      .eq("society_id", activeSociety.id).order("name")
-    setProducts(data || [])
-  }
-
-  const loadVentes = async (convId: string) => {
-    const { data } = await supabase.from("convention_ventes")
-      .select("*").eq("convention_id", convId)
-      .order("jour").order("heure")
-    setVentes(data || [])
-  }
-
-  const loadFrais = async (convId: string) => {
-    const { data } = await supabase.from("convention_frais")
-      .select("*").eq("convention_id", convId)
-      .order("created_at")
-    setFrais(data || [])
-  }
-
-  const saveFrais = async () => {
-    if (!selected || !fraisForm.label.trim() || !fraisForm.montant) return
-    const { error } = await supabase.from("convention_frais").insert({
-      convention_id: selected.id,
-      society_id: activeSociety.id,
-      label: fraisForm.label,
-      montant: Number(fraisForm.montant),
-    })
-    if (error) { alert("Erreur: " + error.message); return }
-    setFraisForm({ label: "", montant: "" })
-    setShowFraisForm(false)
-    loadFrais(selected.id)
-  }
-
-  const deleteFrais = async (id: string) => {
-    await supabase.from("convention_frais").delete().eq("id", id)
-    if (selected) loadFrais(selected.id)
-  }
-
-  const saveConvention = async () => {
-    if (!convForm.nom.trim() || !convForm.date_debut || !convForm.date_fin) return
-    setSavingConv(true)
-    const { error } = await supabase.from("conventions").insert({
-      ...convForm, society_id: activeSociety.id, user_id: profile.id, statut: "en_cours"
-    })
-    if (error) { alert("Erreur: " + error.message); setSavingConv(false); return }
-    setSavingConv(false)
-    setShowConvForm(false)
-    setConvForm({ nom: "", lieu: "", date_debut: "", date_fin: "", notes: "" })
-    loadConventions()
-  }
-
-  const terminerConvention = async (id: string) => {
-    if (!confirm("Marquer cette convention comme terminée ?")) return
-    await supabase.from("conventions").update({ statut: "terminee" }).eq("id", id)
-    loadConventions()
-    if (selected?.id === id) setSelected(prev => prev ? { ...prev, statut: "terminee" } : prev)
-  }
+  useEffect(() => { load() }, [load])
 
   const deleteConvention = async (id: string) => {
-    if (!confirm("Supprimer cette convention et toutes ses ventes ?")) return
+    if (!confirm("Supprimer cette convention ?")) return
     await supabase.from("conventions").delete().eq("id", id)
-    loadConventions()
-    if (selected?.id === id) { setSelected(null); setView("list") }
+    load()
   }
 
-  const addToCart = (p: Product) => {
-    setPanier(prev => {
-      const existing = prev.findIndex(x => x.produit_id === p.id)
-      if (existing >= 0) {
-        const next = [...prev]
-        next[existing] = { ...next[existing], quantite: next[existing].quantite + 1 }
-        return next
-      }
-      return [...prev, { produit_nom: p.name, produit_id: p.id, prix_unitaire: String(p.pv), cout_fab: String(p.cf), quantite: 1 }]
-    })
-    setPanierSearch("")
-    setSearchProd("")
-  }
+  const todayStr = new Date().toISOString().split("T")[0]
 
-  const updateCartQty = (idx: number, delta: number) => {
-    setPanier(prev => {
-      const next = [...prev]
-      const nq = next[idx].quantite + delta
-      if (nq <= 0) return prev.filter((_, i) => i !== idx)
-      next[idx] = { ...next[idx], quantite: nq }
-      return next
-    })
-  }
-
-  const removeFromCart = (idx: number) => setPanier(prev => prev.filter((_, i) => i !== idx))
-
-  const saveVente = async () => {
-    if (!selected || panier.length === 0) return
-    setSavingVente(true)
-    const rows = panier.map(item => ({
-      convention_id: selected.id,
-      society_id: activeSociety.id,
-      produit_nom: item.produit_nom,
-      produit_id: item.produit_id || null,
-      client_nom: venteGlobal.client_nom || "",
-      quantite: Number(item.quantite),
-      prix_unitaire: Number(item.prix_unitaire),
-      cout_fab: Number(item.cout_fab) || 0,
-      jour: venteGlobal.jour,
-      heure: venteGlobal.heure,
-      paiement: venteGlobal.paiement,
-    }))
-    const { error } = await supabase.from("convention_ventes").insert(rows)
-    if (error) { alert("Erreur: " + error.message); setSavingVente(false); return }
-    setSavingVente(false)
-    setShowVenteForm(false)
-    setPanier([])
-    setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" })
-    setSearchProd(""); setPanierSearch("")
-    loadVentes(selected.id)
-  }
-
-  const deleteVente = async (id: string) => {
-    await supabase.from("convention_ventes").delete().eq("id", id)
-    if (selected) loadVentes(selected.id)
-  }
-
-  const openEdit = (v: ConventionVente) => {
-    setEditVente(v)
-    setEditForm({
-      produit_nom: v.produit_nom, client_nom: v.client_nom || "",
-      quantite: v.quantite, prix_unitaire: String(v.prix_unitaire),
-      cout_fab: String(v.cout_fab), jour: v.jour, heure: v.heure || "",
-      paiement: v.paiement || "especes"
-    })
-  }
-
-  const saveEdit = async () => {
-    if (!editVente) return
-    const { error } = await supabase.from("convention_ventes").update({
-      produit_nom: editForm.produit_nom,
-      client_nom: editForm.client_nom,
-      quantite: Number(editForm.quantite),
-      prix_unitaire: Number(editForm.prix_unitaire),
-      cout_fab: Number(editForm.cout_fab) || 0,
-      jour: editForm.jour,
-      heure: editForm.heure,
-      paiement: editForm.paiement,
-    }).eq("id", editVente.id)
-    if (error) { alert("Erreur: " + error.message); return }
-    setEditVente(null)
-    if (selected) loadVentes(selected.id)
-  }
-
-  // Calculs totaux
-  const totalBrut = ventes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0)
-  const totalCF = ventes.reduce((s, v) => s + v.cout_fab * v.quantite, 0)
-  const totalMarge = totalBrut - totalCF
-  const totalQty = ventes.reduce((s, v) => s + v.quantite, 0)
-  const totalFrais = frais.reduce((s, f) => s + f.montant, 0)
-  const urssaf = totalBrut * 0.138
-  const beneficeNet = totalBrut - urssaf - totalCF - totalFrais
-
-
-  // Par paiement
-  const parPaiement = PAIEMENTS.map(p => {
-    const lignes = ventes.filter(v => v.paiement === p.id)
-    return {
-      ...p,
-      total: lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0),
-      qty: lignes.reduce((s, v) => s + v.quantite, 0),
-    }
-  }).filter(p => p.qty > 0)
-
-  // Par jour
-  const parJour = JOURS.map(jour => {
-    const lignes = ventes.filter(v => v.jour === jour)
-    return {
-      jour,
-      brut: lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0),
-      cf: lignes.reduce((s, v) => s + v.cout_fab * v.quantite, 0),
-      qty: lignes.reduce((s, v) => s + v.quantite, 0),
-      lignes
-    }
+  const filtered = conventions.filter(c => {
+    if (filter === "active")   return c.date_debut <= todayStr && c.date_fin >= todayStr
+    if (filter === "upcoming") return c.date_debut > todayStr
+    if (filter === "past")     return c.date_fin < todayStr
+    return true
   })
 
-  // Par produit
-  const parProduit = Object.values(
-    ventes.reduce((acc, v) => {
-      const key = v.produit_nom
-      if (!acc[key]) acc[key] = { nom: key, qty: 0, brut: 0, cf: 0 }
-      acc[key].qty += v.quantite
-      acc[key].brut += v.prix_unitaire * v.quantite
-      acc[key].cf += v.cout_fab * v.quantite
-      return acc
-    }, {} as Record<string, { nom: string; qty: number; brut: number; cf: number }>)
-  ).sort((a, b) => b.brut - a.brut)
+  const activeNow = conventions.find(c => c.date_debut <= todayStr && c.date_fin >= todayStr)
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(panierSearch.toLowerCase())
-  ).slice(0, 8)
+  return (
+    <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
+      <div className="p-6 max-w-4xl mx-auto">
 
-  const formatDate = (d: string) => d ? new Date(d + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : ""
-
-  // ═══ LISTE DES CONVENTIONS ═══
-  if (view === "list") return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center justify-between">
-        <div>
-          <h1 className="text-white font-bold text-xl">🎪 Conventions</h1>
-          <p className="text-zinc-500 text-xs mt-0.5">{conventions.length} convention{conventions.length > 1 ? "s" : ""}</p>
-        </div>
-        <button onClick={() => setShowConvForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold"
-          style={{ backgroundColor: "#eab308" }}>
-          <Plus size={14} /> Nouvelle convention
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-white">🎪 Conventions</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">{conventions.length} convention{conventions.length>1?"s":""}</p>
           </div>
-        ) : conventions.length === 0 ? (
-          <div className="text-center py-20">
+          <button onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-orange-500/20">
+            <Plus size={16}/> Nouvelle convention
+          </button>
+        </div>
+
+        {/* Active convention banner */}
+        {activeNow && (
+          <div className="mb-6 bg-orange-500/10 border border-orange-500/30 rounded-2xl p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"/>
+                  <p className="text-orange-400 text-sm font-bold uppercase tracking-wider">Convention en cours</p>
+                </div>
+                <h2 className="text-white text-xl font-bold mb-1">{activeNow.nom}</h2>
+                {activeNow.lieu && <p className="text-zinc-400 text-sm">📍 {activeNow.lieu}</p>}
+                <p className="text-zinc-500 text-xs mt-1">
+                  {new Date(activeNow.date_debut+"T00:00:00").toLocaleDateString("fr-FR")} → {new Date(activeNow.date_fin+"T00:00:00").toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+              <button onClick={() => setVenteConv(activeNow)}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shrink-0">
+                <ShoppingCart size={15}/> Vendre
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {[
+            { id: "all",      label: "Toutes" },
+            { id: "active",   label: "🟢 En cours" },
+            { id: "upcoming", label: "🔵 À venir" },
+            { id: "past",     label: "⚫ Passées" },
+          ].map(f => (
+            <button key={f.id} onClick={() => setFilter(f.id as any)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${filter===f.id ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"/>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-24 text-zinc-600">
             <p className="text-5xl mb-4">🎪</p>
-            <p className="text-zinc-400 font-bold text-lg">Aucune convention</p>
-            <p className="text-zinc-600 text-sm mt-2">Créez votre première convention pour commencer le suivi</p>
+            <p className="text-sm">Aucune convention</p>
           </div>
         ) : (
-          <div className="space-y-3 max-w-2xl mx-auto">
-            {conventions.map(c => {
-              const isActive = c.statut === "en_cours"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map(c => {
+              const isActive   = c.date_debut <= todayStr && c.date_fin >= todayStr
+              const isUpcoming = c.date_debut > todayStr
+              const isPast     = c.date_fin < todayStr
+
+              const daysUntil = isUpcoming
+                ? Math.ceil((new Date(c.date_debut).getTime() - Date.now()) / 86400000)
+                : 0
+              const duration = Math.ceil(
+                (new Date(c.date_fin+"T00:00:00").getTime() - new Date(c.date_debut+"T00:00:00").getTime()) / 86400000
+              ) + 1
+
               return (
-                <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 hover:border-zinc-700 transition-all">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
+                <div key={c.id} className={`bg-zinc-900 border rounded-2xl p-5 ${isActive ? "border-orange-500/40" : "border-zinc-800"}`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white font-bold truncate">{c.nom}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isActive ? "bg-green-500/20 text-green-400" : "bg-zinc-700 text-zinc-400"}`}>
-                          {isActive ? "● En cours" : "✓ Terminée"}
-                        </span>
+                        <h3 className="text-white font-bold">{c.nom}</h3>
+                        {isActive && <span className="text-[10px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-1.5 py-0.5 rounded-full animate-pulse">En cours</span>}
+                        {isUpcoming && <span className="text-[10px] font-bold text-blue-400 bg-blue-400/10 border border-blue-400/20 px-1.5 py-0.5 rounded-full">J-{daysUntil}</span>}
+                        {isPast && <span className="text-[10px] font-bold text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-full">Terminée</span>}
                       </div>
-                      {c.lieu && <p className="text-zinc-500 text-xs mb-1">📍 {c.lieu}</p>}
-                      <p className="text-zinc-600 text-xs">
-                        📅 {formatDate(c.date_debut)} → {formatDate(c.date_fin)}
-                      </p>
+                      {c.lieu && <p className="text-zinc-500 text-xs">📍 {c.lieu}</p>}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => { setSelected(c); setView("detail") }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-yellow-500 hover:bg-yellow-400 text-black transition-colors">
-                        {isActive ? "Saisir ventes" : "Voir détail"}
-                      </button>
-                      <button onClick={() => { setSelected(c); loadVentes(c.id); setView("rapport") }}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                        <FileText size={12} /> Rapport
+                      {isActive && (
+                        <button onClick={() => setVenteConv(c)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-2 py-1.5 rounded-lg hover:bg-orange-400/20">
+                          <ShoppingCart size={11}/> Vendre
+                        </button>
+                      )}
+                      <button onClick={() => { setEditConv(c); setShowForm(true) }}
+                        className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800">
+                        <Pencil size={13}/>
                       </button>
                       <button onClick={() => deleteConvention(c.id)}
-                        className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-colors">
-                        <Trash2 size={12} />
+                        className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10">
+                        <Trash2 size={13}/>
                       </button>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-zinc-800 rounded-xl px-3 py-2">
+                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Début</p>
+                      <p className="text-white font-semibold text-xs">{new Date(c.date_debut+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" })}</p>
+                    </div>
+                    <div className="bg-zinc-800 rounded-xl px-3 py-2">
+                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Fin</p>
+                      <p className="text-white font-semibold text-xs">{new Date(c.date_fin+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" })}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
+                    <span>📅 {duration} jour{duration>1?"s":""}</span>
+                    {c.budget > 0 && <span>💰 Budget : {c.budget.toFixed(2)}€</span>}
+                    {c.notes && <span className="italic truncate">{c.notes}</span>}
                   </div>
                 </div>
               )
@@ -348,632 +470,22 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {/* Modal création convention */}
-      {showConvForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="text-white font-bold">Nouvelle convention</h2>
-              <button onClick={() => setShowConvForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom de la convention <span className="text-red-400">*</span></label>
-                <input value={convForm.nom} onChange={e => setConvForm(f => ({ ...f, nom: e.target.value }))}
-                  placeholder="Ex: Convention Paris 2026"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Lieu</label>
-                <input value={convForm.lieu} onChange={e => setConvForm(f => ({ ...f, lieu: e.target.value }))}
-                  placeholder="Ex: Parc des Expositions, Hall 3"
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Début (Vendredi) <span className="text-red-400">*</span></label>
-                  <input type="date" value={convForm.date_debut} onChange={e => setConvForm(f => ({ ...f, date_debut: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Fin (Dimanche) <span className="text-red-400">*</span></label>
-                  <input type="date" value={convForm.date_fin} onChange={e => setConvForm(f => ({ ...f, date_fin: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Notes</label>
-                <textarea value={convForm.notes} onChange={e => setConvForm(f => ({ ...f, notes: e.target.value }))}
-                  rows={2} placeholder="Infos utiles..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none" />
-              </div>
-              <button onClick={saveConvention} disabled={savingConv || !convForm.nom.trim() || !convForm.date_debut || !convForm.date_fin}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                {savingConv ? "Création..." : "Créer la convention"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showForm && (
+        <ConventionForm
+          societyId={activeSociety.id} profile={profile}
+          convention={editConv}
+          onClose={() => { setShowForm(false); setEditConv(null) }}
+          onDone={load}
+        />
+      )}
+      {venteConv && (
+        <VenteConventionPanel
+          societyId={activeSociety.id} profile={profile}
+          convention={venteConv}
+          onClose={() => setVenteConv(null)}
+          onDone={load}
+        />
       )}
     </div>
   )
-
-  // ═══ DÉTAIL / SAISIE VENTES ═══
-  if (view === "detail" && selected) return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-zinc-900">
-        <div className="flex items-center gap-3 mb-1">
-          <button onClick={() => setView("list")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-white font-bold text-lg truncate">{selected.nom}</h1>
-            {selected.lieu && <p className="text-zinc-500 text-xs">{selected.lieu}</p>}
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => setView("rapport")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-              <FileText size={12} /> Rapport
-            </button>
-            {selected.statut === "en_cours" && (
-              <button onClick={() => terminerConvention(selected.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors">
-                ✓ Terminer
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Totaux rapides */}
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          {[
-            { label: "CA Brut", value: `${totalBrut.toFixed(2)}€`, color: "#eab308" },
-            { label: "Coût fab.", value: `${totalCF.toFixed(2)}€`, color: "#ef4444" },
-            { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-zinc-900 rounded-xl p-2.5 text-center">
-              <p className="font-bold text-sm" style={{ color }}>{value}</p>
-              <p className="text-zinc-600 text-[10px] mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-2 mt-2">
-          <div className="bg-zinc-900 rounded-xl p-2.5 text-center">
-            <p className="font-bold text-sm text-orange-400">-{urssaf.toFixed(2)}€</p>
-            <p className="text-zinc-600 text-[10px] mt-0.5">URSSAF 13.8%</p>
-          </div>
-          <div className="col-span-2 bg-zinc-900 rounded-xl p-2.5 text-center" style={{ borderColor: beneficeNet >= 0 ? "#22c55e40" : "#ef444440", border: "1px solid" }}>
-            <p className="font-bold text-base" style={{ color: beneficeNet >= 0 ? "#22c55e" : "#ef4444" }}>{beneficeNet.toFixed(2)}€</p>
-            <p className="text-zinc-500 text-[10px] mt-0.5 font-semibold">✦ Bénéfice net{totalFrais > 0 ? ` (−${totalFrais.toFixed(2)}€ frais)` : ""}</p>
-          </div>
-        </div>
-      </div>
-
-
-        {/* Stats paiement */}
-        {parPaiement.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-            {parPaiement.map(p => (
-              <div key={p.id} className="flex items-center gap-1.5 bg-zinc-900 rounded-xl px-3 py-1.5 shrink-0">
-                <span className="text-sm">{p.icon}</span>
-                <div>
-                  <p className="text-white text-xs font-bold">{p.total.toFixed(2)}€</p>
-                  <p className="text-zinc-600 text-[9px]">{p.label} · {p.qty} vente{p.qty > 1 ? "s" : ""}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-      {/* Bouton ajouter */}
-      <div className="px-6 py-3 border-b border-zinc-900 flex items-center justify-between">
-        <p className="text-zinc-500 text-xs">{ventes.length} vente{ventes.length > 1 ? "s" : ""} saisie{ventes.length > 1 ? "s" : ""}</p>
-        {selected.statut === "en_cours" && (
-          <button onClick={() => setShowVenteForm(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-black text-sm font-bold"
-            style={{ backgroundColor: "#eab308" }}>
-            <Plus size={14} /> Ajouter une vente
-          </button>
-        )}
-      </div>
-
-      {/* Liste ventes par jour */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {JOURS.map(jour => {
-          const lignes = ventes.filter(v => v.jour === jour)
-          if (lignes.length === 0) return null
-          const jourBrut = lignes.reduce((s, v) => s + v.prix_unitaire * v.quantite, 0)
-          return (
-            <div key={jour}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
-                  <h3 className="text-white font-bold">{jour}</h3>
-                  <span className="text-zinc-600 text-xs">({lignes.length} vente{lignes.length > 1 ? "s" : ""})</span>
-                </div>
-                <span className="font-bold text-sm" style={{ color: JOUR_COLORS[jour] }}>{jourBrut.toFixed(2)}€</span>
-              </div>
-              <div className="space-y-2">
-                {lignes.map(v => (
-                  <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 flex items-center gap-3 group hover:border-zinc-700 transition-all">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-semibold text-sm truncate">{v.produit_nom}</span>
-                        {v.client_nom && (
-                          <span className="text-blue-400 text-xs shrink-0">👤 {v.client_nom}</span>
-                        )}
-                        {v.heure && (
-                          <span className="text-zinc-500 text-xs flex items-center gap-1 shrink-0">
-                            <Clock size={10} />{v.heure}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-zinc-500 text-xs">x{v.quantite}</span>
-                        <span className="text-zinc-500 text-xs">{v.prix_unitaire.toFixed(2)}€/u</span>
-                        {v.cout_fab > 0 && <span className="text-red-400/60 text-xs">CF: {v.cout_fab.toFixed(2)}€/u</span>}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-yellow-400 font-bold text-sm">{(v.prix_unitaire * v.quantite).toFixed(2)}€</p>
-                      {v.cout_fab > 0 && (
-                        <p className="text-green-400 text-xs">+{((v.prix_unitaire - v.cout_fab) * v.quantite).toFixed(2)}€</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {v.paiement && (
-                        <span className="text-[10px] text-zinc-600">
-                          {PAIEMENTS.find(p => p.id === v.paiement)?.icon}
-                        </span>
-                      )}
-                      {selected.statut === "en_cours" && (
-                        <>
-                          <button onClick={() => openEdit(v)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700/50 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-all">
-                            ✏️
-                          </button>
-                          <button onClick={() => deleteVente(v.id)}
-                            className="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-all">
-                            <Trash2 size={11} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-        {ventes.length === 0 && (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-3">📋</p>
-            <p className="text-zinc-500">Aucune vente saisie</p>
-            <p className="text-zinc-700 text-sm mt-1">Cliquez sur "Ajouter une vente" pour commencer</p>
-          </div>
-        )}
-
-        {/* Section frais */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-white font-bold text-sm">💸 Frais de convention</h3>
-              {totalFrais > 0 && <p className="text-red-400 text-xs mt-0.5">−{totalFrais.toFixed(2)}€ au total</p>}
-            </div>
-            {selected.statut === "en_cours" && (
-              <button onClick={() => setShowFraisForm(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors">
-                <Plus size={12} /> Ajouter un frais
-              </button>
-            )}
-          </div>
-          {frais.length === 0 ? (
-            <p className="text-zinc-700 text-xs">Aucun frais ajouté</p>
-          ) : (
-            <div className="space-y-2">
-              {frais.map(f => (
-                <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                  <span className="text-zinc-300 text-sm">{f.label}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-red-400 font-bold text-sm">−{f.montant.toFixed(2)}€</span>
-                    {selected.statut === "en_cours" && (
-                      <button onClick={() => deleteFrais(f.id)}
-                        className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400">
-                        <Trash2 size={10} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Modal ajout frais */}
-        {showFraisForm && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-sm shadow-2xl">
-              <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-                <h2 className="text-white font-bold">Ajouter un frais</h2>
-                <button onClick={() => setShowFraisForm(false)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                  <X size={14} />
-                </button>
-              </div>
-              <div className="p-5 space-y-4">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Description</label>
-                  <input value={fraisForm.label} onChange={e => setFraisForm(f => ({ ...f, label: e.target.value }))}
-                    placeholder="Ex: Location stand, Essence, Repas..."
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Montant €</label>
-                  <input type="number" step="0.01" value={fraisForm.montant} onChange={e => setFraisForm(f => ({ ...f, montant: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <button onClick={saveFrais} disabled={!fraisForm.label.trim() || !fraisForm.montant}
-                  className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                  ✓ Ajouter ce frais
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Modal saisie vente — PANIER MULTI-PRODUITS */}
-      {showVenteForm && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
-              <div>
-                <h2 className="text-white font-bold">Nouvelle vente</h2>
-                {panier.length > 0 && (
-                  <p className="text-yellow-400 text-xs mt-0.5">
-                    {panier.reduce((s, i) => s + i.quantite, 0)} produit{panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} —{" "}
-                    {panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€
-                  </p>
-                )}
-              </div>
-              <button onClick={() => { setShowVenteForm(false); setPanier([]); setPanierSearch(""); setVenteGlobal({ client_nom: "", jour: "Vendredi", heure: "", paiement: "especes" }) }}
-                className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-              {/* Paiement + Client en haut */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Client</label>
-                  <input value={venteGlobal.client_nom} onChange={e => setVenteGlobal(f => ({ ...f, client_nom: e.target.value }))}
-                    placeholder="Nom client..."
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Paiement</label>
-                  <div className="grid grid-cols-3 gap-1">
-                    {PAIEMENTS.slice(0,3).map(p => (
-                      <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
-                        className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                        style={venteGlobal.paiement === p.id
-                          ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                          : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                        <span className="text-sm">{p.icon}</span>
-                        <span className="text-[9px]">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 mt-1">
-                    {PAIEMENTS.slice(3).map(p => (
-                      <button key={p.id} onClick={() => setVenteGlobal(f => ({ ...f, paiement: p.id }))}
-                        className="flex flex-col items-center gap-0.5 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                        style={venteGlobal.paiement === p.id
-                          ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                          : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                        <span className="text-sm">{p.icon}</span>
-                        <span className="text-[9px]">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recherche produit */}
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Ajouter un produit</label>
-                <input value={panierSearch} onChange={e => setPanierSearch(e.target.value)}
-                  placeholder="Rechercher dans le catalogue..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                {panierSearch && filteredProducts.length > 0 && (
-                  <div className="mt-1.5 bg-zinc-800 border border-zinc-700 rounded-xl overflow-hidden">
-                    {filteredProducts.map(p => (
-                      <button key={p.id} onClick={() => addToCart(p)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-zinc-700 active:bg-yellow-500/20 transition-colors text-left border-b border-zinc-700 last:border-0">
-                        <div>
-                          <p className="text-white text-sm font-medium">{p.name}</p>
-                          <p className="text-zinc-500 text-xs">{p.gamme}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-yellow-400 text-sm font-bold">{p.pv.toFixed(2)}€</p>
-                          <p className="text-zinc-500 text-xs">+ Ajouter</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Panier */}
-              {panier.length > 0 && (
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">🛒 Panier ({panier.length} produit{panier.length > 1 ? "s" : ""})</label>
-                  <div className="space-y-2">
-                    {panier.map((item, idx) => (
-                      <div key={idx} className="bg-zinc-800/80 border border-zinc-700 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-semibold truncate">{item.produit_nom}</p>
-                          <p className="text-zinc-500 text-xs">{Number(item.prix_unitaire).toFixed(2)}€/u · CF: {Number(item.cout_fab).toFixed(2)}€</p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => updateCartQty(idx, -1)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">−</button>
-                          <span className="text-white font-bold text-sm w-6 text-center">{item.quantite}</span>
-                          <button onClick={() => updateCartQty(idx, 1)}
-                            className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm">+</button>
-                        </div>
-                        <div className="text-right shrink-0 min-w-[52px]">
-                          <p className="text-yellow-400 font-bold text-sm">{(Number(item.prix_unitaire) * item.quantite).toFixed(2)}€</p>
-                        </div>
-                        <button onClick={() => removeFromCart(idx)}
-                          className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 shrink-0">
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Jour */}
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {JOURS.map(j => (
-                    <button key={j} onClick={() => setVenteGlobal(f => ({ ...f, jour: j }))}
-                      className="py-2.5 rounded-xl text-sm font-bold border transition-all"
-                      style={venteGlobal.jour === j
-                        ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      {j}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure (optionnel)</label>
-                <input type="time" value={venteGlobal.heure} onChange={e => setVenteGlobal(f => ({ ...f, heure: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-            </div>
-
-            {/* Footer fixe */}
-            <div className="p-5 border-t border-zinc-800 shrink-0">
-              <button onClick={saveVente} disabled={savingVente || panier.length === 0}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 transition-colors">
-                {savingVente ? "Enregistrement..." : panier.length === 0 ? "Ajoute des produits au panier" : `✓ Enregistrer ${panier.reduce((s, i) => s + i.quantite, 0)} produit${panier.reduce((s, i) => s + i.quantite, 0) > 1 ? "s" : ""} — ${panier.reduce((s, i) => s + Number(i.prix_unitaire) * i.quantite, 0).toFixed(2)}€`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* Modal édition vente */}
-      {editVente && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111111] border border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-              <h2 className="text-white font-bold">Modifier la vente</h2>
-              <button onClick={() => setEditVente(null)} className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Produit</label>
-                <input value={editForm.produit_nom} onChange={e => setEditForm(f => ({ ...f, produit_nom: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Nom du client</label>
-                <input value={editForm.client_nom} onChange={e => setEditForm(f => ({ ...f, client_nom: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Prix €</label>
-                  <input type="number" step="0.01" value={editForm.prix_unitaire} onChange={e => setEditForm(f => ({ ...f, prix_unitaire: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-                <div>
-                  <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Coût fab. €</label>
-                  <input type="number" step="0.01" value={editForm.cout_fab} onChange={e => setEditForm(f => ({ ...f, cout_fab: e.target.value }))}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Quantité</label>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setEditForm(f => ({ ...f, quantite: Math.max(1, f.quantite - 1) }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">−</button>
-                  <span className="text-white font-bold text-xl w-12 text-center">{editForm.quantite}</span>
-                  <button onClick={() => setEditForm(f => ({ ...f, quantite: f.quantite + 1 }))}
-                    className="w-10 h-10 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xl font-bold flex items-center justify-center">+</button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Jour</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {JOURS.map(j => (
-                    <button key={j} onClick={() => setEditForm(f => ({ ...f, jour: j }))}
-                      className="py-2.5 rounded-xl text-sm font-bold border transition-all"
-                      style={editForm.jour === j
-                        ? { backgroundColor: JOUR_COLORS[j] + "25", color: JOUR_COLORS[j], borderColor: JOUR_COLORS[j] + "60" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      {j}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-1.5">Heure</label>
-                <input type="time" value={editForm.heure} onChange={e => setEditForm(f => ({ ...f, heure: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60" />
-              </div>
-              <div>
-                <label className="block text-zinc-500 text-[11px] uppercase tracking-wider mb-2">Paiement</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {PAIEMENTS.map(p => (
-                    <button key={p.id} onClick={() => setEditForm(f => ({ ...f, paiement: p.id }))}
-                      className="flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold border transition-all"
-                      style={editForm.paiement === p.id
-                        ? { backgroundColor: "#eab30820", color: "#eab308", borderColor: "#eab30860" }
-                        : { backgroundColor: "#18181b", color: "#71717a", borderColor: "#3f3f46" }}>
-                      <span>{p.icon}</span>
-                      <span className="text-[10px]">{p.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={saveEdit}
-                className="w-full py-3 rounded-xl text-black font-bold text-sm bg-yellow-500 hover:bg-yellow-400 transition-colors">
-                ✓ Enregistrer les modifications
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
-  // ═══ RAPPORT FINAL ═══
-  if (view === "rapport" && selected) return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0a0a0a]">
-      <div className="px-6 py-4 border-b border-zinc-900 flex items-center gap-3">
-        <button onClick={() => setView("detail")} className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-          <ChevronLeft size={16} />
-        </button>
-        <div>
-          <h1 className="text-white font-bold text-lg">📊 Rapport — {selected.nom}</h1>
-          <p className="text-zinc-500 text-xs">{formatDate(selected.date_debut)} → {formatDate(selected.date_fin)}{selected.lieu ? ` · ${selected.lieu}` : ""}</p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-2xl mx-auto w-full">
-
-        {/* Totaux globaux */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2">💰 Résumé global</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "CA Brut total", value: `${totalBrut.toFixed(2)}€`, color: "#eab308", sub: `${totalQty} produits vendus` },
-              { label: "Coût fabrication", value: `${totalCF.toFixed(2)}€`, color: "#ef4444", sub: `${((totalCF / totalBrut) * 100 || 0).toFixed(1)}% du CA` },
-              { label: "Marge brute", value: `${totalMarge.toFixed(2)}€`, color: "#22c55e", sub: `${((totalMarge / totalBrut) * 100 || 0).toFixed(1)}% de marge` },
-              { label: "Marge / produit", value: `${totalQty > 0 ? (totalMarge / totalQty).toFixed(2) : "0.00"}€`, color: "#a855f7", sub: "moyenne par unité" },
-              { label: "Bénéfice net", value: `${beneficeNet.toFixed(2)}€`, color: beneficeNet >= 0 ? "#22c55e" : "#ef4444", sub: `Après URSSAF 13.8% + CF` },
-            ].map(({ label, value, color, sub }) => (
-              <div key={label} className="bg-zinc-800/50 rounded-xl p-3">
-                <p className="font-bold text-lg" style={{ color }}>{value}</p>
-                <p className="text-white text-xs font-semibold mt-0.5">{label}</p>
-                <p className="text-zinc-500 text-[10px] mt-0.5">{sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Par jour */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Calendar size={16} /> Par jour</h2>
-          <div className="space-y-3">
-            {parJour.filter(j => j.qty > 0).map(({ jour, brut, cf, qty }) => (
-              <div key={jour} className="bg-zinc-800/50 rounded-xl p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOUR_COLORS[jour] }} />
-                    <span className="text-white font-bold">{jour}</span>
-                    <span className="text-zinc-500 text-xs">{qty} vente{qty > 1 ? "s" : ""}</span>
-                  </div>
-                  <span className="font-bold" style={{ color: JOUR_COLORS[jour] }}>{brut.toFixed(2)}€</span>
-                </div>
-                <div className="flex items-center gap-1 h-2 rounded-full overflow-hidden bg-zinc-700">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${totalBrut > 0 ? (brut / totalBrut) * 100 : 0}%`, backgroundColor: JOUR_COLORS[jour] }} />
-                </div>
-                <div className="flex justify-between mt-1.5 text-xs text-zinc-500">
-                  <span>CF: {cf.toFixed(2)}€</span>
-                  <span className="text-green-400">Marge: {(brut - cf).toFixed(2)}€</span>
-                  <span>{totalBrut > 0 ? ((brut / totalBrut) * 100).toFixed(0) : 0}% du CA</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-
-        {/* Par paiement */}
-        {parPaiement.length > 0 && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-            <h2 className="text-white font-bold mb-4">💳 Modes de paiement</h2>
-            <div className="space-y-2">
-              {parPaiement.map(p => (
-                <div key={p.id} className="bg-zinc-800/50 rounded-xl px-4 py-3 flex items-center gap-3">
-                  <span className="text-2xl">{p.icon}</span>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-white font-semibold text-sm">{p.label}</span>
-                      <span className="text-yellow-400 font-bold text-sm">{p.total.toFixed(2)}€</span>
-                    </div>
-                    <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${totalBrut > 0 ? (p.total / totalBrut) * 100 : 0}%` }} />
-                    </div>
-                    <p className="text-zinc-500 text-[10px] mt-1">{p.qty} vente{p.qty > 1 ? "s" : ""} · {totalBrut > 0 ? ((p.total / totalBrut) * 100).toFixed(0) : 0}% du CA</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Par produit */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-white font-bold mb-4 flex items-center gap-2"><Package size={16} /> Top produits</h2>
-          <div className="space-y-2">
-            {parProduit.map(({ nom, qty, brut, cf }, i) => (
-              <div key={nom} className="bg-zinc-800/50 rounded-xl px-3 py-2.5 flex items-center gap-3">
-                <span className="text-zinc-600 text-xs font-bold w-5 text-center">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{nom}</p>
-                  <p className="text-zinc-500 text-xs">{qty} unité{qty > 1 ? "s" : ""}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-yellow-400 font-bold text-sm">{brut.toFixed(2)}€</p>
-                  <p className="text-green-400 text-xs">+{(brut - cf).toFixed(2)}€</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
-    </div>
-  )
-
-  return null
 }
