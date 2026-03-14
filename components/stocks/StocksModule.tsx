@@ -517,188 +517,172 @@ export default function StocksModule({ activeSociety, profile }: Props) {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
+          </div>
         ) : viewMode==="table" ? (
           <div className="space-y-8">
-          {/* ── TABLEAU 1 : MON STOCK ── */}
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-white font-bold text-base">📦 Mon stock</h2>
-              <span className="text-xs text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-full">{filteredSorted.length} produit{filteredSorted.length>1?"s":""}</span>
-            </div>
-            {filteredSorted.length===0 ? (
-              <div className="text-center py-10 text-zinc-600 bg-zinc-900 border border-zinc-800 rounded-2xl">
-                <Package size={32} className="mx-auto mb-3 opacity-20"/>
-                <p className="text-sm">Aucun produit{search?" trouvé":""}</p>
-                {!search && <button onClick={()=>setShowAdd(true)} className="mt-3 text-yellow-500 text-xs hover:underline">+ Ajouter</button>}
-              </div>
-            ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-zinc-800">
-                  {([{l:"Produit",f:"produit_nom"},{l:"Quantité",f:"quantite"},{l:"Unité",f:null},{l:"Fournisseur",f:null},{l:"Seuil",f:"seuil_alerte"},{l:"Statut",f:null},{l:"Actions",f:null}] as {l:string;f:string|null}[]).map(({l,f})=>(
-                    <th key={l} onClick={()=>f&&toggleSort(f as typeof sortField)}
-                      className={`px-4 py-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider ${f?"cursor-pointer hover:text-zinc-300 select-none":""} ${l==="Actions"?"text-right":"text-left"}`}>
-                      <span className="inline-flex items-center">{l}{f&&<SortIcon field={f}/>}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {filteredSorted.map(item => {
-                  const neg=item.quantite<0, empty=item.quantite===0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
-                  return (
-                    <tr key={item.id} className="hover:bg-zinc-800/40 transition-colors group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${neg?"bg-red-500/20":alert?"bg-orange-500/20":"bg-yellow-500/20"}`}>
-                            <Package size={13} className={neg?"text-red-500":alert?"text-orange-400":"text-yellow-500"}/>
-                          </div>
-                          <span className="text-white text-sm font-medium">{item.produit_nom}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`text-lg font-bold ${neg?"text-red-500":empty?"text-zinc-600":alert?"text-orange-400":"text-white"}`}>{item.quantite}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-xs">{item.unite||"—"}</span></td>
-                      <td className="px-4 py-3"><span className="text-zinc-400 text-xs">{item.fournisseur||"—"}</span></td>
-                      <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-sm">{item.seuil_alerte||"—"}</span></td>
-                      <td className="px-4 py-3 text-center">
-                        {neg?<span className="text-[11px] font-semibold text-red-500 bg-red-500/10 px-2 py-1 rounded-full border border-red-500/30 animate-pulse">⚠ Négatif</span>
-                        :empty?<span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full border border-zinc-700">Vide</span>
-                        :alert?<span className="text-[11px] font-semibold text-orange-400 bg-orange-400/10 px-2 py-1 rounded-full border border-orange-400/20 animate-pulse">⚠ Alerte</span>
-                        :<span className="text-[11px] font-semibold text-green-400 bg-green-400/10 px-2 py-1 rounded-full border border-green-400/20">OK</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button onClick={()=>setMovementItem(item)} className="flex items-center gap-1 text-[11px] font-semibold text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-2 py-1.5 rounded-lg hover:bg-yellow-400/20">
-                            <TrendingUp size={11}/> Mvt
-                          </button>
-                          <button onClick={()=>setEditItem(item)} className="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
-                          <button onClick={()=>toggleMyHide(item.id)} title="Masquer de mon affichage" className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-lg hover:bg-zinc-800"><EyeOff size={13}/></button>
-                          <button onClick={()=>deleteStock(item.id)} className="text-red-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            )}
-          </div>
 
-          {/* ── TABLEAU 2 : STOCK LABO LUDIVINE ── */}
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-white font-bold text-base">🔬 Stock Labo — Ludivine</h2>
-              <span className="text-xs text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-full">{filteredSortedLabo.length} produit{filteredSortedLabo.length>1?"s":""}</span>
-              <span className="text-[10px] text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2 py-0.5 rounded-full">Pots vides</span>
-            </div>
-            {filteredSortedLabo.length===0 ? (
-              <div className="text-center py-8 text-zinc-700 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
-                <p className="text-sm">Aucun stock labo — exécute la migration SQL</p>
+            {/* ══ TABLEAU 1 : MON STOCK ══ */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-white font-bold text-base">📦 Mon stock</h2>
+                <span className="text-xs text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-full">
+                  {filteredSorted.length} produit{filteredSorted.length>1?"s":""}
+                </span>
               </div>
-            ) : (
-              <div className="bg-zinc-900/60 border border-purple-500/10 rounded-2xl overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      {([{l:"Produit (pots vides)",f:"produit_nom"},{l:"Quantité",f:"quantite"},{l:"Unité",f:null},{l:"Seuil",f:"seuil_alerte"},{l:"Statut",f:null},{l:"Actions",f:null}] as {l:string;f:string|null}[]).map(({l,f})=>(
-                        <th key={l} onClick={()=>f&&toggleSort(f as typeof sortField)}
-                          className={`px-4 py-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider ${f?"cursor-pointer hover:text-zinc-300 select-none":""} ${l==="Actions"?"text-right":"text-left"}`}>
-                          <span className="inline-flex items-center">{l}{f&&<SortIcon field={f}/>}</span>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {filteredSortedLabo.map(item => {
-                      const neg=item.quantite<0, empty=item.quantite===0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
-                      return (
-                        <tr key={item.id} className="hover:bg-zinc-800/40 transition-colors group">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                                <Package size={13} className="text-purple-400"/>
-                              </div>
-                              <span className="text-white text-sm font-medium">{item.produit_nom}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`text-lg font-bold ${neg?"text-red-500":empty?"text-zinc-600":alert?"text-orange-400":"text-purple-300"}`}>{item.quantite}</span>
-                          </td>
-                          <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-xs">{item.unite||"—"}</span></td>
-                          <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-sm">{item.seuil_alerte||"—"}</span></td>
-                          <td className="px-4 py-3 text-center">
-                            {neg?<span className="text-[11px] font-semibold text-red-500 bg-red-500/10 px-2 py-1 rounded-full border border-red-500/30 animate-pulse">⚠ Négatif</span>
-                            :empty?<span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full border border-zinc-700">Vide</span>
-                            :alert?<span className="text-[11px] font-semibold text-orange-400 bg-orange-400/10 px-2 py-1 rounded-full border border-orange-400/20 animate-pulse">⚠ Alerte</span>
-                            :<span className="text-[11px] font-semibold text-purple-400 bg-purple-400/10 px-2 py-1 rounded-full border border-purple-400/20">OK</span>}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button onClick={()=>setMovementItem(item)} className="flex items-center gap-1 text-[11px] font-semibold text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2 py-1.5 rounded-lg hover:bg-purple-400/20">
-                                <TrendingUp size={11}/> Mvt
-                              </button>
-                              <button onClick={()=>setEditItem(item)} className="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-          </div>
-        ) : (
-          <div className="space-y-8">
-          {/* ── CARTES 1 : MON STOCK ── */}
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-white font-bold text-base">📦 Mon stock</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredSorted.map(item => {
-              const neg=item.quantite<0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
-              return (
-                <div key={item.id} className={`bg-zinc-900 border rounded-2xl p-4 group relative ${neg?"border-red-500/30":alert?"border-orange-500/30":"border-zinc-800"}`}>
-                  <button onClick={()=>toggleMyHide(item.id)} title="Masquer" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-400 p-1 rounded hover:bg-zinc-800"><EyeOff size={12}/></button>
-                  <p className="text-white font-bold text-sm mb-1 truncate pr-6">{item.produit_nom}</p>
-                  {item.fournisseur && <p className="text-zinc-600 text-[10px] mb-1">{item.fournisseur}</p>}
-                  <p className={`text-3xl font-black mb-0.5 ${neg?"text-red-500":item.quantite===0?"text-zinc-600":alert?"text-orange-400":"text-yellow-500"}`}>{item.quantite}</p>
-                  <p className="text-zinc-600 text-xs mb-1">{item.unite||"unités"}</p>
-                  {item.seuil_alerte>0 && <p className="text-zinc-700 text-[10px]">Seuil: {item.seuil_alerte}</p>}
-                  {item.prix_achat&&item.quantite>0 && <p className="text-zinc-600 text-[10px]">{(item.quantite*item.prix_achat).toFixed(2)}€</p>}
-                  <div className="flex gap-1.5 mt-3">
-                    <button onClick={()=>setMovementItem(item)} className="flex-1 text-[11px] font-semibold text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 py-1.5 rounded-lg hover:bg-yellow-400/20">Mouvement</button>
-                    <button onClick={()=>setEditItem(item)} className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg"><Pencil size={12}/></button>
-                  </div>
+              {filteredSorted.length===0 ? (
+                <div className="text-center py-10 text-zinc-600 bg-zinc-900 border border-zinc-800 rounded-2xl">
+                  <Package size={32} className="mx-auto mb-3 opacity-20"/>
+                  <p className="text-sm">Aucun produit{search?" trouvé":""}</p>
+                  {!search && <button onClick={()=>setShowAdd(true)} className="mt-3 text-yellow-500 text-xs hover:underline">+ Ajouter</button>}
                 </div>
-              )
-            })}
+              ) : (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        {([{l:"Produit",f:"produit_nom"},{l:"Quantité",f:"quantite"},{l:"Unité",f:null},{l:"Fournisseur",f:null},{l:"Seuil",f:"seuil_alerte"},{l:"Statut",f:null},{l:"Actions",f:null}] as {l:string;f:string|null}[]).map(({l,f})=>(
+                          <th key={l} onClick={()=>f&&toggleSort(f as typeof sortField)}
+                            className={`px-4 py-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider ${f?"cursor-pointer hover:text-zinc-300 select-none":""} ${l==="Actions"?"text-right":"text-left"}`}>
+                            <span className="inline-flex items-center">{l}{f&&<SortIcon field={f}/>}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {filteredSorted.map(item => {
+                        const neg=item.quantite<0, empty=item.quantite===0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
+                        return (
+                          <tr key={item.id} className="hover:bg-zinc-800/40 transition-colors group">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${neg?"bg-red-500/20":alert?"bg-orange-500/20":"bg-yellow-500/20"}`}>
+                                  <Package size={13} className={neg?"text-red-500":alert?"text-orange-400":"text-yellow-500"}/>
+                                </div>
+                                <span className="text-white text-sm font-medium">{item.produit_nom}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-lg font-bold ${neg?"text-red-500":empty?"text-zinc-600":alert?"text-orange-400":"text-white"}`}>{item.quantite}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-xs">{item.unite||"—"}</span></td>
+                            <td className="px-4 py-3"><span className="text-zinc-400 text-xs">{item.fournisseur||"—"}</span></td>
+                            <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-sm">{item.seuil_alerte||"—"}</span></td>
+                            <td className="px-4 py-3 text-center">
+                              {neg ? <span className="text-[11px] font-semibold text-red-500 bg-red-500/10 px-2 py-1 rounded-full border border-red-500/30 animate-pulse">⚠ Négatif</span>
+                              : empty ? <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full border border-zinc-700">Vide</span>
+                              : alert ? <span className="text-[11px] font-semibold text-orange-400 bg-orange-400/10 px-2 py-1 rounded-full border border-orange-400/20 animate-pulse">⚠ Alerte</span>
+                              : <span className="text-[11px] font-semibold text-green-400 bg-green-400/10 px-2 py-1 rounded-full border border-green-400/20">OK</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button onClick={()=>setMovementItem(item)} className="flex items-center gap-1 text-[11px] font-semibold text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-2 py-1.5 rounded-lg hover:bg-yellow-400/20">
+                                  <TrendingUp size={11}/> Mvt
+                                </button>
+                                <button onClick={()=>setEditItem(item)} className="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
+                                <button onClick={()=>toggleMyHide(item.id)} className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-lg hover:bg-zinc-800"><EyeOff size={13}/></button>
+                                <button onClick={()=>deleteStock(item.id)} className="text-red-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={13}/></button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* ── CARTES 2 : STOCK LABO ── */}
-          {filteredSortedLabo.length > 0 && (
+            {/* ══ TABLEAU 2 : STOCK LABO LUDIVINE ══ */}
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-white font-bold text-base">🔬 Stock Labo — Ludivine</h2>
+                <span className="text-xs text-zinc-500 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded-full">
+                  {filteredSortedLabo.length} produit{filteredSortedLabo.length>1?"s":""}
+                </span>
                 <span className="text-[10px] text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2 py-0.5 rounded-full">Pots vides</span>
               </div>
+              {filteredSortedLabo.length===0 ? (
+                <div className="text-center py-8 text-zinc-700 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl">
+                  <p className="text-sm">Aucun stock labo — exécute la migration SQL</p>
+                </div>
+              ) : (
+                <div className="bg-zinc-900/60 border border-purple-500/10 rounded-2xl overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        {([{l:"Produit (pots vides)",f:"produit_nom"},{l:"Quantité",f:"quantite"},{l:"Unité",f:null},{l:"Seuil",f:"seuil_alerte"},{l:"Statut",f:null},{l:"Actions",f:null}] as {l:string;f:string|null}[]).map(({l,f})=>(
+                          <th key={l} onClick={()=>f&&toggleSort(f as typeof sortField)}
+                            className={`px-4 py-3 text-[11px] font-semibold text-zinc-500 uppercase tracking-wider ${f?"cursor-pointer hover:text-zinc-300 select-none":""} ${l==="Actions"?"text-right":"text-left"}`}>
+                            <span className="inline-flex items-center">{l}{f&&<SortIcon field={f}/>}</span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {filteredSortedLabo.map(item => {
+                        const neg=item.quantite<0, empty=item.quantite===0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
+                        return (
+                          <tr key={item.id} className="hover:bg-zinc-800/40 transition-colors group">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                                  <Package size={13} className="text-purple-400"/>
+                                </div>
+                                <span className="text-white text-sm font-medium">{item.produit_nom}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`text-lg font-bold ${neg?"text-red-500":empty?"text-zinc-600":alert?"text-orange-400":"text-purple-300"}`}>{item.quantite}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-xs">{item.unite||"—"}</span></td>
+                            <td className="px-4 py-3 text-center"><span className="text-zinc-500 text-sm">{item.seuil_alerte||"—"}</span></td>
+                            <td className="px-4 py-3 text-center">
+                              {neg ? <span className="text-[11px] font-semibold text-red-500 bg-red-500/10 px-2 py-1 rounded-full border border-red-500/30 animate-pulse">⚠ Négatif</span>
+                              : empty ? <span className="text-[11px] font-semibold text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full border border-zinc-700">Vide</span>
+                              : alert ? <span className="text-[11px] font-semibold text-orange-400 bg-orange-400/10 px-2 py-1 rounded-full border border-orange-400/20 animate-pulse">⚠ Alerte</span>
+                              : <span className="text-[11px] font-semibold text-purple-400 bg-purple-400/10 px-2 py-1 rounded-full border border-purple-400/20">OK</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button onClick={()=>setMovementItem(item)} className="flex items-center gap-1 text-[11px] font-semibold text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2 py-1.5 rounded-lg hover:bg-purple-400/20">
+                                  <TrendingUp size={11}/> Mvt
+                                </button>
+                                <button onClick={()=>setEditItem(item)} className="text-zinc-400 hover:text-white p-1.5 rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* ══ CARTES 1 : MON STOCK ══ */}
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-white font-bold text-base">📦 Mon stock</h2>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredSortedLabo.map(item => {
+                {filteredSorted.map(item => {
                   const neg=item.quantite<0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
                   return (
-                    <div key={item.id} className={`bg-zinc-900/60 border rounded-2xl p-4 group relative ${neg?"border-red-500/30":alert?"border-orange-500/30":"border-purple-500/10"}`}>
-                      <p className="text-white font-bold text-sm mb-1 truncate">{item.produit_nom}</p>
-                      <p className={`text-3xl font-black mb-0.5 ${neg?"text-red-500":item.quantite===0?"text-zinc-600":alert?"text-orange-400":"text-purple-300"}`}>{item.quantite}</p>
+                    <div key={item.id} className={`bg-zinc-900 border rounded-2xl p-4 group relative ${neg?"border-red-500/30":alert?"border-orange-500/30":"border-zinc-800"}`}>
+                      <button onClick={()=>toggleMyHide(item.id)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-zinc-400 p-1 rounded hover:bg-zinc-800"><EyeOff size={12}/></button>
+                      <p className="text-white font-bold text-sm mb-1 truncate pr-6">{item.produit_nom}</p>
+                      {item.fournisseur && <p className="text-zinc-600 text-[10px] mb-1">{item.fournisseur}</p>}
+                      <p className={`text-3xl font-black mb-0.5 ${neg?"text-red-500":item.quantite===0?"text-zinc-600":alert?"text-orange-400":"text-yellow-500"}`}>{item.quantite}</p>
                       <p className="text-zinc-600 text-xs mb-1">{item.unite||"unités"}</p>
+                      {item.seuil_alerte>0 && <p className="text-zinc-700 text-[10px]">Seuil: {item.seuil_alerte}</p>}
+                      {item.prix_achat&&item.quantite>0 && <p className="text-zinc-600 text-[10px]">{(item.quantite*item.prix_achat).toFixed(2)}€</p>}
                       <div className="flex gap-1.5 mt-3">
-                        <button onClick={()=>setMovementItem(item)} className="flex-1 text-[11px] font-semibold text-purple-400 bg-purple-400/10 border border-purple-400/20 py-1.5 rounded-lg hover:bg-purple-400/20">Mvt</button>
+                        <button onClick={()=>setMovementItem(item)} className="flex-1 text-[11px] font-semibold text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 py-1.5 rounded-lg hover:bg-yellow-400/20">Mouvement</button>
                         <button onClick={()=>setEditItem(item)} className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg"><Pencil size={12}/></button>
                       </div>
                     </div>
@@ -706,11 +690,33 @@ export default function StocksModule({ activeSociety, profile }: Props) {
                 })}
               </div>
             </div>
-          )}
+            {/* ══ CARTES 2 : STOCK LABO ══ */}
+            {filteredSortedLabo.length > 0 && (
+              <div>
+                <div className="flex items-center gap-3 mb-3">
+                  <h2 className="text-white font-bold text-base">🔬 Stock Labo — Ludivine</h2>
+                  <span className="text-[10px] text-purple-400 bg-purple-400/10 border border-purple-400/20 px-2 py-0.5 rounded-full">Pots vides</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredSortedLabo.map(item => {
+                    const neg=item.quantite<0, alert=!neg&&item.seuil_alerte>0&&item.quantite<=item.seuil_alerte
+                    return (
+                      <div key={item.id} className={`bg-zinc-900/60 border rounded-2xl p-4 ${neg?"border-red-500/30":alert?"border-orange-500/30":"border-purple-500/10"}`}>
+                        <p className="text-white font-bold text-sm mb-1 truncate">{item.produit_nom}</p>
+                        <p className={`text-3xl font-black mb-0.5 ${neg?"text-red-500":item.quantite===0?"text-zinc-600":alert?"text-orange-400":"text-purple-300"}`}>{item.quantite}</p>
+                        <p className="text-zinc-600 text-xs mb-1">{item.unite||"unités"}</p>
+                        <div className="flex gap-1.5 mt-3">
+                          <button onClick={()=>setMovementItem(item)} className="flex-1 text-[11px] font-semibold text-purple-400 bg-purple-400/10 border border-purple-400/20 py-1.5 rounded-lg hover:bg-purple-400/20">Mvt</button>
+                          <button onClick={()=>setEditItem(item)} className="p-1.5 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg"><Pencil size={12}/></button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
-
       {showAdd && <AddStockPanel societyId={activeSociety.id} onClose={()=>setShowAdd(false)} onDone={loadStock}/>}
       {showHistory && <HistoryPanel societyId={activeSociety.id} onClose={()=>setShowHistory(false)}/>}
       {movementItem && <MouvementPanel item={movementItem} profile={profile} onClose={()=>setMovementItem(null)} onDone={loadStock}/>}
