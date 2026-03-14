@@ -17,7 +17,7 @@ const FOURNISSEURS = [
     produits: [
       { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
       { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
-      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "20ml",             prix_defaut: 0 },
+      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "Baume 20ml",       prix_defaut: 0 },
       { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
     ],
     // Tiny Tube: commande pots → met à jour stock Ludivine
@@ -32,7 +32,7 @@ const FOURNISSEURS = [
     produits: [
       { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
       { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
-      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "20ml",             prix_defaut: 0 },
+      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "Baume 20ml",       prix_defaut: 0 },
       { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
     ],
     targetFournisseur: null, // commande chez Ludivine → met à jour stock principal
@@ -278,12 +278,23 @@ async function updateStockByName(
   // Find stock entry matching name (case-insensitive)
   const { data: allStock } = await supabase.from("stock")
     .select("*").eq("society_id", societyId)
-  const item = (allStock || []).find((s: any) =>
-    s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim() &&
-    (target === "labo" ? s.is_labo === true : !s.is_labo)
-  ) || (allStock || []).find((s: any) =>
-    s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim()
-  )
+  // Pour "labo" : cherche uniquement les entrées is_labo=true, SANS fallback sur le stock principal
+  // Pour "main" : cherche uniquement les entrées is_labo=false/null
+  let item = (allStock || []).find((s: any) => {
+    const nameMatch = s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim() ||
+      s.produit_nom.toLowerCase().includes(produitNom.toLowerCase()) ||
+      produitNom.toLowerCase().includes(s.produit_nom.toLowerCase())
+    if (target === "labo") return nameMatch && s.is_labo === true
+    return nameMatch && !s.is_labo
+  })
+  // Fallback uniquement pour "main" (jamais pour labo)
+  if (!item && target === "main") {
+    item = (allStock || []).find((s: any) =>
+      s.produit_nom.toLowerCase().trim() === produitNom.toLowerCase().trim() ||
+      s.produit_nom.toLowerCase().includes(produitNom.toLowerCase()) ||
+      produitNom.toLowerCase().includes(s.produit_nom.toLowerCase())
+    )
+  }
 
   if (item) {
     const newQty = item.quantite + delta
@@ -433,13 +444,13 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
     // ── Logique stock selon fournisseur ──
     if (produitStock && qtyVal > 0) {
       if (fournId === "tiny_tube") {
-        // Tiny Tube → les pots arrivent chez Ludivine (stock labo)
+        // Tiny Tube → les pots arrivent chez Ludivine (stock labo uniquement)
+        // Le stock principal n'est PAS touché
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Tiny Tube — ${prodNom} ×${qtyVal}`, "labo")
       } else if (fournId === "ludivine") {
-        // Ludivine → retire les pots du stock labo + ajoute les produits finis en stock principal
-        await updateStockByName(activeSociety.id, produitStock, -qtyVal, profile.id,
-          `Fabrication Ludivine — ${prodNom} ×${qtyVal} (pots utilisés)`, "labo")
+        // Ludivine → les produits finis arrivent dans TON stock principal uniquement
+        // Le stock labo (pots) est géré séparément
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Ludivine — ${prodNom} ×${qtyVal}`, "main")
       } else if (fournId === "claudia") {
