@@ -93,37 +93,49 @@ function NouvelleCommandePanel({
 
     const realPrix = fournisseur.id === "claudia" ? 4 : prix
 
-    // Save to commandes table
-    // Utilise les colonnes existantes + nouvelles (si migration faite)
-    const insertData: any = {
+    // Stocke TOUT dans les notes pour ne pas dépendre des colonnes
+    // La migration SQL peut être appliquée après pour déverrouiller les colonnes avancées
+    const notesStr = [
+      notes ? `Notes: ${notes}` : "",
+      `Produit: ${produitInfo.nom}`,
+      `Qté: ${qty}`,
+      `Stock: ${produitInfo.stock_produit}`,
+      `Prix/u: ${realPrix}€`,
+      `Frais: ${frais}€`,
+      `Total: ${(qty * realPrix + frais).toFixed(2)}€`,
+      `Date: ${dateCmd}`,
+      `Fourn: ${fournisseur.id}`,
+    ].filter(Boolean).join(" | ")
+
+    // Essaie d'abord avec toutes les colonnes (si migration faite)
+    let insertResult = await supabase.from("commandes").insert({
       society_id: societyId,
       user_id: profile.id,
       fournisseur: fournisseur.nom,
-      // Stocke les infos dans les champs existants
-      produit: produitInfo.nom,          // colonne existante
+      fournisseur_id: fournisseur.id,
+      produit_nom: produitInfo.nom,
+      produit: produitInfo.nom,
+      stock_produit: produitInfo.stock_produit,
       quantite: qty,
+      prix_unitaire: realPrix,
+      frais_livraison: frais,
+      total: qty * realPrix + frais,
       statut: "en_attente",
-      notes: [
-        notes,
-        `Produit stock: ${produitInfo.stock_produit}`,
-        `Prix unit: ${realPrix}€`,
-        `Frais livraison: ${frais}€`,
-        `Total: ${qty * realPrix + frais}€`,
-        `Date: ${dateCmd}`,
-        `Fournisseur ID: ${fournisseur.id}`,
-      ].filter(Boolean).join(" | "),
+      date_commande: dateCmd,
+      notes: notesStr,
+    }).select().single()
+
+    // Si erreur de colonne manquante → fallback avec seulement les colonnes de base
+    if (insertResult.error?.message?.includes("column")) {
+      insertResult = await supabase.from("commandes").insert({
+        society_id: societyId,
+        user_id: profile.id,
+        fournisseur: fournisseur.nom,
+        notes: notesStr,
+      }).select().single()
     }
-    // Ajouter les nouvelles colonnes si la migration a été faite
-    try {
-      insertData.fournisseur_id = fournisseur.id
-      insertData.produit_nom = produitInfo.nom
-      insertData.stock_produit = produitInfo.stock_produit
-      insertData.prix_unitaire = realPrix
-      insertData.frais_livraison = frais
-      insertData.total = qty * realPrix + frais
-      insertData.date_commande = dateCmd
-    } catch {}
-    const { data: cmd, error } = await supabase.from("commandes").insert(insertData).select().single()
+
+    const { data: cmd, error } = insertResult
 
     if (!error && cmd) {
       // Logic selon fournisseur
@@ -386,8 +398,14 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
     return true
   })
 
-  const totalEnAttente = commandes.filter(c => c.statut === "en_attente").reduce((s: number, c: any) => s + Number(c.total||0), 0)
-  const totalRecu      = commandes.filter(c => c.statut === "reçu").reduce((s: number, c: any) => s + Number(c.total||0), 0)
+  // Parse total from notes if column doesn't exist
+  const parseTotal = (cmd: any) => {
+    if (cmd.total) return Number(cmd.total)
+    const match = (cmd.notes || "").match(/Total: ([\d.]+)€/)
+    return match ? parseFloat(match[1]) : 0
+  }
+  const totalEnAttente = commandes.filter(c => c.statut === "en_attente").reduce((s: number, c: any) => s + parseTotal(c), 0)
+  const totalRecu      = commandes.filter(c => c.statut === "reçu").reduce((s: number, c: any) => s + parseTotal(c), 0)
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
@@ -522,11 +540,29 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-white text-sm">{cmd.produit_nom || cmd.produit || "—"}</td>
-                      <td className="px-4 py-3 text-white text-sm font-bold">{cmd.quantite}</td>
+                      {/* Produit */}
+                      <td className="px-4 py-3 text-white text-sm">
+                        {cmd.produit_nom || cmd.produit || (() => {
+                          const m = (cmd.notes||"").match(/Produit: ([^|]+)/)
+                          return m ? m[1].trim() : "—"
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-white text-sm font-bold">
+                        {cmd.quantite || (() => {
+                          const m = (cmd.notes||"").match(/Qté: (\d+)/)
+                          return m ? m[1] : "—"
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.prix_unitaire||0).toFixed(2)}€</td>
                       <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.frais_livraison||0).toFixed(2)}€</td>
-                      <td className="px-4 py-3 text-red-400 text-sm font-bold">-{Number(cmd.total||0).toFixed(2)}€</td>
+                      {/* Total */}
+                      <td className="px-4 py-3 text-red-400 text-sm font-bold">
+                        -{(() => {
+                          if (cmd.total) return Number(cmd.total).toFixed(2)
+                          const m = (cmd.notes||"").match(/Total: ([\d.]+)€/)
+                          return m ? parseFloat(m[1]).toFixed(2) : "0.00"
+                        })()}€
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-[11px] font-bold px-2 py-1 rounded-full border ${sCfg.color} ${sCfg.bg} ${sCfg.border}`}>
                           {sCfg.label}
