@@ -137,9 +137,21 @@ function NouvelleCommandePanel({
 
     const { data: cmd, error } = insertResult
 
-    // ✅ Aucun mouvement de stock à la création
-    // Le stock se met à jour uniquement quand la commande est marquée "Reçu"
-    // (voir markAsReceived)
+    // ── Mouvements de stock à la CRÉATION ──
+    if (!error && cmd) {
+      const prodStock = produitInfo.stock_produit
+      if (fournisseur.id === "tiny_tube" && prodStock) {
+        // Tiny Tube → les pots arrivent directement chez Ludivine dès la commande
+        await updateStockByName(societyId, prodStock, qty, profile.id,
+          `Commande Tiny Tube — ${produitInfo.nom} ×${qty}`, "labo")
+      } else if (fournisseur.id === "ludivine" && prodStock) {
+        // Ludivine → retire les produits de son stock labo
+        // (ils partent chez toi, mais pas encore arrivés → statut en_transit géré par la ligne)
+        await updateStockByName(societyId, prodStock, -qty, profile.id,
+          `Commande Ludivine — ${produitInfo.nom} ×${qty} (en transit)`, "labo")
+      }
+      // Claudia → aucun mouvement à la création
+    }
 
     setSaving(false)
     if (error) {
@@ -441,20 +453,17 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
       date_reception: new Date().toISOString(),
     }).eq("id", cmd.id)
 
-    // ── Logique stock selon fournisseur ──
+    // ── Logique stock à la VALIDATION ──
     if (produitStock && qtyVal > 0) {
       if (fournId === "tiny_tube") {
-        // Tiny Tube → les pots arrivent chez Ludivine (stock labo uniquement)
-        // Le stock principal n'est PAS touché
-        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
-          `Réception Tiny Tube — ${prodNom} ×${qtyVal}`, "labo")
+        // Tiny Tube : stock labo déjà mis à jour à la création → rien à faire
       } else if (fournId === "ludivine") {
-        // Ludivine → les produits finis arrivent dans TON stock principal uniquement
-        // Le stock labo (pots) est géré séparément
+        // Ludivine validée → les produits finis arrivent dans TON stock principal
+        // Le stock labo a déjà été débité à la création de la commande
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Ludivine — ${prodNom} ×${qtyVal}`, "main")
       } else if (fournId === "claudia") {
-        // Claudia → directement en stock principal
+        // Claudia → directement en stock principal à la réception
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Claudia — ${prodNom} ×${qtyVal}`, "main")
       }
@@ -539,6 +548,57 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
         </div>
 
 
+
+        {/* ── EN TRANSIT (commandes Ludivine en attente de réception) ── */}
+        {commandes.filter(cmd => {
+          const fId = cmd.fournisseur_id || (cmd.notes||"").match(/Fourn: ([^|]+)/)?.[1]?.trim()
+          return fId === "ludivine" && cmd.statut === "en_attente"
+        }).length > 0 && (
+          <div className="mb-6 bg-purple-500/5 border border-purple-500/20 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-purple-500/15 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"/>
+                <p className="text-purple-300 font-bold text-sm">🚚 En transit — Ludivine</p>
+              </div>
+              <p className="text-zinc-500 text-xs">Validez à la réception pour mettre à jour votre stock</p>
+            </div>
+            <div className="divide-y divide-purple-500/10">
+              {commandes.filter(cmd => {
+                const fId = cmd.fournisseur_id || (cmd.notes||"").match(/Fourn: ([^|]+)/)?.[1]?.trim()
+                return fId === "ludivine" && cmd.statut === "en_attente"
+              }).map(cmd => {
+                const prodNom = cmd.produit_nom || cmd.produit || (() => {
+                  const m = (cmd.notes||"").match(/Produit: ([^|]+)/); return m ? m[1].trim() : "—"
+                })()
+                const qtyVal = cmd.quantite || (() => {
+                  const m = (cmd.notes||"").match(/Qté: (\d+)/); return m ? m[1] : "—"
+                })()
+                return (
+                  <div key={cmd.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <span className="text-purple-400 text-sm">🔬</span>
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-semibold">{prodNom}</p>
+                        <p className="text-zinc-500 text-xs">
+                          {qtyVal} unités · commandé le {cmd.date_commande
+                            ? new Date(cmd.date_commande).toLocaleDateString("fr-FR")
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => markAsReceived(cmd)}
+                      className="flex items-center gap-1.5 bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs px-3 py-2 rounded-xl transition-colors">
+                      ✓ Réceptionner
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
