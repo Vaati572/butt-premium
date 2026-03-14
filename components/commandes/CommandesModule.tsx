@@ -141,16 +141,12 @@ function NouvelleCommandePanel({
     if (!error && cmd) {
       const prodStock = produitInfo.stock_produit
       if (fournisseur.id === "tiny_tube" && prodStock) {
-        // Tiny Tube → les pots arrivent directement chez Ludivine dès la commande
+        // Tiny Tube → les pots arrivent chez Ludivine immédiatement
         await updateStockByName(societyId, prodStock, qty, profile.id,
           `Commande Tiny Tube — ${produitInfo.nom} ×${qty}`, "labo")
-      } else if (fournisseur.id === "ludivine" && prodStock) {
-        // Ludivine → retire les produits de son stock labo
-        // (ils partent chez toi, mais pas encore arrivés → statut en_transit géré par la ligne)
-        await updateStockByName(societyId, prodStock, -qty, profile.id,
-          `Commande Ludivine — ${produitInfo.nom} ×${qty} (en transit)`, "labo")
       }
-      // Claudia → aucun mouvement à la création
+      // Ludivine → rien à la création (stock bouge uniquement à la validation)
+      // Claudia  → rien à la création
     }
 
     setSaving(false)
@@ -456,14 +452,17 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
     // ── Logique stock à la VALIDATION ──
     if (produitStock && qtyVal > 0) {
       if (fournId === "tiny_tube") {
-        // Tiny Tube : stock labo déjà mis à jour à la création → rien à faire
+        // Tiny Tube : déjà mis à jour à la création → rien
       } else if (fournId === "ludivine") {
-        // Ludivine validée → les produits finis arrivent dans TON stock principal
-        // Le stock labo a déjà été débité à la création de la commande
+        // Ludivine validée :
+        //   1. +qty dans MON stock principal (je reçois les produits finis)
+        //   2. -qty dans stock Ludivine (elle les a fabriqués et envoyés)
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Ludivine — ${prodNom} ×${qtyVal}`, "main")
+        await updateStockByName(activeSociety.id, produitStock, -qtyVal, profile.id,
+          `Expédition Ludivine → toi — ${prodNom} ×${qtyVal}`, "labo")
       } else if (fournId === "claudia") {
-        // Claudia → directement en stock principal à la réception
+        // Claudia validée → +qty mon stock
         await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
           `Réception Claudia — ${prodNom} ×${qtyVal}`, "main")
       }
