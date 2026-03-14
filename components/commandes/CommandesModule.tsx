@@ -94,21 +94,36 @@ function NouvelleCommandePanel({
     const realPrix = fournisseur.id === "claudia" ? 4 : prix
 
     // Save to commandes table
-    const { data: cmd, error } = await supabase.from("commandes").insert({
+    // Utilise les colonnes existantes + nouvelles (si migration faite)
+    const insertData: any = {
       society_id: societyId,
       user_id: profile.id,
       fournisseur: fournisseur.nom,
-      fournisseur_id: fournisseur.id,
-      produit_nom: produitInfo.nom,
-      stock_produit: produitInfo.stock_produit,
+      // Stocke les infos dans les champs existants
+      produit: produitInfo.nom,          // colonne existante
       quantite: qty,
-      prix_unitaire: realPrix,
-      frais_livraison: frais,
-      total: qty * realPrix + frais,
       statut: "en_attente",
-      date_commande: dateCmd,
-      notes,
-    }).select().single()
+      notes: [
+        notes,
+        `Produit stock: ${produitInfo.stock_produit}`,
+        `Prix unit: ${realPrix}€`,
+        `Frais livraison: ${frais}€`,
+        `Total: ${qty * realPrix + frais}€`,
+        `Date: ${dateCmd}`,
+        `Fournisseur ID: ${fournisseur.id}`,
+      ].filter(Boolean).join(" | "),
+    }
+    // Ajouter les nouvelles colonnes si la migration a été faite
+    try {
+      insertData.fournisseur_id = fournisseur.id
+      insertData.produit_nom = produitInfo.nom
+      insertData.stock_produit = produitInfo.stock_produit
+      insertData.prix_unitaire = realPrix
+      insertData.frais_livraison = frais
+      insertData.total = qty * realPrix + frais
+      insertData.date_commande = dateCmd
+    } catch {}
+    const { data: cmd, error } = await supabase.from("commandes").insert(insertData).select().single()
 
     if (!error && cmd) {
       // Logic selon fournisseur
@@ -363,8 +378,11 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
   const filtered = commandes.filter(c => {
     if (filterFourn !== "all" && c.fournisseur_id !== filterFourn) return false
     if (filterStatus !== "all" && c.statut !== filterStatus) return false
-    if (search && !c.produit_nom?.toLowerCase().includes(search.toLowerCase()) &&
-        !c.fournisseur?.toLowerCase().includes(search.toLowerCase())) return false
+    if (search) {
+      const s = search.toLowerCase()
+      const prodNom = c.produit_nom || c.produit || ""
+      if (!prodNom.toLowerCase().includes(s) && !c.fournisseur?.toLowerCase().includes(s)) return false
+    }
     return true
   })
 
@@ -430,14 +448,21 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">En attente</p>
-            <p className="text-yellow-400 text-xl font-bold">{totalEnAttente.toFixed(2)}€</p>
+            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">💸 À payer</p>
+            <p className="text-red-400 text-xl font-bold">{totalEnAttente.toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-0.5">Commandes en attente</p>
           </div>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">Reçu (total)</p>
+            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">✅ Payé (reçu)</p>
             <p className="text-green-400 text-xl font-bold">{totalRecu.toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-0.5">Commandes reçues</p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">📦 Total dépensé</p>
+            <p className="text-orange-400 text-xl font-bold">{(totalEnAttente + totalRecu).toFixed(2)}€</p>
+            <p className="text-zinc-600 text-xs mt-0.5">Achats fournisseurs</p>
           </div>
         </div>
 
@@ -497,11 +522,11 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-white text-sm">{cmd.produit_nom}</td>
+                      <td className="px-4 py-3 text-white text-sm">{cmd.produit_nom || cmd.produit || "—"}</td>
                       <td className="px-4 py-3 text-white text-sm font-bold">{cmd.quantite}</td>
                       <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.prix_unitaire||0).toFixed(2)}€</td>
                       <td className="px-4 py-3 text-zinc-400 text-sm">{Number(cmd.frais_livraison||0).toFixed(2)}€</td>
-                      <td className="px-4 py-3 text-yellow-400 text-sm font-bold">{Number(cmd.total||0).toFixed(2)}€</td>
+                      <td className="px-4 py-3 text-red-400 text-sm font-bold">-{Number(cmd.total||0).toFixed(2)}€</td>
                       <td className="px-4 py-3">
                         <span className={`text-[11px] font-bold px-2 py-1 rounded-full border ${sCfg.color} ${sCfg.bg} ${sCfg.border}`}>
                           {sCfg.label}
@@ -515,7 +540,7 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
                           {cmd.statut === "en_attente" && (
                             <button onClick={() => markAsReceived(cmd)}
                               className="p-1.5 text-green-400 hover:text-green-300 bg-green-400/10 rounded-lg hover:bg-green-400/20 transition-colors"
-                              title="Marquer comme reçu">
+                              title="Marquer comme reçu (payé)">
                               <CheckCircle2 size={13}/>
                             </button>
                           )}

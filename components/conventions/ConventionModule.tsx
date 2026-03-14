@@ -331,13 +331,14 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const todayStr = new Date().toISOString().split("T")[0]
 
   const filtered = conventions.filter(c => {
+    if (!c.date_debut || !c.date_fin) return filter === "all" // sans dates → visible seulement dans "Toutes"
     if (filter === "active")   return c.date_debut <= todayStr && c.date_fin >= todayStr
     if (filter === "upcoming") return c.date_debut > todayStr
     if (filter === "past")     return c.date_fin < todayStr
     return true
   })
 
-  const activeNow = conventions.find(c => c.date_debut <= todayStr && c.date_fin >= todayStr)
+  const activeNow = conventions.find(c => c.date_debut && c.date_fin && c.date_debut <= todayStr && c.date_fin >= todayStr)
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
@@ -450,7 +451,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="bg-zinc-800 rounded-xl px-3 py-2">
                       <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Début</p>
-                      <p className="text-white font-semibold text-xs">{new Date(c.date_debut+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" })}</p>
+                      <p className="text-white font-semibold text-xs">{c.date_debut ? new Date(c.date_debut+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" }) : "—"}</p>
                     </div>
                     <div className="bg-zinc-800 rounded-xl px-3 py-2">
                       <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Fin</p>

@@ -19,7 +19,7 @@ interface Client {
 
 interface Product { id: string; name: string; gamme: string; pv: number }
 
-const CONTRATS = ["Particulier", "Professionnel", "Pharmacie", "Grossiste", "Revendeur"]
+const CONTRATS = ["Particuliers", "Professionnels", "Particulier", "Professionnel", "Pharmacie", "Grossiste", "Revendeur", "Convention"]
 const STATUTS  = [
   { id: "actif",   label: "Actif",    color: "text-green-400 bg-green-400/10 border-green-400/20" },
   { id: "inactif", label: "Inactif",  color: "text-zinc-500 bg-zinc-800 border-zinc-700" },
@@ -170,7 +170,7 @@ function ClientForm({
       email: form.email, telephone: form.telephone,
       adresse: form.adresse, ville: form.ville, cp: form.cp,
       contrat: form.contrat, statut: form.statut, notes: form.notes,
-      tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
+      tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
     }
     if (client?.id) await supabase.from("clients").update(data).eq("id", client.id)
     else await supabase.from("clients").insert(data)
@@ -287,9 +287,12 @@ function ClientCard({ client, accentColor, onEdit, onDelete, onTarifs }: {
       {/* Header */}
       <div className="flex items-start gap-4 p-5">
         {/* Avatar */}
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-base shrink-0"
-          style={{ backgroundColor: avatarColor }}>
-          {initials(client.nom)}
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-base shrink-0 overflow-hidden"
+          style={{ backgroundColor: client.avatar_url ? undefined : avatarColor }}>
+          {client.avatar_url
+            ? <img src={client.avatar_url} alt={client.nom} className="w-full h-full object-cover" />
+            : initials(client.nom)
+          }
         </div>
 
         {/* Name + statut */}
