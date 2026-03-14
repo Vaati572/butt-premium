@@ -278,116 +278,152 @@ function ClientCard({ client, accentColor, onEdit, onDelete, onTarifs }: {
   onDelete: () => void
   onTarifs: () => void
 }) {
-  const statut = STATUTS.find(s => s.id === (client.statut || "actif")) || STATUTS[0]
-  const colors = ["#d97706","#7c3aed","#db2777","#059669","#2563eb","#dc2626"]
-  const avatarColor = colors[(client.nom?.charCodeAt(0) || 0) % colors.length]
+  const statut   = STATUTS.find(s => s.id === (client.statut || "actif")) || STATUTS[0]
+  const colors   = ["#d97706","#7c3aed","#db2777","#059669","#2563eb","#dc2626"]
+  const avatarBg = colors[(client.nom?.charCodeAt(0) || 0) % colors.length]
+  const hasCA    = (client.ca_total || 0) > 0
+  const isVIP    = client.statut === "vip"
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden hover:border-zinc-700 transition-all group">
-      {/* Header */}
-      <div className="flex items-start gap-4 p-5">
+    <div className="group relative bg-[#111111] border border-zinc-800/80 rounded-2xl overflow-hidden transition-all duration-200 hover:border-zinc-600 hover:shadow-xl hover:shadow-black/40 flex flex-col"
+      style={isVIP ? { borderColor: accentColor+"50", boxShadow: `0 0 20px ${accentColor}10` } : {}}>
+
+      {/* Accent bar top */}
+      <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${avatarBg}80, transparent)` }}/>
+
+      {/* HEADER — Avatar + Nom + actions */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         {/* Avatar */}
-        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-base shrink-0 overflow-hidden"
-          style={{ backgroundColor: client.avatar_url ? undefined : avatarColor }}>
-          {client.avatar_url
-            ? <img src={client.avatar_url} alt={client.nom} className="w-full h-full object-cover" />
-            : initials(client.nom)
-          }
+        <div className="relative shrink-0">
+          <div className="w-11 h-11 rounded-xl overflow-hidden flex items-center justify-center text-white font-black text-sm ring-2 ring-black"
+            style={{ backgroundColor: client.avatar_url ? "#18181b" : avatarBg }}>
+            {client.avatar_url
+              ? <img src={client.avatar_url} alt={client.nom} className="w-full h-full object-cover"/>
+              : initials(client.nom)
+            }
+          </div>
+          {/* Statut dot */}
+          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[#111111] ${
+            client.statut === "vip" ? "bg-yellow-400" :
+            client.statut === "inactif" ? "bg-zinc-600" :
+            "bg-green-400"
+          }`}/>
         </div>
 
-        {/* Name + statut */}
+        {/* Nom + type */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h3 className="text-white font-bold text-base truncate">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <p className="text-white font-bold text-sm leading-tight truncate">
               {client.prenom ? `${client.prenom} ` : ""}{client.nom}
-            </h3>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statut.color}`}>
-              {statut.label}
-            </span>
+            </p>
+            {isVIP && <span className="text-[10px]">⭐</span>}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {client.contrat && (
-              <span className="text-zinc-500 text-xs bg-zinc-800 px-2 py-0.5 rounded-full">{client.contrat}</span>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {client.contrat && client.contrat !== "Aucun" && (
+              <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">
+                {client.contrat}
+              </span>
             )}
-            {(client.tags || []).slice(0, 3).map(tag => (
-              <span key={tag} className="text-xs px-2 py-0.5 rounded-full border"
-                style={{ color: accentColor, backgroundColor: accentColor+"15", borderColor: accentColor+"30" }}>
+            {(client.tags || []).slice(0, 2).map(tag => (
+              <span key={tag} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                style={{ color: accentColor, backgroundColor: accentColor+"18" }}>
                 {tag}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          <button onClick={onTarifs} className="p-1.5 text-blue-400 hover:text-blue-300 rounded-lg hover:bg-blue-400/10" title="Tarifs perso">
-            <Euro size={14}/>
+        {/* Actions — toujours visibles */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button onClick={onTarifs} className="w-7 h-7 flex items-center justify-center text-blue-400 hover:text-blue-300 rounded-lg hover:bg-blue-400/10 transition-colors" title="Tarifs perso">
+            <Euro size={13}/>
           </button>
-          <button onClick={onEdit} className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700">
-            <Pencil size={14}/>
+          <button onClick={onEdit} className="w-7 h-7 flex items-center justify-center text-zinc-500 hover:text-white rounded-lg hover:bg-zinc-700 transition-colors">
+            <Pencil size={13}/>
           </button>
-          <button onClick={onDelete} className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10">
-            <Trash2 size={14}/>
+          <button onClick={onDelete} className="w-7 h-7 flex items-center justify-center text-zinc-700 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors">
+            <Trash2 size={13}/>
           </button>
         </div>
       </div>
 
-      {/* Info grid — visible sans cliquer */}
-      <div className="px-5 pb-5 grid grid-cols-1 gap-2">
+      {/* SÉPARATEUR */}
+      <div className="mx-4 h-px bg-zinc-800/60"/>
+
+      {/* INFOS CONTACT */}
+      <div className="px-4 py-3 space-y-1.5 flex-1">
         {client.telephone && (
-          <div className="flex items-center gap-2 text-sm">
-            <Phone size={13} className="text-zinc-500 shrink-0"/>
-            <a href={`tel:${client.telephone}`} className="text-zinc-300 hover:text-white transition-colors">{client.telephone}</a>
-          </div>
+          <a href={`tel:${client.telephone}`}
+            className="flex items-center gap-2.5 group/link">
+            <div className="w-5 h-5 rounded-md bg-zinc-800 flex items-center justify-center shrink-0">
+              <Phone size={10} className="text-zinc-400"/>
+            </div>
+            <span className="text-zinc-300 text-xs font-medium group-hover/link:text-white transition-colors">
+              {client.telephone}
+            </span>
+          </a>
         )}
         {client.email && (
-          <div className="flex items-center gap-2 text-sm">
-            <Mail size={13} className="text-zinc-500 shrink-0"/>
-            <a href={`mailto:${client.email}`} className="text-zinc-300 hover:text-white transition-colors truncate">{client.email}</a>
-          </div>
+          <a href={`mailto:${client.email}`}
+            className="flex items-center gap-2.5 group/link">
+            <div className="w-5 h-5 rounded-md bg-zinc-800 flex items-center justify-center shrink-0">
+              <Mail size={10} className="text-zinc-400"/>
+            </div>
+            <span className="text-zinc-400 text-xs truncate group-hover/link:text-white transition-colors">
+              {client.email}
+            </span>
+          </a>
         )}
         {(client.adresse || client.ville) && (
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin size={13} className="text-zinc-500 shrink-0"/>
-            <span className="text-zinc-400 truncate">
-              {[client.adresse, client.cp, client.ville].filter(Boolean).join(", ")}
+          <div className="flex items-start gap-2.5">
+            <div className="w-5 h-5 rounded-md bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5">
+              <MapPin size={10} className="text-zinc-400"/>
+            </div>
+            <span className="text-zinc-500 text-xs leading-snug">
+              {[client.adresse, client.cp && client.ville ? `${client.cp} ${client.ville}` : client.ville].filter(Boolean).join(", ")}
             </span>
           </div>
         )}
         {client.notes && (
-          <div className="flex items-start gap-2 text-sm">
-            <span className="text-zinc-500 text-xs shrink-0 mt-0.5">📝</span>
-            <p className="text-zinc-500 text-xs italic line-clamp-2">{client.notes}</p>
+          <div className="flex items-start gap-2.5 pt-0.5">
+            <div className="w-5 h-5 rounded-md bg-zinc-800/60 flex items-center justify-center shrink-0 mt-0.5">
+              <span className="text-[9px]">📝</span>
+            </div>
+            <p className="text-zinc-500 text-[11px] italic leading-relaxed line-clamp-2">
+              {client.notes}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Footer — stats */}
-      {(client.ca_total != null || client.nb_achats != null) && (
-        <div className="px-5 py-3 border-t border-zinc-800 flex items-center gap-4">
-          {client.ca_total != null && (
-            <div className="flex items-center gap-1.5">
-              <TrendingUp size={12} style={{ color: accentColor }}/>
-              <span className="text-sm font-bold" style={{ color: accentColor }}>{client.ca_total.toFixed(2)}€</span>
-              <span className="text-zinc-600 text-xs">CA total</span>
-            </div>
-          )}
-          {client.nb_achats != null && client.nb_achats > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Package size={12} className="text-zinc-500"/>
-              <span className="text-zinc-400 text-xs">{client.nb_achats} achat{client.nb_achats>1?"s":""}</span>
-            </div>
-          )}
-          {client.created_at && (
-            <div className="flex items-center gap-1.5 ml-auto">
-              <Calendar size={11} className="text-zinc-600"/>
-              <span className="text-zinc-600 text-[10px]">
-                Depuis {new Date(client.created_at).toLocaleDateString("fr-FR", { month:"short", year:"numeric" })}
-              </span>
-            </div>
+      {/* FOOTER — CA + stats */}
+      <div className="mx-4 h-px bg-zinc-800/60"/>
+      <div className="px-4 py-2.5 flex items-center justify-between">
+        {/* CA */}
+        <div className="flex items-center gap-1.5">
+          <TrendingUp size={11} style={{ color: hasCA ? accentColor : "#52525b" }}/>
+          <span className={`text-xs font-bold ${hasCA ? "" : "text-zinc-600"}`}
+            style={hasCA ? { color: accentColor } : {}}>
+            {(client.ca_total || 0).toFixed(2)}€
+          </span>
+          {(client.nb_achats || 0) > 0 && (
+            <>
+              <span className="text-zinc-700 text-[10px]">·</span>
+              <span className="text-zinc-500 text-[10px]">{client.nb_achats} achat{(client.nb_achats||0)>1?"s":""}</span>
+            </>
           )}
         </div>
-      )}
+
+        {/* Date */}
+        {client.created_at && (
+          <div className="flex items-center gap-1">
+            <Calendar size={10} className="text-zinc-700"/>
+            <span className="text-zinc-700 text-[10px]">
+              {new Date(client.created_at).toLocaleDateString("fr-FR", { month:"short", year:"numeric" })}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
