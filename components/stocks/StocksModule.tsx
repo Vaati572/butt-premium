@@ -717,10 +717,12 @@ export default function StocksModule({ activeSociety, profile }: Props) {
             )}
           </div>
         )}
-      {showAdd && <AddStockPanel societyId={activeSociety.id} onClose={()=>setShowAdd(false)} onDone={loadStock}/>}
-      {showHistory && <HistoryPanel societyId={activeSociety.id} onClose={()=>setShowHistory(false)}/>}
-      {movementItem && <MouvementPanel item={movementItem} profile={profile} onClose={()=>setMovementItem(null)} onDone={loadStock}/>}
-      {editItem && <EditStockPanel item={editItem} onClose={()=>setEditItem(null)} onDone={loadStock}/>}
+
+        {showAdd && <AddStockPanel societyId={activeSociety.id} onClose={()=>setShowAdd(false)} onDone={loadStock}/>}
+        {showHistory && <HistoryPanel societyId={activeSociety.id} onClose={()=>setShowHistory(false)}/>}
+        {movementItem && <MouvementPanel item={movementItem} profile={profile} onClose={()=>setMovementItem(null)} onDone={loadStock}/>}
+        {editItem && <EditStockPanel item={editItem} onClose={()=>setEditItem(null)} onDone={loadStock}/>}
+      </div>
     </div>
   )
 }
