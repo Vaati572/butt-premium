@@ -319,32 +319,63 @@ const STATUS_CONFIG: Record<CommStatus, { label: string; color: string; bg: stri
   annulé:     { label: "Annulé",     color: "text-red-400",    bg: "bg-red-400/10",    border: "border-red-400/20"  },
 }
 
-/* ── STOCK DISPLAY ───────────────────────── */
-function StockDisplay({ societyId }: { societyId: string }) {
+/* ── STOCK PAR FOURNISSEUR ────────────────── */
+function FournisseurStock({ societyId, produits, color, fournisseurId }: {
+  societyId: string
+  produits: { id: string; nom: string; stock_produit: string }[]
+  color: string
+  fournisseurId: string
+}) {
   const [stock, setStock] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const targets = produits.map(p => p.stock_produit.toLowerCase().trim())
     supabase.from("stock").select("*")
       .eq("society_id", societyId)
-      .order("produit_nom")
-      .then(({ data }) => { setStock(data || []); setLoading(false) })
-  }, [societyId])
+      .then(({ data }) => {
+        // Pour Tiny Tube : montre le stock Ludivine (ce que Tiny Tube alimente)
+        // Pour Ludivine et Claudia : montre le stock principal
+        const relevantStock = (data || []).filter(s => {
+          const nomLower = s.produit_nom.toLowerCase().trim()
+          return targets.some(t => nomLower.includes(t) || t.includes(nomLower))
+        })
+        setStock(relevantStock)
+        setLoading(false)
+      })
+  }, [societyId, produits])
 
-  if (loading) return <div className="text-zinc-600 text-sm text-center py-2">Chargement...</div>
-  if (stock.length === 0) return <div className="text-zinc-600 text-sm text-center py-2">Aucun produit en stock</div>
+  if (loading) return <div className="text-zinc-700 text-xs py-1">Chargement...</div>
 
+  // Map produits aux stocks trouvés
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-      {stock.filter(s => !s.is_labo).map(s => {
-        const neg = s.quantite < 0
-        const alert = !neg && s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte
+    <div className="space-y-1.5">
+      {produits.map(p => {
+        const target = p.stock_produit.toLowerCase().trim()
+        const stockItem = stock.find(s =>
+          s.produit_nom.toLowerCase().trim().includes(target) ||
+          target.includes(s.produit_nom.toLowerCase().trim())
+        )
+        const qty = stockItem?.quantite ?? null
+        const unite = stockItem?.unite || "pcs"
+        const neg = qty !== null && qty < 0
+        const zero = qty === 0
+        const alert = !neg && stockItem?.seuil_alerte > 0 && qty !== null && qty <= stockItem.seuil_alerte
+
         return (
-          <div key={s.id} className={`bg-zinc-800 border rounded-xl px-3 py-2 ${neg ? "border-red-500/30" : alert ? "border-orange-500/30" : "border-zinc-700"}`}>
-            <p className="text-zinc-400 text-[11px] truncate mb-0.5">{s.produit_nom}</p>
-            <p className={`text-lg font-black ${neg ? "text-red-500" : s.quantite === 0 ? "text-zinc-600" : alert ? "text-orange-400" : "text-white"}`}>
-              {s.quantite}{s.unite ? <span className="text-xs font-normal text-zinc-600 ml-0.5">{s.unite}</span> : ""}
-            </p>
+          <div key={p.id} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-zinc-800/60 border border-zinc-700/40">
+            <span className="text-zinc-400 text-xs truncate mr-2">{p.nom}</span>
+            {qty === null ? (
+              <span className="text-zinc-700 text-xs font-semibold">—</span>
+            ) : (
+              <div className="flex items-center gap-1 shrink-0">
+                <span className={`text-sm font-black ${
+                  neg ? "text-red-500" : zero ? "text-zinc-600" : alert ? "text-orange-400" : "text-white"
+                }`}>{qty}</span>
+                <span className="text-zinc-600 text-[10px]">{unite}</span>
+                {(neg || zero) && <span className="text-red-400 text-[10px]">⚠</span>}
+              </div>
+            )}
           </div>
         )
       })}
@@ -398,14 +429,6 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
     return true
   })
 
-  // Parse total from notes if column doesn't exist
-  const parseTotal = (cmd: any) => {
-    if (cmd.total) return Number(cmd.total)
-    const match = (cmd.notes || "").match(/Total: ([\d.]+)€/)
-    return match ? parseFloat(match[1]) : 0
-  }
-  const totalEnAttente = commandes.filter(c => c.statut === "en_attente").reduce((s: number, c: any) => s + parseTotal(c), 0)
-  const totalRecu      = commandes.filter(c => c.statut === "reçu").reduce((s: number, c: any) => s + parseTotal(c), 0)
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
@@ -419,70 +442,53 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
           </div>
         </div>
 
-        {/* Stock société actuel */}
-        <div className="mb-6 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-zinc-800 flex items-center justify-between">
-            <p className="text-white font-bold text-sm">📦 Stock société</p>
-            <p className="text-zinc-500 text-xs">Mis à jour en temps réel</p>
-          </div>
-          <div className="p-4">
-            <StockDisplay societyId={activeSociety.id} />
-          </div>
-        </div>
-
         {/* Fournisseur cards - Commander */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {FOURNISSEURS.map(f => {
             const count = commandes.filter(c => c.fournisseur_id === f.id && c.statut === "en_attente").length
             return (
-              <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 hover:border-zinc-700 transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-2xl mb-1">{f.emoji}</p>
-                    <h3 className="text-white font-bold">{f.nom}</h3>
-                    <p className="text-zinc-500 text-xs">{f.description}</p>
+              <div key={f.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden hover:border-zinc-700 transition-colors flex flex-col">
+                {/* Header fournisseur */}
+                <div className="p-5 pb-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-2xl mb-1">{f.emoji}</p>
+                      <h3 className="text-white font-bold">{f.nom}</h3>
+                      <p className="text-zinc-500 text-xs">{f.description}</p>
+                    </div>
+                    {count > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 shrink-0">
+                        {count} en attente
+                      </span>
+                    )}
                   </div>
-                  {count > 0 && (
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-full text-yellow-400 bg-yellow-400/10 border border-yellow-400/20">
-                      {count} en attente
-                    </span>
-                  )}
                 </div>
 
-                <div className="space-y-1 mb-4">
-                  {f.produits.map(p => (
-                    <p key={p.id} className="text-zinc-600 text-xs">• {p.nom}</p>
-                  ))}
+                {/* Stocks des produits de ce fournisseur */}
+                <div className="px-5 pb-4 flex-1">
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">Stock actuel</p>
+                  <FournisseurStock
+                    societyId={activeSociety.id}
+                    produits={f.produits}
+                    color={f.color}
+                    fournisseurId={f.id}
+                  />
                 </div>
 
-                <button onClick={() => setActiveFourn(f)}
-                  className="w-full py-2.5 rounded-xl font-bold text-sm text-black flex items-center justify-center gap-2 hover:brightness-110 transition"
-                  style={{ backgroundColor: f.color }}>
-                  <Plus size={14}/> Commander
-                </button>
+                {/* Bouton commander */}
+                <div className="px-5 pb-5">
+                  <button onClick={() => setActiveFourn(f)}
+                    className="w-full py-2.5 rounded-xl font-bold text-sm text-black flex items-center justify-center gap-2 hover:brightness-110 transition"
+                    style={{ backgroundColor: f.color }}>
+                    <Plus size={14}/> Commander
+                  </button>
+                </div>
               </div>
             )
           })}
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">💸 À payer</p>
-            <p className="text-red-400 text-xl font-bold">{totalEnAttente.toFixed(2)}€</p>
-            <p className="text-zinc-600 text-xs mt-0.5">Commandes en attente</p>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">✅ Payé (reçu)</p>
-            <p className="text-green-400 text-xl font-bold">{totalRecu.toFixed(2)}€</p>
-            <p className="text-zinc-600 text-xs mt-0.5">Commandes reçues</p>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-zinc-500 text-[11px] uppercase tracking-wider mb-1">📦 Total dépensé</p>
-            <p className="text-orange-400 text-xl font-bold">{(totalEnAttente + totalRecu).toFixed(2)}€</p>
-            <p className="text-zinc-600 text-xs mt-0.5">Achats fournisseurs</p>
-          </div>
-        </div>
+
 
         {/* Filters */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
