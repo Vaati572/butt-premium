@@ -137,20 +137,9 @@ function NouvelleCommandePanel({
 
     const { data: cmd, error } = insertResult
 
-    if (!error && cmd) {
-      // Logic selon fournisseur
-      if (fournisseur.id === "tiny_tube") {
-        // Tiny Tube: commande pots → stock Ludivine (stock_labo)
-        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Commande Tiny Tube — ${produitInfo.nom}`, "labo")
-      } else if (fournisseur.id === "ludivine") {
-        // Ludivine commande pots → retire du stock Ludivine, ajoute au stock principal
-        await updateStockByName(societyId, produitInfo.stock_produit, -qty, profile.id, `Sortie Labo Ludivine — ${produitInfo.nom}`, "labo")
-        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Réception Ludivine — ${produitInfo.nom}`, "main")
-      } else if (fournisseur.id === "claudia") {
-        // Claudia: ajoute au stock principal directement
-        await updateStockByName(societyId, produitInfo.stock_produit, qty, profile.id, `Commande Claudia — ${produitInfo.nom}`, "main")
-      }
-    }
+    // ✅ Aucun mouvement de stock à la création
+    // Le stock se met à jour uniquement quand la commande est marquée "Reçu"
+    // (voir markAsReceived)
 
     setSaving(false)
     if (error) {
@@ -320,58 +309,73 @@ const STATUS_CONFIG: Record<CommStatus, { label: string; color: string; bg: stri
 }
 
 /* ── STOCK PAR FOURNISSEUR ────────────────── */
-function FournisseurStock({ societyId, produits, color, fournisseurId }: {
+function FournisseurStock({ societyId, produits, fournisseurId }: {
   societyId: string
   produits: { id: string; nom: string; stock_produit: string }[]
-  color: string
   fournisseurId: string
 }) {
   const [stock, setStock] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const targets = produits.map(p => p.stock_produit.toLowerCase().trim())
     supabase.from("stock").select("*")
       .eq("society_id", societyId)
-      .then(({ data }) => {
-        // Pour Tiny Tube : montre le stock Ludivine (ce que Tiny Tube alimente)
-        // Pour Ludivine et Claudia : montre le stock principal
-        const relevantStock = (data || []).filter(s => {
-          const nomLower = s.produit_nom.toLowerCase().trim()
-          return targets.some(t => nomLower.includes(t) || t.includes(nomLower))
-        })
-        setStock(relevantStock)
-        setLoading(false)
-      })
-  }, [societyId, produits])
+      .then(({ data }) => { setStock(data || []); setLoading(false) })
+  }, [societyId])
+
+  // Tiny Tube n'a pas de stock propre — il envoie chez Ludivine
+  if (fournisseurId === "tiny_tube") {
+    return (
+      <div className="rounded-lg bg-zinc-800/40 border border-zinc-700/30 px-3 py-2.5">
+        <p className="text-zinc-500 text-[11px]">
+          📦 Les pots commandés chez Tiny Tube sont envoyés directement chez{" "}
+          <span className="text-purple-400 font-semibold">Ludivine (Labo)</span>.
+        </p>
+        <p className="text-zinc-600 text-[10px] mt-1">Le stock Ludivine se met à jour à la validation.</p>
+      </div>
+    )
+  }
 
   if (loading) return <div className="text-zinc-700 text-xs py-1">Chargement...</div>
 
-  // Map produits aux stocks trouvés
+  // Tiny Tube → stock labo (is_labo=true) | Ludivine → stock labo | Claudia → stock principal
+  const isLabo = fournisseurId === "ludivine"
+  const label  = fournisseurId === "ludivine" ? "Stock Labo" : "Stock"
+
   return (
     <div className="space-y-1.5">
+      <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">{label}</p>
       {produits.map(p => {
         const target = p.stock_produit.toLowerCase().trim()
-        const stockItem = stock.find(s =>
-          s.produit_nom.toLowerCase().trim().includes(target) ||
-          target.includes(s.produit_nom.toLowerCase().trim())
+        // Cherche d'abord dans le bon bucket (labo ou principal)
+        let stockItem = stock.find(s =>
+          (s.produit_nom.toLowerCase().trim().includes(target) || target.includes(s.produit_nom.toLowerCase().trim())) &&
+          (isLabo ? s.is_labo === true : !s.is_labo)
         )
-        const qty = stockItem?.quantite ?? null
+        // Fallback sans filtre labo si pas trouvé
+        if (!stockItem) {
+          stockItem = stock.find(s =>
+            s.produit_nom.toLowerCase().trim().includes(target) ||
+            target.includes(s.produit_nom.toLowerCase().trim())
+          )
+        }
+
+        const qty   = stockItem?.quantite ?? null
         const unite = stockItem?.unite || "pcs"
-        const neg = qty !== null && qty < 0
-        const zero = qty === 0
+        const neg   = qty !== null && qty < 0
+        const zero  = qty === 0
         const alert = !neg && stockItem?.seuil_alerte > 0 && qty !== null && qty <= stockItem.seuil_alerte
 
         return (
           <div key={p.id} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-zinc-800/60 border border-zinc-700/40">
             <span className="text-zinc-400 text-xs truncate mr-2">{p.nom}</span>
             {qty === null ? (
-              <span className="text-zinc-700 text-xs font-semibold">—</span>
+              <span className="text-zinc-700 text-xs">—</span>
             ) : (
               <div className="flex items-center gap-1 shrink-0">
-                <span className={`text-sm font-black ${
-                  neg ? "text-red-500" : zero ? "text-zinc-600" : alert ? "text-orange-400" : "text-white"
-                }`}>{qty}</span>
+                <span className={`text-sm font-black ${neg ? "text-red-500" : zero ? "text-zinc-600" : alert ? "text-orange-400" : "text-white"}`}>
+                  {qty}
+                </span>
                 <span className="text-zinc-600 text-[10px]">{unite}</span>
                 {(neg || zero) && <span className="text-red-400 text-[10px]">⚠</span>}
               </div>
@@ -405,10 +409,46 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
   useEffect(() => { load() }, [load])
 
   const markAsReceived = async (cmd: any) => {
+    // Récupère les infos du produit depuis les colonnes ou les notes
+    const produitStock = cmd.stock_produit || (() => {
+      const m = (cmd.notes || "").match(/Stock: ([^|]+)/)
+      return m ? m[1].trim() : null
+    })()
+    const qtyVal = Number(cmd.quantite) || (() => {
+      const m = (cmd.notes || "").match(/Qté: (\d+)/)
+      return m ? parseInt(m[1]) : 0
+    })()
+    const fournId = cmd.fournisseur_id || (() => {
+      const m = (cmd.notes || "").match(/Fourn: ([^|]+)/)
+      return m ? m[1].trim() : null
+    })()
+    const prodNom = cmd.produit_nom || cmd.produit || ""
+
+    // Mise à jour du statut
     await supabase.from("commandes").update({
       statut: "reçu",
       date_reception: new Date().toISOString(),
     }).eq("id", cmd.id)
+
+    // ── Logique stock selon fournisseur ──
+    if (produitStock && qtyVal > 0) {
+      if (fournId === "tiny_tube") {
+        // Tiny Tube → les pots arrivent chez Ludivine (stock labo)
+        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
+          `Réception Tiny Tube — ${prodNom} ×${qtyVal}`, "labo")
+      } else if (fournId === "ludivine") {
+        // Ludivine → retire les pots du stock labo + ajoute les produits finis en stock principal
+        await updateStockByName(activeSociety.id, produitStock, -qtyVal, profile.id,
+          `Fabrication Ludivine — ${prodNom} ×${qtyVal} (pots utilisés)`, "labo")
+        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
+          `Réception Ludivine — ${prodNom} ×${qtyVal}`, "main")
+      } else if (fournId === "claudia") {
+        // Claudia → directement en stock principal
+        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
+          `Réception Claudia — ${prodNom} ×${qtyVal}`, "main")
+      }
+    }
+
     load()
   }
 
@@ -470,7 +510,6 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
                   <FournisseurStock
                     societyId={activeSociety.id}
                     produits={f.produits}
-                    color={f.color}
                     fournisseurId={f.id}
                   />
                 </div>
