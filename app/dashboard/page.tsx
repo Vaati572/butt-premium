@@ -244,6 +244,51 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
   )
 }
 
+/* ── STOCK ALERT POPUP ───────────────────────────────────── */
+function StockAlertPopup({ alerts, onGoToStock, onClose }: {
+  alerts: any[]; onGoToStock: ()=>void; onClose: ()=>void
+}) {
+  const [progress, setProgress] = useState(100)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - 0.5 })
+    }, 50)
+    return () => clearInterval(timer)
+  }, [])
+  const neg = alerts.filter((a:any)=>a.quantite<0).length
+  const low = alerts.filter((a:any)=>a.quantite>=0).length
+  return (
+    <div className="fixed bottom-6 left-6 z-[100] w-72">
+      <div className="bg-[#18181b] border border-red-500/30 rounded-2xl shadow-2xl overflow-hidden" style={{ boxShadow: "0 8px 40px #ef444420" }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80" style={{ background: "linear-gradient(135deg, #ef444415, transparent)" }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-lg">⚠️</div>
+            <div>
+              <p className="text-white font-bold text-sm">Stocks critiques</p>
+              <p className="text-zinc-400 text-[11px]">{neg > 0 && `${neg} négatif${neg>1?"s":""}`}{neg>0&&low>0&&" · "}{low>0&&`${low} en alerte`}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white text-sm">✕</button>
+        </div>
+        <div className="px-4 py-2.5 max-h-36 overflow-y-auto space-y-1">
+          {alerts.slice(0,5).map((a:any,i:number) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="text-zinc-300 text-xs truncate">{a.produit_nom}</span>
+              <span className={`text-xs font-bold ml-2 shrink-0 ${a.quantite<0?"text-red-500":"text-orange-400"}`}>{a.quantite} {a.unite||"u."}</span>
+            </div>
+          ))}
+          {alerts.length>5 && <p className="text-zinc-600 text-[10px]">+ {alerts.length-5} autres</p>}
+        </div>
+        <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
+          <button onClick={onGoToStock} className="flex-1 py-2 rounded-xl text-black font-bold text-xs bg-red-500 hover:bg-red-400 transition-all">Voir le stock →</button>
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
+        </div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${progress}%` }}/></div>
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════
    INNER DASHBOARD
 ══════════════════════════════════════════════ */
@@ -280,6 +325,12 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [activeTournee, setActiveTournee]   = useState<any>(null)
   const [unreadNotifs, setUnreadNotifs]     = useState<UnreadNotif[]>([])
   const [showUnreadPopup, setShowUnreadPopup] = useState(false)
+  const [stockAlerts, setStockAlerts]       = useState<any[]>([])
+  const [showStockAlert, setShowStockAlert] = useState(false)
+  const [globalSearch, setGlobalSearch]     = useState("")
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
+  const [globalResults, setGlobalResults]   = useState<any[]>([])
+  const [searchLoading, setSearchLoading]   = useState(false)
 
   const heartbeatRef  = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
@@ -306,6 +357,19 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       .order("date_debut", { ascending: false })
       .limit(1).single()
       .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
+
+    // Check stock alerts
+    supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite")
+      .eq("society_id", activeSociety.id)
+      .then(({ data }) => {
+        const alerts = (data||[]).filter((s:any) =>
+          s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte)
+        )
+        if (alerts.length > 0) {
+          setStockAlerts(alerts)
+          setTimeout(() => setShowStockAlert(true), 3000)
+        }
+      })
   }, [activeSociety])
 
   useEffect(() => {
@@ -411,6 +475,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setShowStatusMenu(false)
+      // Close global search if clicking outside
+      const target = e.target as HTMLElement
+      if (!target.closest("[data-global-search]")) setShowGlobalSearch(false)
     }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
@@ -456,6 +523,25 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const updateStatus = async (s: PresenceStatus) => {
     setMyStatus(s); setShowStatusMenu(false)
     await supabase.from("user_presence").update({ status: s, last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+  }
+
+  const runGlobalSearch = async (q: string) => {
+    if (!q.trim() || q.length < 2) { setGlobalResults([]); return }
+    setSearchLoading(true)
+    const [{ data: clients }, { data: pharmacies }, { data: prospects }, { data: ventes }] = await Promise.all([
+      supabase.from("clients").select("id,nom,telephone,email").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("pharmacies").select("id,nom,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("prospects").select("id,nom,entreprise,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id",activeSociety.id).ilike("client_nom",`%${q}%`).order("created_at",{ascending:false}).limit(5),
+    ])
+    const results: any[] = [
+      ...(clients||[]).map((c:any) => ({ type:"client",   icon:"👤", label:c.nom,        sub:c.telephone||c.email||"", tab:"clients",    id:c.id })),
+      ...(pharmacies||[]).map((p:any) => ({ type:"pharmacie",icon:"🏥", label:p.nom,    sub:p.ville||"",              tab:"pharmacies", id:p.id })),
+      ...(prospects||[]).map((p:any) => ({ type:"prospect", icon:"🎯", label:p.entreprise||p.nom, sub:p.ville||"",  tab:"prospects",  id:p.id })),
+      ...(ventes||[]).map((v:any) => ({ type:"vente",     icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€ · "+new Date(v.created_at).toLocaleDateString("fr-FR"), tab:"historique", id:v.id })),
+    ]
+    setGlobalResults(results)
+    setSearchLoading(false)
   }
 
   const logout = async () => {
@@ -531,6 +617,14 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const radiusMap    = { rounded: "12px", sharp: "4px", pill: "20px" }
   const cardRadius   = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
+  const stockAlertPopup = stockAlerts.length > 0 && showStockAlert && (
+    <StockAlertPopup
+      alerts={stockAlerts}
+      onGoToStock={() => { setActiveTab("stocks"); setShowStockAlert(false) }}
+      onClose={() => setShowStockAlert(false)}
+    />
+  )
+
   const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
     <UnreadMessagesPopup
       notifs={unreadNotifs}
@@ -557,6 +651,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         setShowConvPopup={setShowConvPopup} activeConvention={activeConvention}
       />
       {unreadPopup}
+      {stockAlertPopup}
     </>
   )
 
@@ -579,6 +674,39 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
             </div>
           )}
+          {/* Global Search */}
+          <div className="relative mt-2">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">🔍</span>
+            <input
+              type="text" placeholder="Recherche globale..." value={globalSearch}
+              onChange={e => { setGlobalSearch(e.target.value); runGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
+              onFocus={() => setShowGlobalSearch(true)}
+              className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/40"
+            />
+            {showGlobalSearch && globalSearch.length >= 2 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+                {searchLoading ? (
+                  <p className="text-zinc-500 text-xs px-3 py-3 text-center">Recherche...</p>
+                ) : globalResults.length === 0 ? (
+                  <p className="text-zinc-600 text-xs px-3 py-3 text-center">Aucun résultat</p>
+                ) : (
+                  <div className="py-1">
+                    {globalResults.map((r,i) => (
+                      <button key={i} onClick={() => { setActiveTab(r.tab); setShowGlobalSearch(false); setGlobalSearch("") }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-800 transition-colors text-left">
+                        <span className="text-sm shrink-0">{r.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-xs font-medium truncate">{r.label}</p>
+                          {r.sub && <p className="text-zinc-500 text-[10px] truncate">{r.sub}</p>}
+                        </div>
+                        <span className="text-zinc-600 text-[9px] uppercase shrink-0">{r.type}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
