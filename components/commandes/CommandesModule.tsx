@@ -14,14 +14,13 @@ const FOURNISSEURS = [
     emoji: "🧴",
     color: "#3b82f6",
     description: "Fournisseur de contenants",
+    // stock_produit = nom du pot dans le stock labo Ludivine
     produits: [
-      { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
-      { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
-      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "Baume 20ml",       prix_defaut: 0 },
-      { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
+      { id: "pots_250", nom: "Pots 250ml",            stock_produit: "Pots 250ml",      prix_defaut: 0 },
+      { id: "pots_50",  nom: "Pots 50ml",              stock_produit: "Pots 50ml",       prix_defaut: 0 },
+      { id: "pots_20",  nom: "Pots 20ml",              stock_produit: "Pots 20ml",       prix_defaut: 0 },
+      { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Bouteilles Huile Sèche", prix_defaut: 0 },
     ],
-    // Tiny Tube: commande pots → met à jour stock Ludivine
-    targetFournisseur: "ludivine",
   },
   {
     id: "ludivine",
@@ -29,13 +28,14 @@ const FOURNISSEURS = [
     emoji: "🔬",
     color: "#a855f7",
     description: "Laboratoire de fabrication",
+    // stock_produit = produit fini qui va dans MON stock
+    // stock_pot     = pot vide qui se soustrait du labo Ludivine
     produits: [
-      { id: "pots_250", nom: "Pots 250ml",          stock_produit: "Baume 250ml",      prix_defaut: 0 },
-      { id: "pots_50",  nom: "Pots 50ml",            stock_produit: "Baume 50ml",       prix_defaut: 0 },
-      { id: "pots_20",  nom: "Pots 20ml",            stock_produit: "Baume 20ml",       prix_defaut: 0 },
-      { id: "btle_hse", nom: "Bouteilles Huile Sèche", stock_produit: "Huile Sèche",   prix_defaut: 0 },
+      { id: "baume_250", nom: "Baume 250ml",     stock_produit: "Baume 250ml",   stock_pot: "Pots 250ml",            prix_defaut: 0 },
+      { id: "baume_50",  nom: "Baume 50ml",      stock_produit: "Baume 50ml",    stock_pot: "Pots 50ml",             prix_defaut: 0 },
+      { id: "baume_20",  nom: "Baume 20ml",      stock_produit: "Baume 20ml",    stock_pot: "Pots 20ml",             prix_defaut: 0 },
+      { id: "hse",       nom: "Huile Sèche",     stock_produit: "Huile Sèche",   stock_pot: "Bouteilles Huile Sèche", prix_defaut: 0 },
     ],
-    targetFournisseur: null, // commande chez Ludivine → met à jour stock principal
   },
   {
     id: "claudia",
@@ -47,7 +47,6 @@ const FOURNISSEURS = [
       { id: "milky",      nom: "Milky",      stock_produit: "Milky",      prix_defaut: 4 },
       { id: "white_soap", nom: "White Soap", stock_produit: "White Soap", prix_defaut: 4 },
     ],
-    targetFournisseur: null, // toujours → stock principal
   },
 ]
 
@@ -95,11 +94,13 @@ function NouvelleCommandePanel({
 
     // Stocke TOUT dans les notes pour ne pas dépendre des colonnes
     // La migration SQL peut être appliquée après pour déverrouiller les colonnes avancées
+    const prodInfo = produitInfo as any
     const notesStr = [
       notes ? `Notes: ${notes}` : "",
       `Produit: ${produitInfo.nom}`,
       `Qté: ${qty}`,
       `Stock: ${produitInfo.stock_produit}`,
+      prodInfo.stock_pot ? `Pot: ${prodInfo.stock_pot}` : "",
       `Prix/u: ${realPrix}€`,
       `Frais: ${frais}€`,
       `Total: ${(qty * realPrix + frais).toFixed(2)}€`,
@@ -116,6 +117,7 @@ function NouvelleCommandePanel({
       produit_nom: produitInfo.nom,
       produit: produitInfo.nom,
       stock_produit: produitInfo.stock_produit,
+      stock_pot: (produitInfo as any).stock_pot || null,
       quantite: qty,
       prix_unitaire: realPrix,
       frais_livraison: frais,
@@ -139,14 +141,14 @@ function NouvelleCommandePanel({
 
     // ── Mouvements de stock à la CRÉATION ──
     if (!error && cmd) {
-      const prodStock = produitInfo.stock_produit
-      if (fournisseur.id === "tiny_tube" && prodStock) {
-        // Tiny Tube → les pots arrivent chez Ludivine immédiatement
-        await updateStockByName(societyId, prodStock, qty, profile.id,
-          `Commande Tiny Tube — ${produitInfo.nom} ×${qty}`, "labo")
+      const p = produitInfo as any
+      if (fournisseur.id === "tiny_tube") {
+        // Tiny Tube → 50 Pots 250ml commandés = +50 "Pots 250ml" dans stock labo Ludivine
+        await updateStockByName(societyId, p.stock_produit, qty, profile.id,
+          `Tiny Tube — ${p.nom} ×${qty}`, "labo")
       }
-      // Ludivine → rien à la création (stock bouge uniquement à la validation)
-      // Claudia  → rien à la création
+      // Ludivine → RIEN à la création, seulement à la validation
+      // Claudia  → RIEN à la création, seulement à la validation
     }
 
     setSaving(false)
@@ -449,22 +451,37 @@ export default function FournisseurModule({ activeSociety, profile }: Props) {
       date_reception: new Date().toISOString(),
     }).eq("id", cmd.id)
 
-    // ── Logique stock à la VALIDATION ──
-    if (produitStock && qtyVal > 0) {
+    // ── Mouvements de stock à la VALIDATION ──
+    if (qtyVal > 0) {
       if (fournId === "tiny_tube") {
-        // Tiny Tube : déjà mis à jour à la création → rien
-      } else if (fournId === "ludivine") {
-        // Ludivine validée :
-        //   1. +qty dans MON stock principal (je reçois les produits finis)
-        //   2. -qty dans stock Ludivine (elle les a fabriqués et envoyés)
-        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
-          `Réception Ludivine — ${prodNom} ×${qtyVal}`, "main")
-        await updateStockByName(activeSociety.id, produitStock, -qtyVal, profile.id,
-          `Expédition Ludivine → toi — ${prodNom} ×${qtyVal}`, "labo")
-      } else if (fournId === "claudia") {
-        // Claudia validée → +qty mon stock
-        await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
-          `Réception Claudia — ${prodNom} ×${qtyVal}`, "main")
+        // Tiny Tube : déjà fait à la création → rien
+      }
+      else if (fournId === "ludivine") {
+        // Exemple : commande 50 Baume 250ml chez Ludivine, réception validée :
+        //   → MON stock "Baume 250ml"  +50  (je reçois les produits finis)
+        //   → Labo Ludivine "Pots 250ml" -50  (elle a utilisé 50 pots vides)
+
+        // +qty produit fini dans MON stock principal
+        const prodFini = produitStock || cmd.produit_nom || cmd.produit
+        if (prodFini) {
+          await updateStockByName(activeSociety.id, prodFini, qtyVal, profile.id,
+            `Réception Ludivine — ${prodFini} ×${qtyVal}`, "main")
+        }
+
+        // -qty pots vides dans le stock labo Ludivine
+        const nomPot = cmd.stock_pot
+          || (() => { const m = (cmd.notes||"").match(/Pot: ([^|]+)/); return m ? m[1].trim() : null })()
+        if (nomPot) {
+          await updateStockByName(activeSociety.id, nomPot, -qtyVal, profile.id,
+            `Ludivine a utilisé — ${nomPot} ×${qtyVal}`, "labo")
+        }
+      }
+      else if (fournId === "claudia") {
+        // Claudia : +qty Milky ou White Soap dans MON stock
+        if (produitStock) {
+          await updateStockByName(activeSociety.id, produitStock, qtyVal, profile.id,
+            `Réception Claudia — ${prodNom} ×${qtyVal}`, "main")
+        }
       }
     }
 
