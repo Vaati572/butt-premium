@@ -257,7 +257,7 @@ function NouvelleCommandePanel({
             <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-500">
               <p className="font-semibold text-zinc-400 mb-1">Impact stock :</p>
               {fournisseur.id === "tiny_tube" && <p>→ +{qty||0} {produitInfo.stock_produit} dans le <span className="text-purple-400">stock Ludivine</span></p>}
-              {fournisseur.id === "ludivine" && <><p>→ -{qty||0} {produitInfo.stock_produit} du <span className="text-purple-400">stock Ludivine</span></p><p>→ +{qty||0} {produitInfo.stock_produit} dans votre <span className="text-yellow-400">stock principal</span></p></>}
+              {fournisseur.id === "ludivine" && <><p>→ +{qty||0} <span className="text-yellow-400">{produitInfo.stock_produit}</span> dans votre stock</p><p>→ -{qty||0} <span className="text-purple-400">{(produitInfo as any).stock_pot || "pots"}</span> chez Ludivine</p><p className="text-zinc-600 text-[10px]">(uniquement à la validation de réception)</p></>}
               {fournisseur.id === "claudia" && <p>→ +{qty||0} {produitInfo.stock_produit} dans votre <span className="text-yellow-400">stock principal</span></p>}
             </div>
           )}
@@ -332,7 +332,7 @@ const STATUS_CONFIG: Record<CommStatus, { label: string; color: string; bg: stri
 /* ── STOCK PAR FOURNISSEUR ────────────────── */
 function FournisseurStock({ societyId, produits, fournisseurId }: {
   societyId: string
-  produits: { id: string; nom: string; stock_produit: string }[]
+  produits: { id: string; nom: string; stock_produit: string; stock_pot?: string }[]
   fournisseurId: string
 }) {
   const [stock, setStock] = useState<any[]>([])
@@ -344,42 +344,44 @@ function FournisseurStock({ societyId, produits, fournisseurId }: {
       .then(({ data }) => { setStock(data || []); setLoading(false) })
   }, [societyId])
 
-  // Tiny Tube n'a pas de stock propre — il envoie chez Ludivine
+  // Tiny Tube → message informatif (les pots vont chez Ludivine)
   if (fournisseurId === "tiny_tube") {
     return (
       <div className="rounded-lg bg-zinc-800/40 border border-zinc-700/30 px-3 py-2.5">
         <p className="text-zinc-500 text-[11px]">
-          📦 Les pots commandés chez Tiny Tube sont envoyés directement chez{" "}
+          📦 Les pots commandés ici arrivent directement chez{" "}
           <span className="text-purple-400 font-semibold">Ludivine (Labo)</span>.
         </p>
-        <p className="text-zinc-600 text-[10px] mt-1">Le stock Ludivine se met à jour à la validation.</p>
+        <p className="text-zinc-600 text-[10px] mt-1">Commande créée → stock Ludivine mis à jour immédiatement.</p>
       </div>
     )
   }
 
   if (loading) return <div className="text-zinc-700 text-xs py-1">Chargement...</div>
 
-  // Tiny Tube → stock labo (is_labo=true) | Ludivine → stock labo | Claudia → stock principal
+  // Pour Ludivine : affiche les POTS VIDES (stock_pot, is_labo=true)  ← c'est son inventaire de pots
+  // Pour Claudia  : affiche les produits finis (stock_produit, is_labo=false) ← Milky/White Soap
   const isLabo = fournisseurId === "ludivine"
-  const label  = fournisseurId === "ludivine" ? "Stock Labo" : "Stock"
+  const label  = fournisseurId === "ludivine" ? "Pots vides chez Ludivine" : "Stock"
+
+  // Pour Ludivine on cherche stock_pot, pour les autres on cherche stock_produit
+  const getTarget = (p: any) => isLabo
+    ? (p.stock_pot || p.stock_produit)  // Pots 250ml
+    : p.stock_produit                   // Milky, White Soap
 
   return (
     <div className="space-y-1.5">
       <p className="text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">{label}</p>
       {produits.map(p => {
-        const target = p.stock_produit.toLowerCase().trim()
-        // Cherche d'abord dans le bon bucket (labo ou principal)
-        let stockItem = stock.find(s =>
-          (s.produit_nom.toLowerCase().trim().includes(target) || target.includes(s.produit_nom.toLowerCase().trim())) &&
+        const target = getTarget(p).toLowerCase().trim()
+        // Cherche UNIQUEMENT dans le bon bucket (is_labo pour Ludivine, principal pour Claudia)
+        const stockItem = stock.find(s =>
+          s.produit_nom.toLowerCase().trim() === target &&
+          (isLabo ? s.is_labo === true : !s.is_labo)
+        ) || stock.find(s =>
+          s.produit_nom.toLowerCase().includes(target) &&
           (isLabo ? s.is_labo === true : !s.is_labo)
         )
-        // Fallback sans filtre labo si pas trouvé
-        if (!stockItem) {
-          stockItem = stock.find(s =>
-            s.produit_nom.toLowerCase().trim().includes(target) ||
-            target.includes(s.produit_nom.toLowerCase().trim())
-          )
-        }
 
         const qty   = stockItem?.quantite ?? null
         const unite = stockItem?.unite || "pcs"
@@ -387,9 +389,12 @@ function FournisseurStock({ societyId, produits, fournisseurId }: {
         const zero  = qty === 0
         const alert = !neg && stockItem?.seuil_alerte > 0 && qty !== null && qty <= stockItem.seuil_alerte
 
+        // Pour Ludivine : afficher le nom du pot, pas du produit fini
+        const displayNom = isLabo ? getTarget(p) : p.nom
+
         return (
           <div key={p.id} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-zinc-800/60 border border-zinc-700/40">
-            <span className="text-zinc-400 text-xs truncate mr-2">{p.nom}</span>
+            <span className="text-zinc-400 text-xs truncate mr-2">{displayNom}</span>
             {qty === null ? (
               <span className="text-zinc-700 text-xs">—</span>
             ) : (
