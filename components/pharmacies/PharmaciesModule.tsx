@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import {
   Plus, X, Search, Phone, Mail, MapPin,
   Pencil, Trash2, Building2, Euro, TrendingUp,
-  Package, Check, Calendar
+  Package, Check
 } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
@@ -317,7 +317,7 @@ export default function PharmaciesModule({ activeSociety, profile }: Props) {
     setLoading(true)
     const { data: ph } = await supabase.from("pharmacies").select("*").eq("society_id",activeSociety.id).order("nom")
     if (!ph) { setLoading(false); return }
-    const { data: ventes } = await supabase.from("ventes").select("client_id,total_ttc").eq("society_id",activeSociety.id).eq("type_client","pharmacie")
+    const { data: ventes } = await supabase.from("ventes").select("client_id,total_ttc").eq("society_id",activeSociety.id)
     const caMap: Record<string,{total:number;count:number}> = {}
     ;(ventes||[]).forEach((v:any) => {
       if (!caMap[v.client_id]) caMap[v.client_id]={total:0,count:0}
@@ -381,7 +381,7 @@ export default function PharmaciesModule({ activeSociety, profile }: Props) {
           </div>
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
             {([["nom","A-Z"],["ca","CA ↓"]] as const).map(([val,lbl])=>(
-              <button key={val} onClick={()=>setSortBy(val)}
+              <button key={val} onClick={()=>setSortBy(val as "nom"|"ca")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${sortBy===val?"bg-zinc-700 text-white":"text-zinc-500 hover:text-zinc-300"}`}>
                 {lbl}
               </button>
