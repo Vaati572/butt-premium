@@ -19,16 +19,33 @@ interface Client {
 
 interface Product { id: string; name: string; gamme: string; pv: number }
 
-const CONTRATS = ["Particuliers", "Professionnels", "Particulier", "Professionnel", "Pharmacie", "Grossiste", "Revendeur", "Convention"]
-
-const FIDELITE_TIERS: { id: string; label: string; cardColor: string | null }[] = [
-  { id: "aucun",       label: "Aucun",          cardColor: null },
-  { id: "essentielle", label: "Essentielle 🥉", cardColor: "#cd7f32" },
-  { id: "avantage",    label: "Avantage 🥈",    cardColor: "#94a3b8" },
-  { id: "elite",       label: "Elite 🥇",       cardColor: "#eab308" },
-  { id: "proteam",     label: "ProTeam 💎",     cardColor: "#a855f7" },
+// Types clients avec couleur de carte
+const CONTRAT_TIERS: { label: string; cardColor: string | null }[] = [
+  { label: "Aucun",          cardColor: null },
+  { label: "Essentielle",    cardColor: "#cd7f32" }, // 🥉 Bronze
+  { label: "Avantage",       cardColor: "#94a3b8" }, // 🥈 Argent
+  { label: "Élite",          cardColor: "#eab308" }, // 🥇 Or
+  { label: "ProTeam",        cardColor: "#a855f7" }, // 💎 Premium
+  { label: "Particuliers",   cardColor: null },
+  { label: "Professionnels", cardColor: null },
+  { label: "Pharmacie",      cardColor: null },
+  { label: "Convention",     cardColor: null },
 ]
-const getFideliteConfig = (tier?: string) => FIDELITE_TIERS.find(t => t.id === tier) || FIDELITE_TIERS[0]
+
+const CONTRATS = CONTRAT_TIERS.map(t => t.label)
+const getContratColor = (contrat?: string): string => {
+  const tier = CONTRAT_TIERS.find(t => t.label === contrat)
+  return tier?.cardColor || ""
+}
+const getContratBadge = (contrat?: string): string => {
+  switch(contrat) {
+    case "Essentielle": return "🥉 Essentielle"
+    case "Avantage":    return "🥈 Avantage"
+    case "Élite":       return "🥇 Élite"
+    case "ProTeam":     return "💎 ProTeam"
+    default: return contrat || ""
+  }
+}
 const STATUTS  = [
   { id: "actif",   label: "Actif",    color: "text-green-400 bg-green-400/10 border-green-400/20" },
   { id: "inactif", label: "Inactif",  color: "text-zinc-500 bg-zinc-800 border-zinc-700" },
@@ -165,7 +182,6 @@ function ClientForm({
     email: client?.email || "", telephone: client?.telephone || "",
     adresse: client?.adresse || "", ville: client?.ville || "", cp: client?.cp || "",
     contrat: client?.contrat || "Particulier", statut: client?.statut || "actif",
-    fidelite: (client as any)?.fidelite || "aucun",
     latitude: String((client as any)?.latitude || ""),
     longitude: String((client as any)?.longitude || ""),
     notes: client?.notes || "", tags: (client?.tags || []).join(", "),
@@ -182,7 +198,6 @@ function ClientForm({
       email: form.email, telephone: form.telephone,
       adresse: form.adresse, ville: form.ville, cp: form.cp,
       contrat: form.contrat, statut: form.statut, notes: form.notes,
-      fidelite: (form as any).fidelite || "aucun",
       latitude: (form as any).latitude ? parseFloat((form as any).latitude) : null,
       longitude: (form as any).longitude ? parseFloat((form as any).longitude) : null,
       tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
@@ -243,10 +258,18 @@ function ClientForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Type</label>
-              <select value={form.contrat} onChange={e => set("contrat", e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">
-                {CONTRATS.map(c => <option key={c}>{c}</option>)}
-              </select>
+              <div className="grid grid-cols-2 gap-2">
+                {CONTRAT_TIERS.map(tier => {
+                  const active = form.contrat === tier.label
+                  return (
+                    <button key={tier.label} type="button" onClick={() => set("contrat", tier.label)}
+                      className={"py-2 rounded-xl text-xs font-bold border transition-all " + (active ? "text-black border-transparent" : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500")}
+                      style={active && tier.cardColor ? { backgroundColor: tier.cardColor } : active ? { backgroundColor: "#52525b", color: "#fff" } : {}}>
+                      {getContratBadge(tier.label) || tier.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Statut</label>
@@ -298,8 +321,7 @@ function ClientCard({ client, accentColor, onEdit, onDelete, onTarifs }: {
   const avatarBg = colors[(client.nom?.charCodeAt(0) || 0) % colors.length]
   const hasCA    = (client.ca_total || 0) > 0
   const isVIP    = client.statut === "vip"
-  const fidelite      = getFideliteConfig((client as any).fidelite)
-  const cardBorderColor: string = fidelite.cardColor || ""
+  const cardBorderColor: string = getContratColor(client.contrat)
   const hasBorderColor = cardBorderColor !== ""
 
   return (
@@ -340,15 +362,10 @@ function ClientCard({ client, accentColor, onEdit, onDelete, onTarifs }: {
             {isVIP && <span className="text-[10px]">⭐</span>}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            {fidelite.id !== "aucun" && hasBorderColor && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md text-black"
-                style={{ backgroundColor: cardBorderColor }}>
-                {fidelite.label}
-              </span>
-            )}
             {client.contrat && client.contrat !== "Aucun" && (
-              <span className="text-[10px] font-semibold text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">
-                {client.contrat}
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                style={hasBorderColor ? { backgroundColor: cardBorderColor, color: "#000" } : { backgroundColor: "#27272a", color: "#a1a1aa" }}>
+                {getContratBadge(client.contrat)}
               </span>
             )}
             {(client.tags || []).slice(0, 2).map(tag => (
@@ -572,7 +589,7 @@ export default function ClientsModule({ activeSociety, profile }: Props) {
           <select value={filterContrat} onChange={e => setFilterContrat(e.target.value)}
             className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none">
             <option value="all">Tous types</option>
-            {CONTRATS.map(c => <option key={c}>{c}</option>)}
+            {CONTRAT_TIERS.map(t => <option key={t.label} value={t.label}>{t.label}</option>)}
           </select>
 
           <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)}
@@ -639,4 +656,4 @@ export default function ClientsModule({ activeSociety, profile }: Props) {
       )}
     </div>
   )
-}
+} 
