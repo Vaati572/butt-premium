@@ -345,14 +345,21 @@ function ClientCard({ client, accentColor, onEdit, onDelete, onTarifs }: {
   const hasBorderColor = cardBorderColor !== ""
 
   return (
-    <div className="group relative bg-[#111111] border border-zinc-800/80 rounded-2xl overflow-hidden transition-all duration-200 hover:border-zinc-600 hover:shadow-xl hover:shadow-black/40 flex flex-col"
+    <div className="group relative rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-xl flex flex-col"
       style={{
-        borderColor: hasBorderColor ? cardBorderColor+"70" : (isVIP ? accentColor+"50" : "#27272a"),
-        ...(hasBorderColor ? { boxShadow: `0 0 16px ${cardBorderColor}20` } : isVIP ? { boxShadow: `0 0 20px ${accentColor}10` } : {}),
+        backgroundColor: hasBorderColor ? cardBorderColor + "18" : "#111111",
+        border: hasBorderColor
+          ? `1px solid ${cardBorderColor}70`
+          : `1px solid #27272a`,
+        boxShadow: hasBorderColor
+          ? `0 0 24px ${cardBorderColor}25`
+          : undefined,
       }}>
 
-      {/* Accent bar top */}
-      <div className="h-0.5 w-full" style={{ background: `linear-gradient(90deg, ${hasBorderColor ? cardBorderColor : avatarBg}90, transparent)` }}/>
+      {/* Barre accent top — visible seulement si type */}
+      {hasBorderColor && (
+        <div className="h-1 w-full" style={{ backgroundColor: cardBorderColor }}/>
+      )}
 
       {/* HEADER — Avatar + Nom + actions */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
