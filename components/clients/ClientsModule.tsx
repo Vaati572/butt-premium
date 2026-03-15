@@ -21,15 +21,11 @@ interface Product { id: string; name: string; gamme: string; pv: number }
 
 // Types clients avec couleur de carte
 const CONTRAT_TIERS: { label: string; cardColor: string | null }[] = [
-  { label: "Aucun",          cardColor: null },
-  { label: "Essentielle",    cardColor: "#cd7f32" }, // 🥉 Bronze
-  { label: "Avantage",       cardColor: "#94a3b8" }, // 🥈 Argent
-  { label: "Élite",          cardColor: "#eab308" }, // 🥇 Or
-  { label: "ProTeam",        cardColor: "#a855f7" }, // 💎 Premium
-  { label: "Particuliers",   cardColor: null },
-  { label: "Professionnels", cardColor: null },
-  { label: "Pharmacie",      cardColor: null },
-  { label: "Convention",     cardColor: null },
+  { label: "Aucun",       cardColor: null },
+  { label: "Essentielle", cardColor: "#cd7f32" }, // 🥉 Bronze
+  { label: "Avantage",    cardColor: "#94a3b8" }, // 🥈 Argent
+  { label: "Élite",       cardColor: "#eab308" }, // 🥇 Or
+  { label: "ProTeam",     cardColor: "#a855f7" }, // 💎 Premium
 ]
 
 const CONTRATS = CONTRAT_TIERS.map(t => t.label)
@@ -181,13 +177,28 @@ function ClientForm({
     nom: client?.nom || "", prenom: client?.prenom || "",
     email: client?.email || "", telephone: client?.telephone || "",
     adresse: client?.adresse || "", ville: client?.ville || "", cp: client?.cp || "",
-    contrat: client?.contrat || "Particulier", statut: client?.statut || "actif",
+    contrat: client?.contrat || "Aucun", statut: client?.statut || "actif",
     latitude: String((client as any)?.latitude || ""),
     longitude: String((client as any)?.longitude || ""),
     notes: client?.notes || "", tags: (client?.tags || []).join(", "),
   })
   const [saving, setSaving] = useState(false)
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
+
+  // Reset form when client changes (edit mode)
+  useEffect(() => {
+    if (client) {
+      setForm({
+        nom: client.nom || "", prenom: client.prenom || "",
+        email: client.email || "", telephone: client.telephone || "",
+        adresse: client.adresse || "", ville: client.ville || "", cp: client.cp || "",
+        contrat: client.contrat || "Aucun", statut: client.statut || "actif",
+        latitude: String((client as any)?.latitude || ""),
+        longitude: String((client as any)?.longitude || ""),
+        notes: client.notes || "", tags: (client.tags || []).join(", "),
+      } as any)
+    }
+  }, [client?.id])
 
   const save = async () => {
     if (!form.nom.trim()) return
@@ -200,6 +211,7 @@ function ClientForm({
       contrat: form.contrat, statut: form.statut, notes: form.notes,
       latitude: (form as any).latitude ? parseFloat((form as any).latitude) : null,
       longitude: (form as any).longitude ? parseFloat((form as any).longitude) : null,
+      avatar_url: (form as any).avatar_url || null,
       tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
     }
     if (client?.id) await supabase.from("clients").update(data).eq("id", client.id)
@@ -656,4 +668,4 @@ export default function ClientsModule({ activeSociety, profile }: Props) {
       )}
     </div>
   )
-} 
+}
