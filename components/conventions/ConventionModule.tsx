@@ -331,10 +331,13 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const todayStr = new Date().toISOString().split("T")[0]
 
   const filtered = conventions.filter(c => {
-    if (!c.date_debut || !c.date_fin) return filter === "all" // sans dates → visible seulement dans "Toutes"
-    if (filter === "active")   return c.date_debut <= todayStr && c.date_fin >= todayStr
-    if (filter === "upcoming") return c.date_debut > todayStr
-    if (filter === "past")     return c.date_fin < todayStr
+    if (filter === "all") return true // TOUTES → toujours tout afficher
+    if (!c.date_debut || !c.date_fin) return false // sans dates → pas dans les filtres spécifiques
+    const debut = c.date_debut.slice(0,10) // normalize to YYYY-MM-DD
+    const fin   = c.date_fin.slice(0,10)
+    if (filter === "active")   return debut <= todayStr && fin >= todayStr
+    if (filter === "upcoming") return debut > todayStr
+    if (filter === "past")     return fin < todayStr
     return true
   })
 

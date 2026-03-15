@@ -18,6 +18,7 @@ import DocumentsModule from "@/components/documents/DocumentsModule"
 import HistoriqueModule from "@/components/historique/HistoriqueModule"
 import ContratsModule from "@/components/contrats/ContratsModule"
 import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
+import AgendaModule   from "@/components/agenda/AgendaModule"
 import CommandesModule from "@/components/commandes/CommandesModule"
 import TourneesModule from "@/components/tournees/TourneesModule"
 import ConventionModule from "@/components/conventions/ConventionModule"
@@ -598,6 +599,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           onSwitchToProspects={() => setActiveTab("prospects")} />
       case "messages":   return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres": return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "agenda":     return <AgendaModule      activeSociety={activeSociety} profile={profile} />
       case "admin":      return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
@@ -1069,4 +1071,4 @@ function Theme2Layout({
       )}
     </div>
   )
-}
+} 

@@ -13,6 +13,7 @@ interface Pharmacie {
   id: string; nom: string; responsable?: string; telephone?: string; email?: string
   adresse?: string; ville?: string; cp?: string; notes?: string
   remise?: number; contrat?: string; created_at?: string
+  latitude?: number; longitude?: number
 }
 
 function initials(nom: string) {
@@ -46,6 +47,8 @@ function PharmacieForm({ societyId, profile, pharmacie, onClose, onDone }: {
       adresse: form.adresse, ville: form.ville, cp: form.cp,
       contrat: form.contrat, remise: parseFloat(form.remise)||0,
       notes: form.notes,
+      latitude: (form as any).latitude ? parseFloat((form as any).latitude) : null,
+      longitude: (form as any).longitude ? parseFloat((form as any).longitude) : null,
     }
     if (pharmacie?.id) await supabase.from("pharmacies").update(data).eq("id", pharmacie.id)
     else await supabase.from("pharmacies").insert(data)
@@ -82,6 +85,18 @@ function PharmacieForm({ societyId, profile, pharmacie, onClose, onDone }: {
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"/>
               <input value={form.ville} onChange={e=>set("ville",e.target.value)} placeholder="Ville"
                 className="col-span-2 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"/>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <p className="text-[10px] text-zinc-600 mb-1">📍 Latitude</p>
+                <input type="number" step="any" value={(form as any).latitude} onChange={e=>set("latitude",e.target.value)} placeholder="48.8566"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
+              </div>
+              <div>
+                <p className="text-[10px] text-zinc-600 mb-1">📍 Longitude</p>
+                <input type="number" step="any" value={(form as any).longitude} onChange={e=>set("longitude",e.target.value)} placeholder="2.3522"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
