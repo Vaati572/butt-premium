@@ -188,29 +188,43 @@ function ClientForm({
 
 
   const save = async () => {
-    if (!form.nom.trim()) return
+    console.log("SAVE called, form:", form)
+    if (!form.nom.trim()) { console.log("BLOCKED: nom empty"); return }
     setSaving(true)
-    const data = {
-      society_id: societyId, user_id: profile.id,
-      nom: form.nom.trim(), prenom: form.prenom,
-      email: form.email, telephone: form.telephone,
-      adresse: form.adresse, ville: form.ville, cp: form.cp,
-      contrat: form.contrat, statut: form.statut, notes: form.notes,
-      latitude: (form as any).latitude ? parseFloat((form as any).latitude) : null,
-      longitude: (form as any).longitude ? parseFloat((form as any).longitude) : null,
-      avatar_url: (form as any).avatar_url || null,
-      tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+    // Build payload - only include columns that exist in the DB
+    const data: any = {
+      society_id: societyId,
+      user_id: profile?.id || null,
+      nom: form.nom.trim(),
+      prenom: form.prenom || null,
+      email: form.email || null,
+      telephone: form.telephone || null,
+      adresse: form.adresse || null,
+      ville: form.ville || null,
+      cp: form.cp || null,
+      contrat: form.contrat || "Aucun",
+      statut: form.statut || "actif",
+      notes: form.notes || null,
+      tags: form.tags ? form.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
     }
+    // Add optional columns only if they have values (in case columns don't exist yet)
+    if ((form as any).latitude) data.latitude = parseFloat((form as any).latitude) || null
+    if ((form as any).longitude) data.longitude = parseFloat((form as any).longitude) || null
     let error = null
+    console.log("DATA to save:", JSON.stringify(data))
+    console.log("client?.id:", client?.id)
     if (client?.id) {
-      const { error: e } = await supabase.from("clients").update(data).eq("id", client.id)
+      const { error: e, data: d } = await supabase.from("clients").update(data).eq("id", client.id).select()
+      console.log("UPDATE result:", d, "error:", e)
       error = e
     } else {
-      const { error: e } = await supabase.from("clients").insert(data)
+      const { error: e, data: d } = await supabase.from("clients").insert(data).select()
+      console.log("INSERT result:", d, "error:", e)
       error = e
     }
     setSaving(false)
-    if (error) { alert("Erreur: " + error.message); return }
+    if (error) { alert("Erreur Supabase: " + error.message + " | code: " + error.code); return }
+    console.log("Save success, calling onDone")
     onDone(); onClose()
   }
 
