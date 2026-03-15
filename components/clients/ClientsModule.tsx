@@ -194,7 +194,6 @@ function ClientForm({
     // Build payload - only include columns that exist in the DB
     const data: any = {
       society_id: societyId,
-      user_id: profile?.id || null,
       nom: form.nom.trim(),
       prenom: form.prenom || null,
       email: form.email || null,
