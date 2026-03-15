@@ -185,20 +185,7 @@ function ClientForm({
   const [saving, setSaving] = useState(false)
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
-  // Reset form when client changes (edit mode)
-  useEffect(() => {
-    if (client) {
-      setForm({
-        nom: client.nom || "", prenom: client.prenom || "",
-        email: client.email || "", telephone: client.telephone || "",
-        adresse: client.adresse || "", ville: client.ville || "", cp: client.cp || "",
-        contrat: client.contrat || "Aucun", statut: client.statut || "actif",
-        latitude: String((client as any)?.latitude || ""),
-        longitude: String((client as any)?.longitude || ""),
-        notes: client.notes || "", tags: (client.tags || []).join(", "),
-      } as any)
-    }
-  }, [client?.id])
+
 
   const save = async () => {
     if (!form.nom.trim()) return
@@ -214,9 +201,17 @@ function ClientForm({
       avatar_url: (form as any).avatar_url || null,
       tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
     }
-    if (client?.id) await supabase.from("clients").update(data).eq("id", client.id)
-    else await supabase.from("clients").insert(data)
-    setSaving(false); onDone(); onClose()
+    let error = null
+    if (client?.id) {
+      const { error: e } = await supabase.from("clients").update(data).eq("id", client.id)
+      error = e
+    } else {
+      const { error: e } = await supabase.from("clients").insert(data)
+      error = e
+    }
+    setSaving(false)
+    if (error) { alert("Erreur: " + error.message); return }
+    onDone(); onClose()
   }
 
   return (
@@ -654,6 +649,7 @@ export default function ClientsModule({ activeSociety, profile }: Props) {
 
       {showForm && (
         <ClientForm
+          key={editClient?.id || "new"}
           societyId={activeSociety.id} profile={profile}
           client={editClient || undefined}
           onClose={() => { setShowForm(false); setEditClient(null) }}
