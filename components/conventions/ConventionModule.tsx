@@ -242,7 +242,6 @@ function ConventionForm({ societyId, profile, convention, onClose, onDone }: { s
       society_id: societyId,
       nom: nom.trim(), lieu: lieu || null,
       date_debut: dateDebut, date_fin: dateFin,
-      budget: parseFloat(budget) || 0,
       notes: notes || null,
       statut: "planifiee",
     }
