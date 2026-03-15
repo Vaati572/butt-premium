@@ -238,15 +238,25 @@ function ConventionForm({ societyId, profile, convention, onClose, onDone }: { s
   const save = async () => {
     if (!nom.trim() || !dateDebut || !dateFin) return
     setSaving(true)
-    const data = {
-      society_id: societyId, user_id: profile.id,
-      nom, lieu, date_debut: dateDebut, date_fin: dateFin,
-      budget: parseFloat(budget) || 0, notes,
+    const data: any = {
+      society_id: societyId,
+      nom: nom.trim(), lieu: lieu || null,
+      date_debut: dateDebut, date_fin: dateFin,
+      budget: parseFloat(budget) || 0,
+      notes: notes || null,
       statut: "planifiee",
     }
-    if (convention?.id) await supabase.from("conventions").update(data).eq("id", convention.id)
-    else await supabase.from("conventions").insert(data)
-    setSaving(false); onDone(); onClose()
+    let err = null
+    if (convention?.id) {
+      const { error } = await supabase.from("conventions").update(data).eq("id", convention.id)
+      err = error
+    } else {
+      const { error } = await supabase.from("conventions").insert(data)
+      err = error
+    }
+    setSaving(false)
+    if (err) { alert("Erreur convention: " + err.message); return }
+    onDone(); onClose()
   }
 
   return (
