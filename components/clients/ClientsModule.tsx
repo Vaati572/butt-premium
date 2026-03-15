@@ -170,6 +170,55 @@ function TarifsPanel({
 }
 
 /* ── CLIENT FORM ──────────────────────────── */
+/* ── GÉOLOCALISATION ────────────────────────── */
+function GeolocButton({ adresse, cp, ville, onLocate, hasCoords, lat, lng }: {
+  adresse?: string; cp?: string; ville?: string
+  onLocate: (lat: number, lng: number) => void
+  hasCoords: boolean; lat?: string; lng?: string
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState("")
+
+  const geocode = async () => {
+    const q = [adresse, cp, ville].filter(Boolean).join(", ")
+    if (!q.trim()) { setError("Renseigne une adresse d'abord"); return }
+    setLoading(true); setError("")
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`)
+      const data = await res.json()
+      if (data?.length) {
+        onLocate(parseFloat(data[0].lat), parseFloat(data[0].lon))
+      } else {
+        setError("Adresse introuvable")
+      }
+    } catch {
+      setError("Erreur de géolocalisation")
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={geocode} disabled={loading}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border transition-colors disabled:opacity-40 bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20">
+          {loading ? (
+            <><div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"/>Localisation...</>
+          ) : (
+            <>📍 Géolocaliser l'adresse</>
+          )}
+        </button>
+        {hasCoords && lat && lng && (
+          <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 px-2 py-1 rounded-lg">
+            ✓ {parseFloat(lat).toFixed(4)}, {parseFloat(lng).toFixed(4)}
+          </span>
+        )}
+      </div>
+      {error && <p className="text-red-400 text-[11px] mt-1">{error}</p>}
+    </div>
+  )
+}
+
 function ClientForm({
   societyId, profile, client, onClose, onDone
 }: { societyId: string; profile: any; client?: Client; onClose: () => void; onDone: () => void }) {
@@ -272,6 +321,13 @@ function ClientForm({
               <input value={form.ville} onChange={e => set("ville", e.target.value)} placeholder="Ville"
                 className="col-span-2 bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"/>
             </div>
+            {/* Géolocalisation */}
+            <GeolocButton
+              adresse={form.adresse} cp={form.cp} ville={form.ville}
+              onLocate={(lat, lng) => { set("latitude", String(lat)); set("longitude", String(lng)) }}
+              hasCoords={!!(form as any).latitude && !!(form as any).longitude}
+              lat={(form as any).latitude} lng={(form as any).longitude}
+            />
           </div>
 
           {/* Contrat + Statut */}
