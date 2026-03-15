@@ -2,296 +2,497 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import { useUserSettings } from "@/lib/UserSettingsContext"
-import { Plus, X, Calendar, MapPin, Euro, Package, ShoppingCart, Check, Pencil, Trash2, ChevronRight } from "lucide-react"
+import {
+  Plus, X, MapPin, User, Search, ChevronDown,
+  CheckCircle2, Clock, Trash2, Pencil, Route,
+  Building2, Target, History, ArrowRight, Check
+} from "lucide-react"
 
-interface Props { activeSociety: any; profile: any }
+interface Props {
+  activeSociety: any
+  profile: any
+  onLaunchOnMap?: (t: any) => void
+  onSwitchToMap?: () => void
+}
 
-/* ── VENTE CONVENTION PANEL ───────────────── */
-function VenteConventionPanel({
-  societyId, profile, convention, onClose, onDone
-}: { societyId: string; profile: any; convention: any; onClose: () => void; onDone: () => void }) {
-  const { settings } = useUserSettings()
-  const urssafRate = Number((settings as any).urssaf_rate ?? 0.138)
+type ContactType = "client" | "prospect" | "pharmacie"
 
-  const [tab, setTab] = useState<"catalogue" | "libre">("catalogue")
-  const [products, setProducts] = useState<any[]>([])
-  const [cart, setCart] = useState<{ id: string; nom: string; pv: number; qty: number }[]>([])
-  const [paiement, setPaiement] = useState("Espèces")
-  const [clientNom, setClientNom] = useState("")
-  const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState(false)
+interface TourneeStop {
+  id: string           // UUID local
+  contact_id: string
+  contact_nom: string
+  contact_type: ContactType
+  adresse?: string
+  ville?: string
+  telephone?: string
+  ordre: number
+  statut: "a_faire" | "visite" | "absent"
+  notes?: string
+  vente?: string
+  montant?: number
+}
 
-  // Libre mode
-  const [libreItems, setLibreItems] = useState([{ produit: "", qty: 1, pv: 0 }])
-  const [libreClientNom, setLibreClientNom] = useState("")
-  const [librePaiement, setLibrePaiement] = useState("Espèces")
+interface Tournee {
+  id: string
+  nom: string
+  date: string
+  statut: "planifiee" | "en_cours" | "terminee"
+  stops: TourneeStop[]
+  notes?: string
+  society_id: string
+  user_id: string
+  created_at: string
+}
 
-  useEffect(() => {
-    supabase.from("products").select("*")
-      .eq("society_id", societyId).eq("gamme", "Convention")
-      .order("name")
-      .then(({ data }) => setProducts(data || []))
-  }, [societyId])
+const TYPE_CFG: Record<ContactType, { label: string; color: string; icon: any }> = {
+  client:    { label: "Client",    color: "#eab308", icon: User },
+  prospect:  { label: "Prospect",  color: "#f97316", icon: Target },
+  pharmacie: { label: "Pharmacie", color: "#22c55e", icon: Building2 },
+}
 
-  const addToCart = (p: any) => {
-    setCart(prev => {
-      const ex = prev.find(i => i.id === p.id)
-      if (ex) return prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i)
-      return [...prev, { id: p.id, nom: p.name, pv: Number(p.pv), qty: 1 }]
-    })
-  }
+/* ── STOP VISITE PANEL ─────────────────────── */
+function VisitePanel({
+  stop, tourneeId, onClose, onDone
+}: { stop: TourneeStop; tourneeId: string; onClose: () => void; onDone: () => void }) {
+  const [statut, setStatut]   = useState(stop.statut)
+  const [notes, setNotes]     = useState(stop.notes || "")
+  const [vente, setVente]     = useState(stop.vente || "")
+  const [montant, setMontant] = useState(String(stop.montant || ""))
+  const [saving, setSaving]   = useState(false)
 
-  const totalCart = cart.reduce((s, i) => s + i.pv * i.qty, 0)
-  const totalLibre = libreItems.reduce((s, i) => s + i.pv * i.qty, 0)
-
-  const saveVente = async (items: { nom: string; pv: number; qty: number }[], total: number, client: string, pmt: string) => {
+  const save = async () => {
     setSaving(true)
-    const { data: vente } = await supabase.from("ventes").insert({
-      society_id: societyId,
-      user_id: profile.id,
-      client_nom: client || "Convention",
-      total_ht: total, port: 0, remise: 0, total_ttc: total,
-      paiement: pmt,
-      notes: `Convention : ${convention.nom}`,
-      gamme: "Convention",
-    }).select().single()
-
-    if (vente) {
-      await supabase.from("vente_items").insert(items.map(i => ({
-        vente_id: vente.id,
-        produit_nom: i.nom,
-        quantite: i.qty,
-        pv_unitaire: i.pv,
-        cf_unitaire: 0,
-        total: i.pv * i.qty,
-        gamme: "Convention",
-      })))
-    }
+    // Update the stop within the tournee JSON
+    const { data: t } = await supabase.from("tournees").select("stops").eq("id", tourneeId).single()
+    const stops: TourneeStop[] = t?.stops || []
+    const updated = stops.map((s: TourneeStop) =>
+      s.id === stop.id ? { ...s, statut, notes, vente, montant: parseFloat(montant) || 0 } : s
+    )
+    await supabase.from("tournees").update({ stops: updated }).eq("id", tourneeId)
     setSaving(false)
-    setSuccess(true)
-    setTimeout(() => { setSuccess(false); setCart([]); setLibreItems([{ produit: "", qty: 1, pv: 0 }]) }, 2000)
     onDone()
+    onClose()
   }
+
+  const cfg = TYPE_CFG[stop.contact_type]
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-          <div>
-            <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">🎪 {convention.nom}</p>
-            <h3 className="text-white font-bold text-base">Nouvelle vente</h3>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-zinc-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-0.5" style={{ color: cfg.color }}>
+                {cfg.label}
+              </p>
+              <h3 className="text-white font-bold text-lg">{stop.contact_nom}</h3>
+              {stop.adresse && <p className="text-zinc-500 text-xs mt-0.5">📍 {stop.adresse}{stop.ville ? `, ${stop.ville}` : ""}</p>}
+              {stop.telephone && <p className="text-zinc-500 text-xs">📞 {stop.telephone}</p>}
+            </div>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-zinc-800">
-          {([["catalogue", "📦 Catalogue Convention"], ["libre", "✏️ Vente libre"]] as const).map(([val, lbl]) => (
-            <button key={val} onClick={() => setTab(val)}
-              className={`flex-1 py-3 text-sm font-semibold transition-colors ${tab===val ? "text-orange-400 border-b-2 border-orange-400" : "text-zinc-500 hover:text-zinc-300"}`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {tab === "catalogue" ? (
-            <div className="p-4 space-y-4">
-              {/* Products catalogue */}
-              {products.length === 0 ? (
-                <div className="text-center py-8 text-zinc-600">
-                  <Package size={32} className="mx-auto mb-2 opacity-20"/>
-                  <p className="text-sm">Aucun produit dans la gamme "Convention"</p>
-                  <p className="text-xs mt-1">Créez des produits avec la gamme Convention dans l'onglet Admin</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {products.map(p => {
-                    const inCart = cart.find(i => i.id === p.id)
-                    return (
-                      <button key={p.id} onClick={() => addToCart(p)}
-                        className={`relative text-left rounded-xl border p-3 transition-all ${inCart ? "border-orange-500/50 bg-orange-500/10" : "border-zinc-800 bg-zinc-900 hover:border-orange-500/30"}`}>
-                        {inCart && (
-                          <span className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center text-[10px] font-black text-black">
-                            {inCart.qty}
-                          </span>
-                        )}
-                        <p className="text-white text-sm font-semibold truncate mb-1">{p.name}</p>
-                        <p className="text-orange-400 font-bold text-sm">{Number(p.pv).toFixed(2)}€</p>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Cart */}
-              {cart.length > 0 && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
-                  {cart.map(item => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <span className="text-zinc-300 text-sm flex-1 truncate">{item.nom}</span>
-                      <div className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1">
-                        <button onClick={() => setCart(prev => prev.map(i => i.id===item.id ? {...i, qty: Math.max(1,i.qty-1)} : i))} className="text-zinc-400 hover:text-white w-4">-</button>
-                        <span className="text-white text-sm w-4 text-center">{item.qty}</span>
-                        <button onClick={() => setCart(prev => prev.map(i => i.id===item.id ? {...i, qty: i.qty+1} : i))} className="text-zinc-400 hover:text-white w-4">+</button>
-                      </div>
-                      <span className="text-orange-400 text-sm font-bold w-16 text-right">{(item.pv*item.qty).toFixed(2)}€</span>
-                      <button onClick={() => setCart(prev => prev.filter(i => i.id !== item.id))} className="text-red-500 hover:text-red-400"><X size={13}/></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {cart.length > 0 && (
-                <div className="space-y-3">
-                  <input value={clientNom} onChange={e => setClientNom(e.target.value)}
-                    placeholder="Nom du client (optionnel)"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {["Espèces","Carte Bancaire","Virement","Chèque"].map(p => (
-                      <button key={p} onClick={() => setPaiement(p)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${paiement===p ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
-                    <span className="text-zinc-400 text-sm">Total</span>
-                    <span className="text-orange-400 text-xl font-black">{totalCart.toFixed(2)}€</span>
-                  </div>
-                  <button
-                    onClick={() => saveVente(cart.map(i => ({ nom: i.nom, pv: i.pv, qty: i.qty })), totalCart, clientNom, paiement)}
-                    disabled={saving || success}
-                    className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${success ? "bg-green-500 text-white" : "bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40"}`}>
-                    {success ? <><Check size={16}/> Enregistrée !</> : saving ? "..." : <><ShoppingCart size={15}/> Valider {totalCart.toFixed(2)}€</>}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Vente libre */
-            <div className="p-4 space-y-4">
-              <p className="text-zinc-500 text-xs">Sélectionne un produit de la gamme Particuliers avec un tarif personnalisé</p>
-              <div className="space-y-2">
-                {libreItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input value={item.produit} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,produit:e.target.value}:p))}
-                      placeholder="Produit" className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"/>
-                    <input type="number" min="1" value={item.qty} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,qty:parseInt(e.target.value)||1}:p))}
-                      className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
-                    <input type="number" min="0" step="0.01" value={item.pv} onChange={e => setLibreItems(prev => prev.map((p,j)=>j===i?{...p,pv:parseFloat(e.target.value)||0}:p))}
-                      placeholder="Prix" className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
-                    <button onClick={() => setLibreItems(prev => prev.filter((_,j)=>j!==i))} className="text-red-500 hover:text-red-400"><X size={13}/></button>
-                  </div>
-                ))}
-                <button onClick={() => setLibreItems(prev => [...prev, { produit:"", qty:1, pv:0 }])}
-                  className="flex items-center gap-1 text-xs text-orange-400 hover:text-orange-300 font-semibold">
-                  <Plus size={12}/> Ajouter un article
+        <div className="px-6 py-5 space-y-4">
+          {/* Statut visite */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Résultat de la visite</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { val: "visite",  label: "✅ Visité",  color: "text-green-400 bg-green-400/10 border-green-400/30" },
+                { val: "absent",  label: "❌ Absent",  color: "text-red-400 bg-red-400/10 border-red-400/30" },
+                { val: "a_faire", label: "⏳ À faire", color: "text-zinc-400 bg-zinc-800 border-zinc-700" },
+              ].map(({ val, label, color }) => (
+                <button key={val} onClick={() => setStatut(val as any)}
+                  className={`py-2.5 rounded-xl text-xs font-bold border transition-all ${statut === val ? color : "bg-zinc-900 text-zinc-600 border-zinc-800"}`}>
+                  {label}
                 </button>
-              </div>
-
-              {libreItems.some(i => i.produit.trim() && i.pv > 0) && (
-                <div className="space-y-3">
-                  <input value={libreClientNom} onChange={e => setLibreClientNom(e.target.value)}
-                    placeholder="Nom du client (optionnel)"
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {["Espèces","Carte Bancaire","Virement","Chèque"].map(p => (
-                      <button key={p} onClick={() => setLibrePaiement(p)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${librePaiement===p ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{p}</button>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
-                    <span className="text-zinc-400 text-sm">Total</span>
-                    <span className="text-orange-400 text-xl font-black">{totalLibre.toFixed(2)}€</span>
-                  </div>
-                  <button
-                    onClick={() => saveVente(
-                      libreItems.filter(i => i.produit.trim() && i.pv > 0).map(i => ({ nom: i.produit, pv: i.pv, qty: i.qty })),
-                      totalLibre, libreClientNom, librePaiement
-                    )}
-                    disabled={saving || success}
-                    className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${success ? "bg-green-500 text-white" : "bg-orange-500 hover:bg-orange-400 text-black disabled:opacity-40"}`}>
-                    {success ? <><Check size={16}/> Enregistrée !</> : <><ShoppingCart size={15}/> Valider {totalLibre.toFixed(2)}€</>}
-                  </button>
-                </div>
-              )}
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Vente réalisée */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Vente réalisée</label>
+            <input value={vente} onChange={e => setVente(e.target.value)}
+              placeholder="Ex: 3× Baume 50ml, 2× Huile Sèche..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60"/>
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Montant (€)</label>
+            <div className="relative">
+              <input type="number" min="0" step="0.01" value={montant} onChange={e => setMontant(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60"/>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">€</span>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+              placeholder="Compte-rendu de la visite, prochaines actions..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60 resize-none"/>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 flex gap-3">
+          <button onClick={save} disabled={saving}
+            className="flex-1 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-sm disabled:opacity-40">
+            {saving ? "Sauvegarde..." : "✓ Valider la visite"}
+          </button>
+          <button onClick={onClose} className="px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-sm">
+            Annuler
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-/* ── FORM CONVENTION ──────────────────────── */
-function ConventionForm({ societyId, profile, convention, onClose, onDone }: { societyId: string; profile: any; convention?: any; onClose: () => void; onDone: () => void }) {
-  const [nom, setNom]           = useState(convention?.nom || "")
-  const [lieu, setLieu]         = useState(convention?.lieu || "")
-  const [dateDebut, setDateDebut] = useState(convention?.date_debut || "")
-  const [dateFin, setDateFin]   = useState(convention?.date_fin || "")
-  const [budget, setBudget]     = useState(String(convention?.budget || ""))
-  const [notes, setNotes]       = useState(convention?.notes || "")
-  const [saving, setSaving]     = useState(false)
+/* ── CRÉER TOURNÉE PANEL ──────────────────── */
+function CreerTourneePanel({
+  societyId, profile, onClose, onDone
+}: { societyId: string; profile: any; onClose: () => void; onDone: () => void }) {
+  const [nom, setNom]             = useState(`Tournée du ${new Date().toLocaleDateString("fr-FR")}`)
+  const [date, setDate]           = useState(new Date().toISOString().split("T")[0])
+  const [stops, setStops]         = useState<TourneeStop[]>([])
+  const [addingStop, setAddingStop] = useState(false)
+  const [stopType, setStopType]   = useState<ContactType>("client")
+  const [stopSearch, setStopSearch] = useState("")
+  const [contacts, setContacts]   = useState<any[]>([])
+  const [saving, setSaving]       = useState(false)
+
+  useEffect(() => {
+    const loadContacts = async () => {
+      if (!stopSearch.trim()) { setContacts([]); return }
+      const q = stopSearch.toLowerCase()
+
+      if (stopType === "client") {
+        const { data } = await supabase.from("clients").select("id, nom, telephone, adresse, ville")
+          .eq("society_id", societyId).ilike("nom", `%${q}%`).limit(10)
+        setContacts((data || []).map(c => ({ ...c, type: "client" })))
+      } else if (stopType === "prospect") {
+        const { data } = await supabase.from("prospects").select("id, nom, entreprise, tel, adresse, ville")
+          .eq("society_id", societyId).ilike("nom", `%${q}%`).limit(10)
+        setContacts((data || []).map(p => ({ id: p.id, nom: p.entreprise || p.nom, telephone: p.tel, adresse: p.adresse, ville: p.ville, type: "prospect" })))
+      } else {
+        const { data } = await supabase.from("pharmacies").select("id, nom, adresse, ville, telephone")
+          .eq("society_id", societyId).ilike("nom", `%${q}%`).limit(10)
+        setContacts((data || []).map(p => ({ ...p, type: "pharmacie" })))
+      }
+    }
+    const t = setTimeout(loadContacts, 300)
+    return () => clearTimeout(t)
+  }, [stopSearch, stopType, societyId])
+
+  const addStop = (contact: any) => {
+    const newStop: TourneeStop = {
+      id: crypto.randomUUID(),
+      contact_id: contact.id,
+      contact_nom: contact.nom,
+      contact_type: stopType,
+      adresse: contact.adresse,
+      ville: contact.ville,
+      telephone: contact.telephone,
+      ordre: stops.length + 1,
+      statut: "a_faire",
+    }
+    setStops(prev => [...prev, newStop])
+    setAddingStop(false)
+    setStopSearch("")
+    setContacts([])
+  }
+
+  const removeStop = (id: string) => {
+    setStops(prev => prev.filter(s => s.id !== id).map((s, i) => ({ ...s, ordre: i + 1 })))
+  }
+
+  const moveStop = (id: string, dir: "up" | "down") => {
+    setStops(prev => {
+      const idx = prev.findIndex(s => s.id === id)
+      if (dir === "up" && idx === 0) return prev
+      if (dir === "down" && idx === prev.length - 1) return prev
+      const arr = [...prev]
+      const swap = dir === "up" ? idx - 1 : idx + 1
+      ;[arr[idx], arr[swap]] = [arr[swap], arr[idx]]
+      return arr.map((s, i) => ({ ...s, ordre: i + 1 }))
+    })
+  }
 
   const save = async () => {
-    if (!nom.trim() || !dateDebut || !dateFin) return
+    if (!nom.trim() || stops.length === 0) return
     setSaving(true)
-    const data = {
-      society_id: societyId, user_id: profile.id,
-      nom, lieu, date_debut: dateDebut, date_fin: dateFin,
-      budget: parseFloat(budget) || 0, notes,
+    const { error: insertErr } = await supabase.from("tournees").insert({
+      society_id: societyId,
+      user_id: profile.id,
+      nom: nom.trim(),
+      date,
       statut: "planifiee",
-    }
-    if (convention?.id) await supabase.from("conventions").update(data).eq("id", convention.id)
-    else await supabase.from("conventions").insert(data)
-    setSaving(false); onDone(); onClose()
+      stops: JSON.parse(JSON.stringify(stops)), // ensure serializable
+      notes: "",
+    })
+    if (insertErr) { alert("Erreur: "+insertErr.message); setSaving(false); return }
+    setSaving(false)
+    onDone()
+    onClose()
   }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-md h-full flex flex-col shadow-2xl">
         <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <h3 className="text-base font-bold text-white">{convention ? "Modifier" : "Nouvelle"} convention</h3>
+          <div>
+            <h3 className="text-base font-bold text-white">🗺️ Créer une tournée</h3>
+            <p className="text-zinc-500 text-xs mt-0.5">Ajoutez vos étapes dans l'ordre</p>
+          </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
         </div>
-        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-          {[
-            { label: "Nom de la convention", value: nom, set: setNom, placeholder: "Ex: Japan Expo 2025" },
-            { label: "Lieu", value: lieu, set: setLieu, placeholder: "Ex: Paris Le Bourget, Hall 5" },
-            { label: "Budget (€)", value: budget, set: setBudget, placeholder: "0", type: "number" },
-          ].map(({ label, value, set, placeholder, type = "text" }) => (
-            <div key={label}>
-              <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
-              <input type={type} value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-orange-500/60"/>
-            </div>
-          ))}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Date début", value: dateDebut, set: setDateDebut },
-              { label: "Date fin", value: dateFin, set: setDateFin },
-            ].map(({ label, value, set }) => (
-              <div key={label}>
-                <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
-                <input type="date" value={value} onChange={e => set(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500/60"/>
-              </div>
-            ))}
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Nom + Date */}
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Nom de la tournée</label>
+            <input value={nom} onChange={e => setNom(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500/60"/>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Notes</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
+            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+          </div>
+
+          {/* Étapes */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">Étapes ({stops.length})</label>
+              <button onClick={() => setAddingStop(true)}
+                className="flex items-center gap-1 text-xs text-yellow-400 hover:text-yellow-300 font-semibold">
+                <Plus size={12}/> Ajouter
+              </button>
+            </div>
+
+            {/* Add stop form */}
+            {addingStop && (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 mb-3 space-y-2">
+                {/* Type selector */}
+                <div className="flex gap-1.5">
+                  {(["client", "prospect", "pharmacie"] as ContactType[]).map(t => {
+                    const cfg = TYPE_CFG[t]
+                    return (
+                      <button key={t} onClick={() => { setStopType(t); setStopSearch(""); setContacts([]) }}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition-all ${stopType===t ? "text-black border-transparent" : "bg-zinc-700 text-zinc-400 border-zinc-600"}`}
+                        style={stopType===t ? { backgroundColor: cfg.color } : {}}>
+                        {t === "client" ? "👤" : t === "prospect" ? "🎯" : "🏥"} {cfg.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="relative">
+                  <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
+                  <input value={stopSearch} onChange={e => setStopSearch(e.target.value)}
+                    placeholder={`Rechercher un ${TYPE_CFG[stopType].label.toLowerCase()}...`} autoFocus
+                    className="w-full bg-zinc-700 border border-zinc-600 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none"/>
+                </div>
+                {contacts.length > 0 && (
+                  <div className="bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                    {contacts.map(c => (
+                      <button key={c.id} onClick={() => addStop(c)}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-800 text-left transition-colors">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-black shrink-0"
+                          style={{ backgroundColor: TYPE_CFG[stopType].color }}>
+                          {c.nom.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white text-sm truncate">{c.nom}</p>
+                          {c.ville && <p className="text-zinc-500 text-[10px]">{c.ville}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {stopSearch.trim() && contacts.length === 0 && (
+                  <p className="text-zinc-600 text-xs text-center py-2">Aucun résultat</p>
+                )}
+                <button onClick={() => { setAddingStop(false); setStopSearch(""); setContacts([]) }}
+                  className="w-full py-1.5 text-xs text-zinc-500 hover:text-zinc-300 text-center">Annuler</button>
+              </div>
+            )}
+
+            {/* Stops list */}
+            {stops.length === 0 ? (
+              <div className="text-center py-6 text-zinc-600 bg-zinc-900 border border-dashed border-zinc-700 rounded-xl">
+                <Route size={24} className="mx-auto mb-2 opacity-30"/>
+                <p className="text-sm">Aucune étape</p>
+                <p className="text-xs mt-1">Ajoutez des clients, prospects ou pharmacies</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {stops.map((stop, i) => {
+                  const cfg = TYPE_CFG[stop.contact_type]
+                  return (
+                    <div key={stop.id} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+                      {/* Numéro */}
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-black shrink-0"
+                        style={{ backgroundColor: cfg.color }}>
+                        {i + 1}
+                      </div>
+                      {/* Infos */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{stop.contact_nom}</p>
+                        <p className="text-zinc-600 text-[10px]">{cfg.label}{stop.ville ? ` · ${stop.ville}` : ""}</p>
+                      </div>
+                      {/* Move + remove */}
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => moveStop(stop.id, "up")} disabled={i===0}
+                          className="text-zinc-600 hover:text-zinc-300 disabled:opacity-20 text-sm w-5">↑</button>
+                        <button onClick={() => moveStop(stop.id, "down")} disabled={i===stops.length-1}
+                          className="text-zinc-600 hover:text-zinc-300 disabled:opacity-20 text-sm w-5">↓</button>
+                        <button onClick={() => removeStop(stop.id)} className="text-red-500 hover:text-red-400 ml-1">
+                          <X size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Visual route summary */}
+                {stops.length > 1 && (
+                  <div className="flex items-center gap-1 text-zinc-600 text-[10px] overflow-x-auto py-1">
+                    {stops.map((s, i) => (
+                      <div key={s.id} className="flex items-center gap-1 shrink-0">
+                        <span className="text-zinc-400 font-medium">{s.contact_nom.split(" ")[0]}</span>
+                        {i < stops.length - 1 && <ArrowRight size={10}/>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-        <div className="p-6 border-t border-zinc-800 space-y-3">
-          <button onClick={save} disabled={saving || !nom.trim() || !dateDebut || !dateFin}
-            className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm">
-            {saving ? "Sauvegarde..." : convention ? "Modifier" : "Créer la convention"}
+
+        <div className="p-5 border-t border-zinc-800 space-y-3">
+          <button onClick={save} disabled={saving || stops.length === 0 || !nom.trim()}
+            className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+            <Route size={15}/> {saving ? "Création..." : `Créer la tournée (${stops.length} étape${stops.length>1?"s":""})`}
           </button>
           <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">Annuler</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── HISTORIQUE TOURNÉE ───────────────────── */
+function HistoriqueTourneePanel({ societyId, onClose }: { societyId: string; onClose: () => void }) {
+  const [tournees, setTournees] = useState<any[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from("tournees").select("*").eq("society_id", societyId)
+      .order("date", { ascending: false }).limit(100)
+      .then(({ data }) => { setTournees(data || []); setLoading(false) })
+  }, [])
+
+  const deleteTournee = async (id: string) => {
+    if (!confirm("Supprimer cette tournée ?")) return
+    await supabase.from("tournees").delete().eq("id", id)
+    setTournees(prev => prev.filter(t => t.id !== id))
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+          <div>
+            <h3 className="text-base font-bold text-white">📋 Historique tournées</h3>
+            <p className="text-zinc-500 text-xs mt-0.5">{tournees.length} tournée{tournees.length>1?"s":""}</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : tournees.length === 0 ? (
+            <div className="text-center py-12 text-zinc-600">
+              <Route size={32} className="mx-auto mb-3 opacity-20"/>
+              <p className="text-sm">Aucune tournée</p>
+            </div>
+          ) : tournees.map(t => {
+            const stops: TourneeStop[] = t.stops || []
+            const totalMontant = stops.reduce((s: number, st: TourneeStop) => s + (st.montant || 0), 0)
+            const visites = stops.filter((s: TourneeStop) => s.statut === "visite").length
+            const isExpanded = expanded === t.id
+            const statusCfg = {
+              planifiee:  { label: "Planifiée",  color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+              en_cours:   { label: "En cours",   color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+              terminee:   { label: "Terminée",   color: "text-green-400 bg-green-400/10 border-green-400/20" },
+            }[t.statut as string] || { label: t.statut, color: "text-zinc-400 bg-zinc-800 border-zinc-700" }
+
+            return (
+              <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <button className="w-full flex items-start justify-between p-4 text-left hover:bg-zinc-800/30 transition-colors"
+                  onClick={() => setExpanded(isExpanded ? null : t.id)}>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-white font-bold text-sm">{t.nom}</p>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${statusCfg.color}`}>{statusCfg.label}</span>
+                    </div>
+                    <p className="text-zinc-500 text-xs">{new Date(t.date).toLocaleDateString("fr-FR")} · {stops.length} étape{stops.length>1?"s":""}</p>
+                    <p className="text-zinc-600 text-xs">{visites}/{stops.length} visites · <span className="text-yellow-400 font-semibold">{totalMontant.toFixed(2)}€</span></p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={e => { e.stopPropagation(); deleteTournee(t.id) }}
+                      className="text-red-500 hover:text-red-400 p-1 rounded-lg hover:bg-red-500/10 transition-colors">
+                      <Trash2 size={14}/>
+                    </button>
+                    <span className="text-zinc-600">{isExpanded ? "▲" : "▼"}</span>
+                  </div>
+                </button>
+
+                {isExpanded && stops.length > 0 && (
+                  <div className="border-t border-zinc-800 p-3 space-y-2">
+                    {stops.map((stop: TourneeStop, i: number) => {
+                      const cfg = TYPE_CFG[stop.contact_type]
+                      return (
+                        <div key={stop.id} className="flex items-start gap-3 bg-zinc-800 rounded-xl p-3">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black text-black shrink-0"
+                            style={{ backgroundColor: cfg.color }}>
+                            {i+1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white text-sm font-semibold">{stop.contact_nom}</p>
+                              <span className={`text-[10px] font-bold ${stop.statut==="visite"?"text-green-400":stop.statut==="absent"?"text-red-400":"text-zinc-500"}`}>
+                                {stop.statut==="visite"?"✅":stop.statut==="absent"?"❌":"⏳"}
+                              </span>
+                              {stop.montant && stop.montant > 0 && (
+                                <span className="text-yellow-400 text-xs font-bold">{stop.montant.toFixed(2)}€</span>
+                              )}
+                            </div>
+                            {stop.vente && <p className="text-zinc-400 text-xs mt-0.5">{stop.vente}</p>}
+                            {stop.notes && <p className="text-zinc-500 text-xs italic mt-0.5">{stop.notes}</p>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {/* Total */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-zinc-900 rounded-xl">
+                      <span className="text-zinc-500 text-sm">Total tournée</span>
+                      <span className="text-yellow-400 font-bold">{totalMontant.toFixed(2)}€</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -301,172 +502,202 @@ function ConventionForm({ societyId, profile, convention, onClose, onDone }: { s
 /* ══════════════════════════════════════════════
    MAIN
 ══════════════════════════════════════════════ */
-export default function ConventionModule({ activeSociety, profile }: Props) {
-  const [conventions, setConventions]   = useState<any[]>([])
+export default function TourneesModule({ activeSociety, profile, onLaunchOnMap, onSwitchToMap }: Props) {
+  const [tournees, setTournees]         = useState<any[]>([])
   const [loading, setLoading]           = useState(true)
-  const [showForm, setShowForm]         = useState(false)
-  const [editConv, setEditConv]         = useState<any>(null)
-  const [venteConv, setVenteConv]       = useState<any>(null)
-  const [filter, setFilter]             = useState<"all" | "active" | "upcoming" | "past">("all")
+  const [showCreate, setShowCreate]     = useState(false)
+  const [showHistory, setShowHistory]   = useState(false)
+  const [activeTournee, setActiveTournee] = useState<any>(null)
+  const [visitStop, setVisitStop]       = useState<{ stop: TourneeStop; tourneeId: string } | null>(null)
 
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
     setLoading(true)
-    // Try ordering by date_debut, fallback to created_at
-    let query = supabase.from("conventions").select("*").eq("society_id", activeSociety.id)
-    const { data, error } = await query.order("created_at", { ascending: false })
-    if (error) console.error("Convention load error:", error)
-    setConventions(data || [])
+    const { data, error } = await supabase.from("tournees")
+      .select("*")
+      .eq("society_id", activeSociety.id)
+      .order("date", { ascending: true })
+    // Ne pas filtrer par statut ici — affiche tout sauf "terminee"
+    setTournees((data||[]).filter((t:any) => t.statut !== "terminee"))
     setLoading(false)
   }, [activeSociety?.id])
 
   useEffect(() => { load() }, [load])
 
-  const deleteConvention = async (id: string) => {
-    if (!confirm("Supprimer cette convention ?")) return
-    await supabase.from("conventions").delete().eq("id", id)
+  const startTournee = async (tournee: any) => {
+    await supabase.from("tournees").update({ statut: "en_cours" }).eq("id", tournee.id)
+    setActiveTournee({ ...tournee, statut: "en_cours" })
     load()
   }
 
-  const todayStr = new Date().toISOString().split("T")[0]
+  const terminerTournee = async (tournee: any) => {
+    if (!confirm("Terminer cette tournée ?")) return
+    await supabase.from("tournees").update({ statut: "terminee" }).eq("id", tournee.id)
+    setActiveTournee(null)
+    load()
+  }
 
-  const filtered = conventions.filter(c => {
-    if (filter === "all") return true // TOUTES → toujours tout afficher
-    if (!c.date_debut || !c.date_fin) return false // sans dates → pas dans les filtres spécifiques
-    const debut = c.date_debut.slice(0,10) // normalize to YYYY-MM-DD
-    const fin   = c.date_fin.slice(0,10)
-    if (filter === "active")   return debut <= todayStr && fin >= todayStr
-    if (filter === "upcoming") return debut > todayStr
-    if (filter === "past")     return fin < todayStr
-    return true
-  })
+  const deleteTournee = async (id: string) => {
+    if (!confirm("Supprimer cette tournée ?")) return
+    await supabase.from("tournees").delete().eq("id", id)
+    if (activeTournee?.id === id) setActiveTournee(null)
+    load()
+  }
 
-  const activeNow = conventions.find(c => c.date_debut && c.date_fin && c.date_debut <= todayStr && c.date_fin >= todayStr)
+  const handleVisiteValidated = async () => {
+    // Refresh tournee data
+    const { data } = await supabase.from("tournees").select("*").eq("id", activeTournee.id).single()
+    if (data) setActiveTournee(data)
+    load()
+  }
+
+  // Currently active tournee view
+  const currentTournee = activeTournee
+    ? tournees.find(t => t.id === activeTournee.id) || activeTournee
+    : null
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6 max-w-3xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-white">🎪 Conventions</h1>
-            <p className="text-zinc-500 text-sm mt-0.5">{conventions.length} convention{conventions.length>1?"s":""}</p>
+            <h1 className="text-2xl font-bold text-white">🛣️ Tournées</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">Planifiez vos visites terrain</p>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-orange-500/20">
-            <Plus size={16}/> Nouvelle convention
-          </button>
-        </div>
-
-        {/* Active convention banner */}
-        {activeNow && (
-          <div className="mb-6 bg-orange-500/10 border border-orange-500/30 rounded-2xl p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"/>
-                  <p className="text-orange-400 text-sm font-bold uppercase tracking-wider">Convention en cours</p>
-                </div>
-                <h2 className="text-white text-xl font-bold mb-1">{activeNow.nom}</h2>
-                {activeNow.lieu && <p className="text-zinc-400 text-sm">📍 {activeNow.lieu}</p>}
-                <p className="text-zinc-500 text-xs mt-1">
-                  {new Date(activeNow.date_debut+"T00:00:00").toLocaleDateString("fr-FR")} → {new Date(activeNow.date_fin+"T00:00:00").toLocaleDateString("fr-FR")}
-                </p>
-              </div>
-              <button onClick={() => setVenteConv(activeNow)}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shrink-0">
-                <ShoppingCart size={15}/> Vendre
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex gap-2 mb-5 flex-wrap">
-          {[
-            { id: "all",      label: "Toutes" },
-            { id: "active",   label: "🟢 En cours" },
-            { id: "upcoming", label: "🔵 À venir" },
-            { id: "past",     label: "⚫ Passées" },
-          ].map(f => (
-            <button key={f.id} onClick={() => setFilter(f.id as any)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${filter===f.id ? "bg-orange-500 text-black border-orange-500" : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"}`}>
-              {f.label}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowHistory(true)}
+              className="flex items-center gap-1.5 text-sm text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:bg-zinc-800">
+              <History size={14}/> Historique
             </button>
-          ))}
+            <button onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">
+              <Plus size={16}/> Créer une tournée
+            </button>
+          </div>
         </div>
 
-        {/* List */}
+        {/* Active / planned tournees */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"/>
+            <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : tournees.length === 0 ? (
           <div className="text-center py-24 text-zinc-600">
-            <p className="text-5xl mb-4">🎪</p>
-            <p className="text-sm">Aucune convention</p>
+            <Route size={48} className="mx-auto mb-4 opacity-20"/>
+            <p className="text-base font-semibold text-zinc-500 mb-2">Aucune tournée planifiée</p>
+            <p className="text-sm mb-6">Créez votre première tournée pour organiser vos visites</p>
+            <button onClick={() => setShowCreate(true)}
+              className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-6 py-3 rounded-xl text-sm inline-flex items-center gap-2">
+              <Plus size={16}/> Créer une tournée
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filtered.map(c => {
-              const isActive   = c.date_debut <= todayStr && c.date_fin >= todayStr
-              const isUpcoming = c.date_debut > todayStr
-              const isPast     = c.date_fin < todayStr
-
-              const daysUntil = isUpcoming
-                ? Math.ceil((new Date(c.date_debut).getTime() - Date.now()) / 86400000)
-                : 0
-              const duration = Math.ceil(
-                (new Date(c.date_fin+"T00:00:00").getTime() - new Date(c.date_debut+"T00:00:00").getTime()) / 86400000
-              ) + 1
+          <div className="space-y-4">
+            {tournees.map(t => {
+              const stops: TourneeStop[] = t.stops || []
+              const visites = stops.filter((s: TourneeStop) => s.statut === "visite").length
+              const absents = stops.filter((s: TourneeStop) => s.statut === "absent").length
+              const totalMontant = stops.reduce((s: number, st: TourneeStop) => s + (st.montant||0), 0)
+              const isEnCours = t.statut === "en_cours"
+              const isActive = activeTournee?.id === t.id
 
               return (
-                <div key={c.id} className={`bg-zinc-900 border rounded-2xl p-5 ${isActive ? "border-orange-500/40" : "border-zinc-800"}`}>
-                  <div className="flex items-start justify-between mb-3">
+                <div key={t.id} className={`bg-zinc-900 border rounded-2xl overflow-hidden transition-all ${isEnCours ? "border-yellow-500/30" : "border-zinc-800"}`}>
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-5">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-white font-bold">{c.nom}</h3>
-                        {isActive && <span className="text-[10px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-1.5 py-0.5 rounded-full animate-pulse">En cours</span>}
-                        {isUpcoming && <span className="text-[10px] font-bold text-blue-400 bg-blue-400/10 border border-blue-400/20 px-1.5 py-0.5 rounded-full">J-{daysUntil}</span>}
-                        {isPast && <span className="text-[10px] font-bold text-zinc-500 bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 rounded-full">Terminée</span>}
+                        <p className="text-white font-bold">{t.nom}</p>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${isEnCours ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/20 animate-pulse" : "text-blue-400 bg-blue-400/10 border-blue-400/20"}`}>
+                          {isEnCours ? "En cours" : "Planifiée"}
+                        </span>
                       </div>
-                      {c.lieu && <p className="text-zinc-500 text-xs">📍 {c.lieu}</p>}
+                      <p className="text-zinc-500 text-sm">
+                        📅 {new Date(t.date).toLocaleDateString("fr-FR")} · {stops.length} étape{stops.length>1?"s":""}
+                      </p>
+                      {isEnCours && (
+                        <p className="text-zinc-400 text-xs mt-1">
+                          {visites} visité · {absents} absent · <span className="text-yellow-400 font-bold">{totalMontant.toFixed(2)}€</span>
+                        </p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isActive && (
-                        <button onClick={() => setVenteConv(c)}
-                          className="flex items-center gap-1 text-[11px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-2 py-1.5 rounded-lg hover:bg-orange-400/20">
-                          <ShoppingCart size={11}/> Vendre
+                    <div className="flex items-center gap-2">
+                      {!isEnCours && (
+                        <button onClick={() => startTournee(t)}
+                          className="flex items-center gap-1.5 text-xs bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-3 py-1.5 rounded-lg">
+                          ▶ Démarrer
                         </button>
                       )}
-                      <button onClick={() => { setEditConv(c); setShowForm(true) }}
-                        className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800">
-                        <Pencil size={13}/>
-                      </button>
-                      <button onClick={() => deleteConvention(c.id)}
-                        className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10">
-                        <Trash2 size={13}/>
+                      {isEnCours && (
+                        <button onClick={() => setActiveTournee(isActive ? null : t)}
+                          className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${isActive ? "bg-zinc-700 text-zinc-300 border-zinc-600" : "bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30"}`}>
+                          {isActive ? "Réduire" : "Voir étapes"}
+                        </button>
+                      )}
+                      <button onClick={() => deleteTournee(t.id)} className="text-red-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10">
+                        <Trash2 size={14}/>
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="bg-zinc-800 rounded-xl px-3 py-2">
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Début</p>
-                      <p className="text-white font-semibold text-xs">{c.date_debut ? new Date(c.date_debut+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" }) : "—"}</p>
-                    </div>
-                    <div className="bg-zinc-800 rounded-xl px-3 py-2">
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-0.5">Fin</p>
-                      <p className="text-white font-semibold text-xs">{new Date(c.date_fin+"T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short" })}</p>
-                    </div>
-                  </div>
+                  {/* Stops (only when expanded + en_cours) */}
+                  {isActive && isEnCours && (
+                    <div className="border-t border-zinc-800 p-4 space-y-2">
+                      {stops.map((stop: TourneeStop, i: number) => {
+                        const cfg = TYPE_CFG[stop.contact_type]
+                        const isDone = stop.statut !== "a_faire"
+                        return (
+                          <div key={stop.id}
+                            className={`flex items-center gap-3 rounded-xl p-3 border transition-all ${isDone ? "bg-zinc-800/30 border-zinc-800" : "bg-zinc-800 border-zinc-700"}`}>
+                            {/* Numéro */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${isDone ? "opacity-50" : ""}`}
+                              style={{ backgroundColor: cfg.color + (isDone ? "40" : ""), color: isDone ? "#71717a" : "black" }}>
+                              {stop.statut === "visite" ? "✓" : stop.statut === "absent" ? "✗" : i+1}
+                            </div>
 
-                  <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
-                    <span>📅 {duration} jour{duration>1?"s":""}</span>
-                    {c.budget > 0 && <span>💰 Budget : {c.budget.toFixed(2)}€</span>}
-                    {c.notes && <span className="italic truncate">{c.notes}</span>}
-                  </div>
+                            {/* Infos */}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-semibold ${isDone ? "text-zinc-500 line-through" : "text-white"}`}>
+                                {stop.contact_nom}
+                              </p>
+                              <p className="text-zinc-600 text-[10px]">
+                                {cfg.label}{stop.ville ? ` · ${stop.ville}` : ""}
+                                {stop.telephone && ` · ${stop.telephone}`}
+                              </p>
+                              {stop.vente && <p className="text-zinc-400 text-xs mt-0.5">{stop.vente}</p>}
+                              {stop.montant && stop.montant > 0 && (
+                                <p className="text-yellow-400 text-xs font-bold">{stop.montant.toFixed(2)}€</p>
+                              )}
+                            </div>
+
+                            {/* Action */}
+                            {!isDone ? (
+                              <button
+                                onClick={() => setVisitStop({ stop, tourneeId: t.id })}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-2.5 py-1.5 rounded-lg hover:bg-yellow-400/20 transition-colors shrink-0">
+                                <Check size={11}/> Valider
+                              </button>
+                            ) : (
+                              <button onClick={() => setVisitStop({ stop, tourneeId: t.id })}
+                                className="text-zinc-500 hover:text-zinc-300 p-1.5 rounded-lg hover:bg-zinc-700 shrink-0">
+                                <Pencil size={13}/>
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {/* Terminer */}
+                      <button onClick={() => terminerTournee(t)}
+                        className="w-full mt-2 py-2.5 rounded-xl text-sm font-bold text-black flex items-center justify-center gap-2"
+                        style={{ backgroundColor: visites + absents === stops.length ? "#22c55e" : "#eab308" }}>
+                        <CheckCircle2 size={15}/>
+                        {visites + absents === stops.length ? "✓ Terminer la tournée" : `Terminer (${visites+absents}/${stops.length} traités)`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -474,20 +705,18 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {showForm && (
-        <ConventionForm
-          societyId={activeSociety.id} profile={profile}
-          convention={editConv}
-          onClose={() => { setShowForm(false); setEditConv(null) }}
-          onDone={load}
-        />
+      {showCreate && (
+        <CreerTourneePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowCreate(false)} onDone={load}/>
       )}
-      {venteConv && (
-        <VenteConventionPanel
-          societyId={activeSociety.id} profile={profile}
-          convention={venteConv}
-          onClose={() => setVenteConv(null)}
-          onDone={load}
+      {showHistory && (
+        <HistoriqueTourneePanel societyId={activeSociety.id} onClose={() => setShowHistory(false)}/>
+      )}
+      {visitStop && (
+        <VisitePanel
+          stop={visitStop.stop}
+          tourneeId={visitStop.tourneeId}
+          onClose={() => setVisitStop(null)}
+          onDone={handleVisiteValidated}
         />
       )}
     </div>

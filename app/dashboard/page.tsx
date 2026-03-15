@@ -84,6 +84,7 @@ const ALL_NAV = [
     { id: "ia",         label: "IA",                 icon: "🤖" }, // ← AJOUT
   ]},
   { section: "Système", items: [
+    { id: "agenda",     label: "Agenda & Tâches",   icon: "📅" },
     { id: "admin",      label: "Admin",              icon: "🔒" },
     { id: "parametres", label: "Paramètres",         icon: "⚙️" },
   ]},
@@ -528,6 +529,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   const runGlobalSearch = async (q: string) => {
     if (!q.trim() || q.length < 2) { setGlobalResults([]); return }
+    if (!activeSociety?.id) return
     setSearchLoading(true)
     const [{ data: clients }, { data: pharmacies }, { data: prospects }, { data: ventes }] = await Promise.all([
       supabase.from("clients").select("id,nom,telephone,email").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
@@ -900,6 +902,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       </main>
 
       {unreadPopup}
+      {stockAlertPopup}
     </div>
   )
 }
@@ -1071,4 +1074,4 @@ function Theme2Layout({
       )}
     </div>
   )
-} 
+}
