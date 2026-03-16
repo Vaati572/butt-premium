@@ -27,7 +27,6 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   const [allVentesRaw, setAllVentesRaw] = useState<any[]>([])
   const [allDepenses,  setAllDepenses]  = useState<any[]>([])
   const [loading,      setLoading]      = useState(true)
-  const [debugError,   setDebugError]   = useState<string>("")
 
   // Taux URSSAF
   useEffect(() => {
@@ -42,15 +41,14 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     if (!activeSociety?.id) return
     const fetchAll = async () => {
       setLoading(true)
-      setDebugError("")
 
-      const { data: ventes, error: ventesError } = await supabase
+      const { data: ventes } = await supabase
         .from("ventes")
         .select("id,created_at,total_ttc,client_nom,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
         .eq("society_id", activeSociety.id)
         .order("created_at", { ascending: false })
 
-      if (ventesError) setDebugError(ventesError.message)
+
 
       const { data: deps } = await supabase
         .from("depenses").select("montant,created_at")
@@ -207,20 +205,6 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* ── DEBUG PANEL — à supprimer une fois que ça marche ── */}
-        <div className="bg-red-950/40 border border-red-500/40 rounded-xl p-3 text-xs space-y-1 font-mono">
-          <p className="text-red-400 font-bold mb-2">🔍 DEBUG — à supprimer après résolution</p>
-          <p className="text-zinc-300">activeSociety.id : <span className="text-yellow-400 font-bold">{activeSociety?.id || "❌ NULL"}</span></p>
-          <p className="text-zinc-300">Ventes RAW (toutes) : <span className="text-yellow-400 font-bold">{allVentesRaw.length}</span></p>
-          <p className="text-zinc-300">Ventes filtrées année {year} : <span className="text-yellow-400 font-bold">{allVentes.length}</span></p>
-          <p className="text-zinc-300">Années détectées : <span className="text-yellow-400 font-bold">{availableYears.join(", ") || "aucune"}</span></p>
-          <p className="text-zinc-300">Loading : <span className="text-yellow-400 font-bold">{String(loading)}</span></p>
-          {debugError && <p className="text-red-400 font-bold">❌ Erreur Supabase : {debugError}</p>}
-          {allVentesRaw.length > 0 && (
-            <p className="text-zinc-300">Dernière vente : <span className="text-yellow-400 font-bold">{allVentesRaw[0].created_at} — {allVentesRaw[0].total_ttc}€</span></p>
-          )}
         </div>
 
         {loading ? (
