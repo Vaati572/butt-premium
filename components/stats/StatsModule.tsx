@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useUserSettings } from "@/lib/UserSettingsContext"
-import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Package, Users, Clock } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar, Package, Users, Clock } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
 
@@ -14,56 +14,66 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   const { settings } = useUserSettings()
   const ACCENT = settings.accent_color || "#eab308"
 
-  const [urssafRate, setUrssafRate] = useState(0.138)
+  const today = new Date()
+
+  const [urssafRate,     setUrssafRate]     = useState(0.138)
+  const [view,           setView]           = useState<"annee"|"mois"|"jour">("annee")
+  const [year,           setYear]           = useState(today.getFullYear())
+  const [selectedMonth,  setSelectedMonth]  = useState(today.getMonth())
+  const [selectedDay,    setSelectedDay]    = useState(today.toISOString().slice(0,10))
+  const [statsView,      setStatsView]      = useState<"ca"|"marge">("ca")
+  const [hoveredBar,     setHoveredBar]     = useState<number|null>(null)
+  const [allVentes,      setAllVentes]      = useState<any[]>([])
+  const [depenses,       setDepenses]       = useState(0)
+  const [loading,        setLoading]        = useState(true)
+
+
   useEffect(() => {
     if (!activeSociety?.id) return
-    supabase.from("settings").select("value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single()
+    supabase.from("settings").select("value")
+      .eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single()
       .then(({ data }) => { if (data?.value != null) setUrssafRate(Number(data.value)) })
   }, [activeSociety?.id])
 
-  const today = new Date()
-  const [view,          setView]          = useState<"annee"|"mois"|"jour">("annee")
-  const [year,          setYear]          = useState(today.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
-  const [selectedDay,   setSelectedDay]   = useState(today.toISOString().slice(0,10))
-  const [statsView,     setStatsView]     = useState<"ca"|"marge">("ca")
-  const [hoveredBar,    setHoveredBar]    = useState<number|null>(null)
-
-  const [allVentes, setAllVentes] = useState<any[]>([])
-  const [depenses,  setDepenses]  = useState(0)
-  const [loading,   setLoading]   = useState(true)
-
-  const load = useCallback(async (targetYear?: number) => {
+  // Détection automatique de l'année la plus récente en base
+  useEffect(() => {
     if (!activeSociety?.id) return
-    setLoading(true)
-    const y = targetYear ?? year
-    const [{ data: ventes }, { data: deps }] = await Promise.all([
-      supabase.from("ventes")
-        .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
-        .eq("society_id", activeSociety.id)
-        .gte("created_at", `${y}-01-01T00:00:00`)
-        .lte("created_at", `${y}-12-31T23:59:59`),
-      supabase.from("depenses").select("montant").eq("society_id", activeSociety.id)
-        .gte("created_at", `${y}-01-01T00:00:00`).lte("created_at", `${y}-12-31T23:59:59`),
-    ])
+    supabase.from("ventes").select("created_at")
+      .eq("society_id", activeSociety.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setYear(new Date(data[0].created_at).getFullYear())
+        }
+      })
+  }, [activeSociety?.id])
 
-    // ── AUTO-FALLBACK : si aucune vente sur l'année courante, recule d'un an ──
-    if ((!ventes || ventes.length === 0) && targetYear === undefined && y === today.getFullYear()) {
-      const prevYear = y - 1
-      setYear(prevYear)
+  // Chargement des ventes pour l'année
+  useEffect(() => {
+    if (!activeSociety?.id) return
+    const fetch = async () => {
+      setLoading(true)
+      const [{ data: ventes }, { data: deps }] = await Promise.all([
+        supabase.from("ventes")
+          .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
+          .eq("society_id", activeSociety.id)
+          .gte("created_at", `${year}-01-01T00:00:00`)
+          .lte("created_at", `${year}-12-31T23:59:59`)
+          .order("created_at", { ascending: false }),
+        supabase.from("depenses").select("montant")
+          .eq("society_id", activeSociety.id)
+          .gte("created_at", `${year}-01-01T00:00:00`)
+          .lte("created_at", `${year}-12-31T23:59:59`),
+      ])
+      setAllVentes(ventes || [])
+      setDepenses((deps||[]).reduce((s:number,d:any) => s + Number(d.montant||0), 0))
       setLoading(false)
-      load(prevYear)
-      return
     }
-
-    setAllVentes(ventes || [])
-    setDepenses((deps||[]).reduce((s:number,d:any)=>s+Number(d.montant||0),0))
-    setLoading(false)
+    fetch()
   }, [activeSociety?.id, year])
 
-  useEffect(() => { load() }, [load])
-
-  // ── ANNÉE ──
+  // ── Calculs année ──
   const monthlyCA = new Array(12).fill(0)
   const monthlyNb = new Array(12).fill(0)
   const monthlyCF = new Array(12).fill(0)
@@ -71,23 +81,25 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     const m = new Date(v.created_at).getMonth()
     monthlyCA[m] += Number(v.total_ttc||0)
     monthlyNb[m] += 1
-    ;(v.vente_items||[]).forEach((it:any) => { monthlyCF[m] += Number(it.cf_unitaire||0)*Number(it.quantite||0) })
+    ;(v.vente_items||[]).forEach((it:any) => {
+      monthlyCF[m] += Number(it.cf_unitaire||0) * Number(it.quantite||0)
+    })
   })
   const totalCA       = monthlyCA.reduce((s,v)=>s+v,0)
   const totalCF       = monthlyCF.reduce((s,v)=>s+v,0)
   const urssafTotal   = totalCA * urssafRate
   const resultatFinal = totalCA - urssafTotal - totalCF - depenses
 
-  // ── MOIS ──
-  const ventesMonth = allVentes.filter(v => new Date(v.created_at).getMonth()===selectedMonth)
-  const caMonth  = ventesMonth.reduce((s:number,v:any)=>s+Number(v.total_ttc||0),0)
-  const cfMonth  = ventesMonth.reduce((s:number,v:any)=>s+(v.vente_items||[]).reduce((ss:number,it:any)=>ss+Number(it.cf_unitaire||0)*Number(it.quantite||0),0),0)
+  // ── Calculs mois ──
+  const ventesMonth = allVentes.filter(v => new Date(v.created_at).getMonth() === selectedMonth)
+  const caMonth = ventesMonth.reduce((s:number,v:any) => s + Number(v.total_ttc||0), 0)
   const daysInMonth = new Date(year, selectedMonth+1, 0).getDate()
   const dailyCA = new Array(daysInMonth).fill(0)
   const dailyNb = new Array(daysInMonth).fill(0)
   ventesMonth.forEach((v:any) => {
     const d = new Date(v.created_at).getDate()-1
-    dailyCA[d] += Number(v.total_ttc||0); dailyNb[d] += 1
+    dailyCA[d] += Number(v.total_ttc||0)
+    dailyNb[d] += 1
   })
   const prodStats: Record<string,{qty:number,ca:number}> = {}
   ventesMonth.forEach((v:any) => {
@@ -100,22 +112,30 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   })
   const topProduits = Object.entries(prodStats).sort((a,b)=>b[1].ca-a[1].ca).slice(0,8)
   const clientStats: Record<string,number> = {}
-  ventesMonth.forEach((v:any) => { if(v.client_nom) clientStats[v.client_nom]=(clientStats[v.client_nom]||0)+Number(v.total_ttc||0) })
+  ventesMonth.forEach((v:any) => {
+    if (v.client_nom) clientStats[v.client_nom] = (clientStats[v.client_nom]||0) + Number(v.total_ttc||0)
+  })
   const topClients = Object.entries(clientStats).sort((a,b)=>b[1]-a[1]).slice(0,5)
   const pmtStats: Record<string,number> = {}
-  ventesMonth.forEach((v:any) => { if(v.mode_paiement) pmtStats[v.mode_paiement]=(pmtStats[v.mode_paiement]||0)+Number(v.total_ttc||0) })
+  ventesMonth.forEach((v:any) => {
+    if (v.mode_paiement) pmtStats[v.mode_paiement] = (pmtStats[v.mode_paiement]||0) + Number(v.total_ttc||0)
+  })
   const pmtEntries = Object.entries(pmtStats).sort((a,b)=>b[1]-a[1])
 
-  // ── JOUR ──
-  const ventesDay  = allVentes.filter(v=>v.created_at.slice(0,10)===selectedDay)
-  const caDay      = ventesDay.reduce((s:number,v:any)=>s+Number(v.total_ttc||0),0)
-  const nbDay      = ventesDay.length
-  const hourlyCA   = new Array(14).fill(0)
+  // ── Calculs jour ──
+  const ventesDay = allVentes.filter(v => {
+    const d = new Date(v.created_at)
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
+    return ds === selectedDay
+  })
+  const caDay    = ventesDay.reduce((s:number,v:any) => s + Number(v.total_ttc||0), 0)
+  const nbDay    = ventesDay.length
+  const hourlyCA = new Array(14).fill(0)
   ventesDay.forEach((v:any) => {
     const h = new Date(v.created_at).getHours()
-    if(h>=8&&h<=21) hourlyCA[h-8] += Number(v.total_ttc||0)
+    if (h>=8 && h<=21) hourlyCA[h-8] += Number(v.total_ttc||0)
   })
-  const maxHourly = Math.max(...hourlyCA,1)
+  const maxHourly = Math.max(...hourlyCA, 1)
 
   const anneeDisplay = statsView==="ca" ? monthlyCA : monthlyCA.map((ca,i)=>Math.max(0,ca-monthlyCF[i]))
   const moisDisplay  = statsView==="ca" ? dailyCA   : dailyCA.map(ca=>Math.max(0,ca))
@@ -133,14 +153,14 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-        {/* Header */}
+        {/* ── HEADER ── */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">📊 Statistiques</h1>
             <p className="text-zinc-500 text-sm mt-0.5">{activeSociety?.name}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Vue */}
+
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
               {(["annee","mois","jour"] as const).map(v=>(
                 <button key={v} onClick={()=>setView(v)}
@@ -150,29 +170,30 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 </button>
               ))}
             </div>
-            {/* Année */}
+
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
               <button onClick={()=>setYear(y=>y-1)} className="text-zinc-500 hover:text-white"><ChevronLeft size={14}/></button>
               <span className="text-white font-bold text-sm px-2">{year}</span>
               <button onClick={()=>setYear(y=>y+1)} disabled={year>=today.getFullYear()}
                 className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
             </div>
-            {/* Mois */}
-            {(view==="mois"||view==="jour") && (
+
+            {view==="mois" && (
               <select value={selectedMonth} onChange={e=>setSelectedMonth(Number(e.target.value))}
                 className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
                 {MOIS_FR.map((m,i)=><option key={i} value={i}>{m}</option>)}
               </select>
             )}
-            {/* Jour */}
+
             {view==="jour" && (
               <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
                 <Calendar size={13} className="text-zinc-500"/>
                 <input type="date" value={selectedDay} onChange={e=>setSelectedDay(e.target.value)}
+                  max={today.toISOString().slice(0,10)}
                   className="bg-transparent text-sm text-white focus:outline-none"/>
               </div>
             )}
-            {/* CA/Marge */}
+
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
               {(["ca","marge"] as const).map(v=>(
                 <button key={v} onClick={()=>setStatsView(v)}
@@ -189,51 +210,58 @@ export default function StatsModule({ activeSociety, profile }: Props) {
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{borderColor:ACCENT}}/>
           </div>
+
         ) : view==="annee" ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Kpi label="CA Brut" value={totalCA.toFixed(2)+"€"} color={ACCENT}/>
-              <Kpi label="Net URSSAF" value={(totalCA*(1-urssafRate)).toFixed(2)+"€"} color="#22c55e"/>
-              <Kpi label="Coût fabrication" value={totalCF.toFixed(2)+"€"} color="#f97316"/>
-              <Kpi label="Résultat final" value={resultatFinal.toFixed(2)+"€"} color={resultatFinal>=0?"#22c55e":"#ef4444"}/>
+              <Kpi label="CA Brut"         value={totalCA.toFixed(2)+"€"}                      color={ACCENT}/>
+              <Kpi label="Net URSSAF"       value={(totalCA*(1-urssafRate)).toFixed(2)+"€"}      color="#22c55e"/>
+              <Kpi label="Coût fabrication" value={totalCF.toFixed(2)+"€"}                      color="#f97316"/>
+              <Kpi label="Résultat final"   value={resultatFinal.toFixed(2)+"€"}                color={resultatFinal>=0?"#22c55e":"#ef4444"}/>
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
               <p className="text-white font-bold mb-6">{statsView==="ca"?"CA":"Marge"} par mois — {year}</p>
-              <div className="flex items-end gap-1 h-48 mb-2">
-                {anneeDisplay.map((val,i)=>{
-                  const isNow = i===today.getMonth()&&year===today.getFullYear()
-                  const barH  = Math.max((val/maxAnnee)*170,val>0?4:2)
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1 cursor-pointer"
-                      onClick={()=>{setSelectedMonth(i);setView("mois")}}
-                      onMouseEnter={()=>setHoveredBar(i)} onMouseLeave={()=>setHoveredBar(null)}>
-                      <div className={`text-white text-[10px] font-bold bg-zinc-800 border border-zinc-700 px-2 py-1 rounded-lg whitespace-nowrap transition-opacity ${hoveredBar===i&&val>0?"opacity-100":"opacity-0"}`}>
-                        {val.toFixed(0)}€ <span className="text-zinc-500">({monthlyNb[i]})</span>
-                      </div>
-                      <div className="w-full rounded-t-lg transition-all duration-200"
-                        style={{height:`${barH}px`,backgroundColor:hoveredBar===i?ACCENT:isNow?ACCENT+"80":val>0?ACCENT+"50":"#3f3f46"}}/>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex gap-1">
-                {MOIS_SHORT.map((m,i)=>(
-                  <div key={i} className="flex-1 text-center">
-                    <p className={`text-[10px] font-semibold ${i===today.getMonth()&&year===today.getFullYear()?"text-white":"text-zinc-600"}`}>{m}</p>
+              {totalCA===0 ? (
+                <div className="py-12 text-center text-zinc-600 text-sm">Aucune vente pour {year}</div>
+              ) : (
+                <>
+                  <div className="flex items-end gap-1 h-48 mb-2">
+                    {anneeDisplay.map((val,i)=>{
+                      const isNow = i===today.getMonth()&&year===today.getFullYear()
+                      const barH  = Math.max((val/maxAnnee)*170,val>0?4:2)
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1 cursor-pointer"
+                          onClick={()=>{setSelectedMonth(i);setView("mois")}}
+                          onMouseEnter={()=>setHoveredBar(i)} onMouseLeave={()=>setHoveredBar(null)}>
+                          <div className={`text-white text-[10px] font-bold bg-zinc-800 border border-zinc-700 px-2 py-1 rounded-lg whitespace-nowrap transition-opacity ${hoveredBar===i&&val>0?"opacity-100":"opacity-0"}`}>
+                            {val.toFixed(0)}€ <span className="text-zinc-500">({monthlyNb[i]})</span>
+                          </div>
+                          <div className="w-full rounded-t-lg transition-all duration-200"
+                            style={{height:`${barH}px`,backgroundColor:hoveredBar===i?ACCENT:isNow?ACCENT+"80":val>0?ACCENT+"50":"#3f3f46"}}/>
+                        </div>
+                      )
+                    })}
                   </div>
-                ))}
-              </div>
+                  <div className="flex gap-1">
+                    {MOIS_SHORT.map((m,i)=>(
+                      <div key={i} className="flex-1 text-center">
+                        <p className={`text-[10px] font-semibold ${i===today.getMonth()&&year===today.getFullYear()?"text-white":"text-zinc-600"}`}>{m}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-zinc-800"><p className="text-white font-bold">Récap financier {year}</p></div>
               <div className="divide-y divide-zinc-800">
                 {[
-                  {label:"CA Brut",value:"+"+totalCA.toFixed(2)+"€",color:ACCENT},
-                  {label:`URSSAF (${(urssafRate*100).toFixed(0)}%)`,value:"-"+urssafTotal.toFixed(2)+"€",color:"#ef4444"},
-                  {label:"Coût fabrication",value:"-"+totalCF.toFixed(2)+"€",color:"#f97316"},
-                  {label:"Dépenses",value:"-"+depenses.toFixed(2)+"€",color:"#ef4444"},
+                  {label:"CA Brut",                                  value:"+"+totalCA.toFixed(2)+"€",     color:ACCENT},
+                  {label:`URSSAF (${(urssafRate*100).toFixed(0)}%)`, value:"-"+urssafTotal.toFixed(2)+"€", color:"#ef4444"},
+                  {label:"Coût fabrication",                          value:"-"+totalCF.toFixed(2)+"€",    color:"#f97316"},
+                  {label:"Dépenses",                                  value:"-"+depenses.toFixed(2)+"€",   color:"#ef4444"},
                 ].map(({label,value,color})=>(
                   <div key={label} className="flex items-center justify-between px-6 py-3">
                     <span className="text-zinc-400 text-sm">{label}</span>
@@ -251,33 +279,46 @@ export default function StatsModule({ activeSociety, profile }: Props) {
         ) : view==="mois" ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Kpi label={MOIS_FR[selectedMonth]+" CA"} value={caMonth.toFixed(2)+"€"} color={ACCENT}/>
-              <Kpi label="Net URSSAF" value={(caMonth*(1-urssafRate)).toFixed(2)+"€"} color="#22c55e"/>
-              <Kpi label="Nb ventes" value={String(ventesMonth.length)} color="#a78bfa"/>
-              <Kpi label="Panier moyen" value={ventesMonth.length?(caMonth/ventesMonth.length).toFixed(2)+"€":"—"} color="#f97316"/>
+              <Kpi label={MOIS_FR[selectedMonth]+" CA"} value={caMonth.toFixed(2)+"€"}                                            color={ACCENT}/>
+              <Kpi label="Net URSSAF"                    value={(caMonth*(1-urssafRate)).toFixed(2)+"€"}                            color="#22c55e"/>
+              <Kpi label="Nb ventes"                     value={String(ventesMonth.length)}                                         color="#a78bfa"/>
+              <Kpi label="Panier moyen"                  value={ventesMonth.length?(caMonth/ventesMonth.length).toFixed(2)+"€":"—"} color="#f97316"/>
             </div>
 
-            {/* Graphe par jour — cliquable */}
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-              <p className="text-white font-bold mb-4 text-sm">CA par jour — {MOIS_FR[selectedMonth]} {year} <span className="text-zinc-500 font-normal text-xs">(cliquer un jour pour le détail)</span></p>
-              <div className="flex items-end gap-0.5 h-32 mb-2">
-                {moisDisplay.map((val,i)=>{
-                  const d = new Date(year,selectedMonth,i+1)
-                  const isToday = d.toISOString().slice(0,10)===today.toISOString().slice(0,10)
-                  const barH = Math.max((val/maxMois)*110,val>0?3:1)
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-0.5 cursor-pointer flex-1"
-                      onClick={()=>{setSelectedDay(d.toISOString().slice(0,10));setView("jour")}}
-                      onMouseEnter={()=>setHoveredBar(i+100)} onMouseLeave={()=>setHoveredBar(null)}>
-                      {hoveredBar===i+100&&val>0&&<div className="text-white text-[9px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded whitespace-nowrap">{val.toFixed(0)}€</div>}
-                      <div className="w-full rounded-t-sm" style={{height:`${barH}px`,backgroundColor:isToday?ACCENT:val>0?ACCENT+"60":"#3f3f46"}}/>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex gap-0.5">
-                {moisDisplay.map((_,i)=><div key={i} className="flex-1 text-center"><p className="text-[9px] text-zinc-700">{i+1}</p></div>)}
-              </div>
+              <p className="text-white font-bold mb-4 text-sm">
+                CA par jour — {MOIS_FR[selectedMonth]} {year}
+                <span className="text-zinc-500 font-normal text-xs ml-2">(cliquer un jour → détail)</span>
+              </p>
+              {caMonth===0 ? (
+                <div className="py-10 text-center text-zinc-600 text-sm">Aucune vente ce mois</div>
+              ) : (
+                <>
+                  <div className="flex items-end gap-0.5 h-32 mb-2">
+                    {moisDisplay.map((val,i)=>{
+                      const ds = `${year}-${String(selectedMonth+1).padStart(2,"0")}-${String(i+1).padStart(2,"0")}`
+                      const isToday = ds===today.toISOString().slice(0,10)
+                      const barH = Math.max((val/maxMois)*110,val>0?3:1)
+                      return (
+                        <div key={i} className="flex flex-col items-center gap-0.5 cursor-pointer flex-1"
+                          onClick={()=>{ setSelectedDay(ds); setView("jour") }}
+                          onMouseEnter={()=>setHoveredBar(i+100)} onMouseLeave={()=>setHoveredBar(null)}>
+                          {hoveredBar===i+100&&val>0&&(
+                            <div className="text-white text-[9px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded whitespace-nowrap">{val.toFixed(0)}€</div>
+                          )}
+                          <div className="w-full rounded-t-sm"
+                            style={{height:`${barH}px`,backgroundColor:isToday?ACCENT:val>0?ACCENT+"60":"#3f3f46"}}/>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-0.5">
+                    {moisDisplay.map((_,i)=>(
+                      <div key={i} className="flex-1 text-center"><p className="text-[9px] text-zinc-700">{i+1}</p></div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -286,7 +327,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 {topProduits.length===0 ? <p className="text-zinc-600 text-sm">Aucune vente</p> : (
                   <div className="space-y-2.5">
                     {topProduits.map(([nom,{qty,ca}],i)=>{
-                      const pct = (ca/(caMonth||1))*100
+                      const pct=(ca/(caMonth||1))*100
                       return (
                         <div key={nom}>
                           <div className="flex items-center justify-between mb-1">
@@ -308,7 +349,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 {topClients.length===0 ? <p className="text-zinc-600 text-sm">Aucun client</p> : (
                   <div className="space-y-2.5">
                     {topClients.map(([nom,ca],i)=>{
-                      const pct = (ca/(caMonth||1))*100
+                      const pct=(ca/(caMonth||1))*100
                       return (
                         <div key={nom}>
                           <div className="flex items-center justify-between mb-1">
@@ -326,7 +367,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               </div>
             </div>
 
-            {pmtEntries.length>0&&(
+            {pmtEntries.length>0 && (
               <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
                 <p className="text-white font-bold text-sm mb-3">💳 Modes de paiement</p>
                 <div className="flex gap-3 flex-wrap">
@@ -345,9 +386,9 @@ export default function StatsModule({ activeSociety, profile }: Props) {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Kpi label="CA du jour" value={caDay.toFixed(2)+"€"} color={ACCENT}/>
-              <Kpi label="Net URSSAF" value={(caDay*(1-urssafRate)).toFixed(2)+"€"} color="#22c55e"/>
-              <Kpi label="Nb ventes" value={String(nbDay)} color="#a78bfa"/>
+              <Kpi label="CA du jour"   value={caDay.toFixed(2)+"€"}                   color={ACCENT}/>
+              <Kpi label="Net URSSAF"   value={(caDay*(1-urssafRate)).toFixed(2)+"€"}   color="#22c55e"/>
+              <Kpi label="Nb ventes"    value={String(nbDay)}                           color="#a78bfa"/>
               <Kpi label="Panier moyen" value={nbDay?(caDay/nbDay).toFixed(2)+"€":"—"} color="#f97316"/>
             </div>
 
@@ -358,21 +399,31 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                   Ventes par heure — {new Date(selectedDay+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
                 </p>
               </div>
-              <div className="flex items-end gap-2 h-32 mb-2">
-                {hourlyCA.map((val,i)=>{
-                  const barH = Math.max((val/maxHourly)*110,val>0?4:2)
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1"
-                      onMouseEnter={()=>setHoveredBar(i+200)} onMouseLeave={()=>setHoveredBar(null)}>
-                      {hoveredBar===i+200&&val>0&&<div className="text-white text-[9px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded">{val.toFixed(0)}€</div>}
-                      <div className="w-full rounded-t-lg" style={{height:`${barH}px`,backgroundColor:val>0?ACCENT+"90":"#3f3f46"}}/>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="flex gap-2">
-                {hourlyCA.map((_,i)=><div key={i} className="flex-1 text-center"><p className="text-[10px] text-zinc-600">{i+8}h</p></div>)}
-              </div>
+              {nbDay===0 ? (
+                <div className="py-10 text-center text-zinc-600 text-sm">Aucune vente ce jour</div>
+              ) : (
+                <>
+                  <div className="flex items-end gap-2 h-32 mb-2">
+                    {hourlyCA.map((val,i)=>{
+                      const barH=Math.max((val/maxHourly)*110,val>0?4:2)
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1"
+                          onMouseEnter={()=>setHoveredBar(i+200)} onMouseLeave={()=>setHoveredBar(null)}>
+                          {hoveredBar===i+200&&val>0&&(
+                            <div className="text-white text-[9px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded">{val.toFixed(0)}€</div>
+                          )}
+                          <div className="w-full rounded-t-lg" style={{height:`${barH}px`,backgroundColor:val>0?ACCENT+"90":"#3f3f46"}}/>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    {hourlyCA.map((_,i)=>(
+                      <div key={i} className="flex-1 text-center"><p className="text-[10px] text-zinc-600">{i+8}h</p></div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -385,15 +436,20 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               ) : (
                 <div className="divide-y divide-zinc-800">
                   {ventesDay.map((v:any)=>(
-                    <div key={v.id} className="flex items-center justify-between px-5 py-3">
+                    <div key={v.id} className="flex items-start justify-between px-5 py-3">
                       <div>
                         <p className="text-white text-sm font-semibold">{v.client_nom||"—"}</p>
                         <p className="text-zinc-500 text-xs">
                           {new Date(v.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
                           {v.mode_paiement&&<span className="ml-2 text-zinc-600">{v.mode_paiement}</span>}
                         </p>
+                        {(v.vente_items||[]).length>0 && (
+                          <p className="text-zinc-600 text-[10px] mt-0.5">
+                            {(v.vente_items as any[]).map((it:any)=>`${it.produit_nom} ×${it.quantite}`).join(" · ")}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm font-bold" style={{color:ACCENT}}>{Number(v.total_ttc||0).toFixed(2)}€</p>
+                      <p className="text-sm font-bold shrink-0 ml-3" style={{color:ACCENT}}>{Number(v.total_ttc||0).toFixed(2)}€</p>
                     </div>
                   ))}
                 </div>
