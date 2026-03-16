@@ -13,21 +13,23 @@ const MOIS_SHORT = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct
 export default function StatsModule({ activeSociety, profile }: Props) {
   const { settings } = useUserSettings()
   const ACCENT = settings.accent_color || "#eab308"
-
   const today = new Date()
 
-  const [urssafRate,     setUrssafRate]     = useState(0.138)
-  const [view,           setView]           = useState<"annee"|"mois"|"jour">("annee")
-  const [year,           setYear]           = useState(today.getFullYear())
-  const [selectedMonth,  setSelectedMonth]  = useState(today.getMonth())
-  const [selectedDay,    setSelectedDay]    = useState(today.toISOString().slice(0,10))
-  const [statsView,      setStatsView]      = useState<"ca"|"marge">("ca")
-  const [hoveredBar,     setHoveredBar]     = useState<number|null>(null)
-  const [allVentes,      setAllVentes]      = useState<any[]>([])
-  const [depenses,       setDepenses]       = useState(0)
-  const [loading,        setLoading]        = useState(true)
+  const [urssafRate,    setUrssafRate]    = useState(0.138)
+  const [view,          setView]          = useState<"annee"|"mois"|"jour">("annee")
+  const [year,          setYear]          = useState(today.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth())
+  const [selectedDay,   setSelectedDay]   = useState(today.toISOString().slice(0,10))
+  const [statsView,     setStatsView]     = useState<"ca"|"marge">("ca")
+  const [hoveredBar,    setHoveredBar]    = useState<number|null>(null)
 
+  // On charge TOUT sans filtre année pour éviter la race condition
+  const [allVentesRaw, setAllVentesRaw] = useState<any[]>([])
+  const [allDepenses,  setAllDepenses]  = useState<any[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [debugError,   setDebugError]   = useState<string>("")
 
+  // Taux URSSAF
   useEffect(() => {
     if (!activeSociety?.id) return
     supabase.from("settings").select("value")
@@ -35,43 +37,48 @@ export default function StatsModule({ activeSociety, profile }: Props) {
       .then(({ data }) => { if (data?.value != null) setUrssafRate(Number(data.value)) })
   }, [activeSociety?.id])
 
-  // Détection automatique de l'année la plus récente en base
+  // Chargement TOUTES ventes + dépenses (sans filtre année)
   useEffect(() => {
     if (!activeSociety?.id) return
-    supabase.from("ventes").select("created_at")
-      .eq("society_id", activeSociety.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setYear(new Date(data[0].created_at).getFullYear())
-        }
-      })
-  }, [activeSociety?.id])
-
-  // Chargement des ventes pour l'année
-  useEffect(() => {
-    if (!activeSociety?.id) return
-    const fetch = async () => {
+    const fetchAll = async () => {
       setLoading(true)
-      const [{ data: ventes }, { data: deps }] = await Promise.all([
-        supabase.from("ventes")
-          .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
-          .eq("society_id", activeSociety.id)
-          .gte("created_at", `${year}-01-01T00:00:00`)
-          .lte("created_at", `${year}-12-31T23:59:59`)
-          .order("created_at", { ascending: false }),
-        supabase.from("depenses").select("montant")
-          .eq("society_id", activeSociety.id)
-          .gte("created_at", `${year}-01-01T00:00:00`)
-          .lte("created_at", `${year}-12-31T23:59:59`),
-      ])
-      setAllVentes(ventes || [])
-      setDepenses((deps||[]).reduce((s:number,d:any) => s + Number(d.montant||0), 0))
+      setDebugError("")
+
+      const { data: ventes, error: ventesError } = await supabase
+        .from("ventes")
+        .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
+        .eq("society_id", activeSociety.id)
+        .order("created_at", { ascending: false })
+
+      if (ventesError) setDebugError(ventesError.message)
+
+      const { data: deps } = await supabase
+        .from("depenses").select("montant,created_at")
+        .eq("society_id", activeSociety.id)
+
+      const ventesData = ventes || []
+      setAllVentesRaw(ventesData)
+      setAllDepenses(deps || [])
+
+      // Caler l'année sur la vente la plus récente
+      if (ventesData.length > 0) {
+        setYear(new Date(ventesData[0].created_at).getFullYear())
+      }
+
       setLoading(false)
     }
-    fetch()
-  }, [activeSociety?.id, year])
+    fetchAll()
+  }, [activeSociety?.id])
+
+  // Filtrage par année côté client
+  const allVentes = allVentesRaw.filter(v => new Date(v.created_at).getFullYear() === year)
+  const depenses  = allDepenses
+    .filter(d => new Date(d.created_at).getFullYear() === year)
+    .reduce((s:number,d:any) => s + Number(d.montant||0), 0)
+
+  // Années disponibles
+  const availableYears = [...new Set(allVentesRaw.map(v => new Date(v.created_at).getFullYear()))].sort((a,b)=>b-a)
+  const minYear = availableYears.length > 0 ? Math.min(...availableYears) : today.getFullYear()
 
   // ── Calculs année ──
   const monthlyCA = new Array(12).fill(0)
@@ -123,7 +130,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   const pmtEntries = Object.entries(pmtStats).sort((a,b)=>b[1]-a[1])
 
   // ── Calculs jour ──
-  const ventesDay = allVentes.filter(v => {
+  const ventesDay = allVentesRaw.filter(v => {
     const d = new Date(v.created_at)
     const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
     return ds === selectedDay
@@ -139,8 +146,8 @@ export default function StatsModule({ activeSociety, profile }: Props) {
 
   const anneeDisplay = statsView==="ca" ? monthlyCA : monthlyCA.map((ca,i)=>Math.max(0,ca-monthlyCF[i]))
   const moisDisplay  = statsView==="ca" ? dailyCA   : dailyCA.map(ca=>Math.max(0,ca))
-  const maxAnnee = Math.max(...anneeDisplay,1)
-  const maxMois  = Math.max(...moisDisplay,1)
+  const maxAnnee = Math.max(...anneeDisplay, 1)
+  const maxMois  = Math.max(...moisDisplay, 1)
 
   const Kpi = ({label,value,color}:{label:string,value:string,color:string}) => (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
@@ -160,7 +167,6 @@ export default function StatsModule({ activeSociety, profile }: Props) {
             <p className="text-zinc-500 text-sm mt-0.5">{activeSociety?.name}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
               {(["annee","mois","jour"] as const).map(v=>(
                 <button key={v} onClick={()=>setView(v)}
@@ -172,7 +178,8 @@ export default function StatsModule({ activeSociety, profile }: Props) {
             </div>
 
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-              <button onClick={()=>setYear(y=>y-1)} className="text-zinc-500 hover:text-white"><ChevronLeft size={14}/></button>
+              <button onClick={()=>setYear(y=>y-1)} disabled={year<=minYear}
+                className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft size={14}/></button>
               <span className="text-white font-bold text-sm px-2">{year}</span>
               <button onClick={()=>setYear(y=>y+1)} disabled={year>=today.getFullYear()}
                 className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
@@ -190,7 +197,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 <Calendar size={13} className="text-zinc-500"/>
                 <input type="date" value={selectedDay} onChange={e=>setSelectedDay(e.target.value)}
                   max={today.toISOString().slice(0,10)}
-                  className="bg-transparent text-sm text-white focus:outline-none"/>
+                  className="bg-transparent text-sm text-white focus:outline-none cursor-pointer"/>
               </div>
             )}
 
@@ -204,6 +211,20 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* ── DEBUG PANEL — à supprimer une fois que ça marche ── */}
+        <div className="bg-red-950/40 border border-red-500/40 rounded-xl p-3 text-xs space-y-1 font-mono">
+          <p className="text-red-400 font-bold mb-2">🔍 DEBUG — à supprimer après résolution</p>
+          <p className="text-zinc-300">activeSociety.id : <span className="text-yellow-400 font-bold">{activeSociety?.id || "❌ NULL"}</span></p>
+          <p className="text-zinc-300">Ventes RAW (toutes) : <span className="text-yellow-400 font-bold">{allVentesRaw.length}</span></p>
+          <p className="text-zinc-300">Ventes filtrées année {year} : <span className="text-yellow-400 font-bold">{allVentes.length}</span></p>
+          <p className="text-zinc-300">Années détectées : <span className="text-yellow-400 font-bold">{availableYears.join(", ") || "aucune"}</span></p>
+          <p className="text-zinc-300">Loading : <span className="text-yellow-400 font-bold">{String(loading)}</span></p>
+          {debugError && <p className="text-red-400 font-bold">❌ Erreur Supabase : {debugError}</p>}
+          {allVentesRaw.length > 0 && (
+            <p className="text-zinc-300">Dernière vente : <span className="text-yellow-400 font-bold">{allVentesRaw[0].created_at} — {allVentesRaw[0].total_ttc}€</span></p>
+          )}
         </div>
 
         {loading ? (
