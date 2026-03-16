@@ -33,18 +33,29 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   const [depenses,  setDepenses]  = useState(0)
   const [loading,   setLoading]   = useState(true)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (targetYear?: number) => {
     if (!activeSociety?.id) return
     setLoading(true)
+    const y = targetYear ?? year
     const [{ data: ventes }, { data: deps }] = await Promise.all([
       supabase.from("ventes")
         .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
         .eq("society_id", activeSociety.id)
-        .gte("created_at", `${year}-01-01T00:00:00`)
-        .lte("created_at", `${year}-12-31T23:59:59`),
+        .gte("created_at", `${y}-01-01T00:00:00`)
+        .lte("created_at", `${y}-12-31T23:59:59`),
       supabase.from("depenses").select("montant").eq("society_id", activeSociety.id)
-        .gte("created_at", `${year}-01-01T00:00:00`).lte("created_at", `${year}-12-31T23:59:59`),
+        .gte("created_at", `${y}-01-01T00:00:00`).lte("created_at", `${y}-12-31T23:59:59`),
     ])
+
+    // ── AUTO-FALLBACK : si aucune vente sur l'année courante, recule d'un an ──
+    if ((!ventes || ventes.length === 0) && targetYear === undefined && y === today.getFullYear()) {
+      const prevYear = y - 1
+      setYear(prevYear)
+      setLoading(false)
+      load(prevYear)
+      return
+    }
+
     setAllVentes(ventes || [])
     setDepenses((deps||[]).reduce((s:number,d:any)=>s+Number(d.montant||0),0))
     setLoading(false)
