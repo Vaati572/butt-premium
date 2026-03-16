@@ -25,7 +25,7 @@ import ConventionModule from "@/components/conventions/ConventionModule"
 import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
-import IAModule from "@/components/IAModule" // ← AJOUT
+import IAModule from "@/components/IAModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -81,7 +81,7 @@ const ALL_NAV = [
     { id: "prospects",  label: "Prospects",          icon: "🎯" },
     { id: "tournees",   label: "Tournées",           icon: "🛣️" },
     { id: "map",        label: "Map & Tournées",     icon: "🗺️" },
-    { id: "ia",         label: "IA",                 icon: "🤖" }, // ← AJOUT
+    { id: "ia",         label: "IA",                 icon: "🤖" },
   ]},
   { section: "Système", items: [
     { id: "agenda",     label: "Agenda & Tâches",   icon: "📅" },
@@ -140,31 +140,19 @@ function UserAvatar({ nom, url, color, size = 30 }: { nom: string; url?: string;
   )
 }
 
-/* ══════════════════════════════════════════════
-   UNREAD MESSAGES POPUP
-══════════════════════════════════════════════ */
+/* ── UNREAD MESSAGES POPUP ── */
 function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
-  notifs: UnreadNotif[]
-  onGoToMessages: () => void
-  onClose: () => void
-  ACCENT: string
+  notifs: UnreadNotif[]; onGoToMessages: () => void; onClose: () => void; ACCENT: string
 }) {
   const total = notifs.reduce((sum, n) => sum + n.count, 0)
   const [progress, setProgress] = useState(100)
-
   useEffect(() => {
-    const duration = 8000
-    const interval = 50
-    const step = (interval / duration) * 100
+    const duration = 8000; const interval = 50; const step = (interval / duration) * 100
     const timer = setInterval(() => {
-      setProgress(p => {
-        if (p <= 0) { clearInterval(timer); onClose(); return 0 }
-        return p - step
-      })
+      setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - step })
     }, interval)
     return () => clearInterval(timer)
   }, [])
-
   return (
     <div className="fixed bottom-6 right-6 z-[100] w-80">
       <div className="bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
@@ -174,45 +162,29 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
           <div className="flex items-center gap-2.5">
             <div className="relative shrink-0">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
-                style={{ backgroundColor: ACCENT + "20", border: `1px solid ${ACCENT}30` }}>
-                💬
-              </div>
+                style={{ backgroundColor: ACCENT + "20", border: `1px solid ${ACCENT}30` }}>💬</div>
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full text-black text-[9px] font-black flex items-center justify-center"
-                style={{ backgroundColor: ACCENT }}>
-                {total > 9 ? "9+" : total}
-              </span>
+                style={{ backgroundColor: ACCENT }}>{total > 9 ? "9+" : total}</span>
             </div>
             <div>
               <p className="text-white font-bold text-sm leading-tight">Messages non lus</p>
               <p className="text-zinc-400 text-[11px]">{total} message{total > 1 ? "s" : ""} pendant votre absence</p>
             </div>
           </div>
-          <button onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white transition-colors shrink-0">
-            ✕
-          </button>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white transition-colors shrink-0">✕</button>
         </div>
         <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800/50">
           {notifs.slice(0, 5).map((n, i) => (
             <div key={i} className="px-4 py-2.5 hover:bg-zinc-800/30 transition-colors cursor-default">
               <div className="flex items-start gap-2.5">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold text-[11px] shrink-0 mt-0.5"
-                  style={{ backgroundColor: ACCENT }}>
-                  {n.sender_nom?.charAt(0)?.toUpperCase() || "?"}
-                </div>
+                  style={{ backgroundColor: ACCENT }}>{n.sender_nom?.charAt(0)?.toUpperCase() || "?"}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <p className="text-white text-xs font-semibold truncate">{n.sender_nom}</p>
-                    {n.count > 1 && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                        style={{ backgroundColor: ACCENT + "20", color: ACCENT }}>
-                        {n.count} msg
-                      </span>
-                    )}
+                    {n.count > 1 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT + "20", color: ACCENT }}>{n.count} msg</span>}
                   </div>
-                  {n.conv_name !== n.sender_nom && (
-                    <p className="text-zinc-600 text-[10px] truncate">dans {n.conv_name}</p>
-                  )}
+                  {n.conv_name !== n.sender_nom && <p className="text-zinc-600 text-[10px] truncate">dans {n.conv_name}</p>}
                   <p className="text-zinc-400 text-[11px] truncate mt-0.5">
                     {n.content ? `"${n.content.slice(0, 50)}${n.content.length > 50 ? "…" : ""}"` : n.file_name ? `📎 ${n.file_name}` : "Nouveau message"}
                   </p>
@@ -220,36 +192,20 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
               </div>
             </div>
           ))}
-          {notifs.length > 5 && (
-            <div className="px-4 py-2 text-center">
-              <p className="text-zinc-600 text-[10px]">+ {notifs.length - 5} autre{notifs.length - 5 > 1 ? "s" : ""} conversation{notifs.length - 5 > 1 ? "s" : ""}</p>
-            </div>
-          )}
+          {notifs.length > 5 && <div className="px-4 py-2 text-center"><p className="text-zinc-600 text-[10px]">+ {notifs.length - 5} autre{notifs.length - 5 > 1 ? "s" : ""} conversation{notifs.length - 5 > 1 ? "s" : ""}</p></div>}
         </div>
         <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
-          <button onClick={onGoToMessages}
-            className="flex-1 py-2 rounded-xl text-black font-bold text-xs transition-all hover:brightness-110 active:scale-95"
-            style={{ backgroundColor: ACCENT }}>
-            Voir les messages →
-          </button>
-          <button onClick={onClose}
-            className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700 transition-colors">
-            Plus tard
-          </button>
+          <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-black font-bold text-xs transition-all hover:brightness-110 active:scale-95" style={{ backgroundColor: ACCENT }}>Voir les messages →</button>
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700 transition-colors">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800">
-          <div className="h-full rounded-full transition-all duration-50"
-            style={{ width: `${progress}%`, backgroundColor: ACCENT }} />
-        </div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full transition-all duration-50" style={{ width: `${progress}%`, backgroundColor: ACCENT }} /></div>
       </div>
     </div>
   )
 }
 
-/* ── STOCK ALERT POPUP ───────────────────────────────────── */
-function StockAlertPopup({ alerts, onGoToStock, onClose }: {
-  alerts: any[]; onGoToStock: ()=>void; onClose: ()=>void
-}) {
+/* ── STOCK ALERT POPUP ── */
+function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGoToStock: ()=>void; onClose: ()=>void }) {
   const [progress, setProgress] = useState(100)
   useEffect(() => {
     const timer = setInterval(() => {
@@ -291,28 +247,23 @@ function StockAlertPopup({ alerts, onGoToStock, onClose }: {
   )
 }
 
-/* ══════════════════════════════════════════════
-   INNER DASHBOARD
-══════════════════════════════════════════════ */
-/* ── ACCESS DENIED PANEL ──────────────────────────────── */
+/* ── ACCESS DENIED ── */
 function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
       <div className="text-center p-8 max-w-sm">
-        <div className="w-24 h-24 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-6">
-          <span className="text-5xl">🚫</span>
-        </div>
+        <div className="w-24 h-24 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-6"><span className="text-5xl">🚫</span></div>
         <h2 className="text-white text-xl font-bold mb-2">Accès non autorisé</h2>
-        <p className="text-zinc-500 text-sm mb-4">
-          Tu n&apos;as pas la permission d&apos;accéder à l&apos;onglet{" "}
-          <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.
-        </p>
+        <p className="text-zinc-500 text-sm mb-4">Tu n&apos;as pas la permission d&apos;accéder à l&apos;onglet <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.</p>
         <p className="text-zinc-700 text-xs">Contacte un administrateur pour obtenir l&apos;accès.</p>
       </div>
     </div>
   )
 }
 
+/* ══════════════════════════════════════════════
+   INNER DASHBOARD
+══════════════════════════════════════════════ */
 function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
   const { settings } = useUserSettings()
   const [activeTab, setActiveTab]           = useState(settings.start_page || "vente")
@@ -344,91 +295,52 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const APP_THEME   = (settings as any).app_theme  || "1"
   const BG_GRADIENT = (settings as any).bg_gradient || ""
 
-  useEffect(() => {
-    if (settings.start_page) setActiveTab(settings.start_page)
-  }, [settings.start_page])
+  useEffect(() => { if (settings.start_page) setActiveTab(settings.start_page) }, [settings.start_page])
 
   useEffect(() => {
     if (!activeSociety) return
-    // Check conventions that are ACTUALLY running today (based on real dates, not just statut)
     const todayStr = new Date().toISOString().split("T")[0]
-    supabase.from("conventions")
-      .select("*").eq("society_id", activeSociety.id)
-      .lte("date_debut", todayStr)
-      .gte("date_fin", todayStr)
-      .order("date_debut", { ascending: false })
-      .limit(1).single()
+    supabase.from("conventions").select("*").eq("society_id", activeSociety.id)
+      .lte("date_debut", todayStr).gte("date_fin", todayStr)
+      .order("date_debut", { ascending: false }).limit(1).single()
       .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
-
-    // Check stock alerts
-    supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite")
-      .eq("society_id", activeSociety.id)
+    supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite").eq("society_id", activeSociety.id)
       .then(({ data }) => {
-        const alerts = (data||[]).filter((s:any) =>
-          s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte)
-        )
-        if (alerts.length > 0) {
-          setStockAlerts(alerts)
-          setTimeout(() => setShowStockAlert(true), 3000)
-        }
+        const alerts = (data||[]).filter((s:any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+        if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
       })
   }, [activeSociety])
 
   useEffect(() => {
     if (!profile || !activeSociety) return
     const check = async () => {
-      const { data: convs } = await supabase.from("conversations")
-        .select("id, name, type, member_ids")
-        .eq("society_id", activeSociety.id)
-        .contains("member_ids", [profile.id])
+      const { data: convs } = await supabase.from("conversations").select("id, name, type, member_ids").eq("society_id", activeSociety.id).contains("member_ids", [profile.id])
       if (!convs || convs.length === 0) return
-
       const allMemberIds = [...new Set(convs.flatMap((c: any) => c.member_ids || []))]
-      const { data: memberProfiles } = await supabase.from("profiles")
-        .select("id, nom").in("id", allMemberIds)
+      const { data: memberProfiles } = await supabase.from("profiles").select("id, nom").in("id", allMemberIds)
       const profileMap: Record<string, string> = {}
       ;(memberProfiles || []).forEach((p: any) => { profileMap[p.id] = p.nom })
-
       const notifs: UnreadNotif[] = []
-
       await Promise.all(convs.map(async (conv: any) => {
-        const { data: unreadMsgs } = await supabase.from("messages")
-          .select("id, sender_nom, sender_id, content, file_name")
-          .eq("conversation_id", conv.id)
-          .not("read_by", "cs", `{${profile.id}}`)
-          .neq("sender_id", profile.id)
-          .order("created_at", { ascending: false })
-          .limit(20)
-
+        const { data: unreadMsgs } = await supabase.from("messages").select("id, sender_nom, sender_id, content, file_name")
+          .eq("conversation_id", conv.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
+          .order("created_at", { ascending: false }).limit(20)
         if (!unreadMsgs || unreadMsgs.length === 0) return
-
         let convName = conv.name
         if (conv.type === "direct" && !conv.name) {
           const otherId = (conv.member_ids || []).find((id: string) => id !== profile.id)
           convName = otherId ? profileMap[otherId] || "Conversation directe" : "Conversation directe"
         }
-
         const bySender: Record<string, { nom: string; msgs: typeof unreadMsgs }> = {}
         unreadMsgs.forEach((m: any) => {
           if (!bySender[m.sender_id]) bySender[m.sender_id] = { nom: m.sender_nom, msgs: [] }
           bySender[m.sender_id].msgs.push(m)
         })
-
         Object.values(bySender).forEach(({ nom, msgs }) => {
-          notifs.push({
-            sender_nom: nom,
-            content: msgs[0].content || "",
-            file_name: msgs[0].file_name,
-            conv_name: convName,
-            conv_id: conv.id,
-            count: msgs.length,
-          })
+          notifs.push({ sender_nom: nom, content: msgs[0].content || "", file_name: msgs[0].file_name, conv_name: convName, conv_id: conv.id, count: msgs.length })
         })
       }))
-
-      if (notifs.length > 0) {
-        setTimeout(() => { setUnreadNotifs(notifs); setShowUnreadPopup(true) }, 1200)
-      }
+      if (notifs.length > 0) setTimeout(() => { setUnreadNotifs(notifs); setShowUnreadPopup(true) }, 1200)
     }
     check()
   }, [profile, activeSociety])
@@ -436,19 +348,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   useEffect(() => {
     if (!profile || !activeSociety) return
     let channel: ReturnType<typeof supabase.channel> | null = null
-    supabase.from("user_presence").upsert({
-      user_id: profile.id, society_id: activeSociety.id,
-      status: "online", last_seen: new Date().toISOString(),
-    }, { onConflict: "user_id" }).then(() => { setMyStatus("online"); loadUsers() })
-
+    supabase.from("user_presence").upsert({ user_id: profile.id, society_id: activeSociety.id, status: "online", last_seen: new Date().toISOString() }, { onConflict: "user_id" })
+      .then(() => { setMyStatus("online"); loadUsers() })
     heartbeatRef.current = setInterval(() => {
       supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
     }, 30000)
-
     channel = supabase.channel(`presence_${activeSociety.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers)
-      .subscribe()
-
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers).subscribe()
     const bye = () => { supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id) }
     window.addEventListener("beforeunload", bye)
     return () => {
@@ -462,22 +368,18 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     if (!profile || !activeSociety) return
     const countUnread = () => {
       supabase.from("messages").select("*", { count: "exact", head: true })
-        .eq("society_id", activeSociety.id)
-        .not("read_by", "cs", `{${profile.id}}`)
-        .neq("sender_id", profile.id)
+        .eq("society_id", activeSociety.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
         .then(({ count: c }) => setUnreadMessages(c || 0))
     }
     countUnread()
     const ch = supabase.channel(`unread_${profile.id}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, countUnread)
-      .subscribe()
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, countUnread).subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [profile, activeSociety])
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setShowStatusMenu(false)
-      // Close global search if clicking outside
       const target = e.target as HTMLElement
       if (!target.closest("[data-global-search]")) setShowGlobalSearch(false)
     }
@@ -538,10 +440,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id",activeSociety.id).ilike("client_nom",`%${q}%`).order("created_at",{ascending:false}).limit(5),
     ])
     const results: any[] = [
-      ...(clients||[]).map((c:any) => ({ type:"client",   icon:"👤", label:c.nom,        sub:c.telephone||c.email||"", tab:"clients",    id:c.id })),
-      ...(pharmacies||[]).map((p:any) => ({ type:"pharmacie",icon:"🏥", label:p.nom,    sub:p.ville||"",              tab:"pharmacies", id:p.id })),
-      ...(prospects||[]).map((p:any) => ({ type:"prospect", icon:"🎯", label:p.entreprise||p.nom, sub:p.ville||"",  tab:"prospects",  id:p.id })),
-      ...(ventes||[]).map((v:any) => ({ type:"vente",     icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€ · "+new Date(v.created_at).toLocaleDateString("fr-FR"), tab:"historique", id:v.id })),
+      ...(clients||[]).map((c:any) => ({ type:"client",    icon:"👤", label:c.nom,                    sub:c.telephone||c.email||"", tab:"clients",    id:c.id })),
+      ...(pharmacies||[]).map((p:any) => ({ type:"pharmacie", icon:"🏥", label:p.nom,                sub:p.ville||"",              tab:"pharmacies", id:p.id })),
+      ...(prospects||[]).map((p:any) => ({ type:"prospect",  icon:"🎯", label:p.entreprise||p.nom,   sub:p.ville||"",              tab:"prospects",  id:p.id })),
+      ...(ventes||[]).map((v:any) => ({ type:"vente",       icon:"🛒", label:v.client_nom||"Vente",  sub:Number(v.total_ttc).toFixed(2)+"€ · "+new Date(v.created_at).toLocaleDateString("fr-FR"), tab:"historique", id:v.id })),
     ]
     setGlobalResults(results)
     setSearchLoading(false)
@@ -553,22 +455,20 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     await supabase.auth.signOut(); router.push("/")
   }
 
-  // ALL tabs visible — restricted ones shown in red with lock
   const visibleNav = ALL_NAV.map(section => ({
     ...section,
     items: section.items.map(tab => ({
       ...tab,
-      restricted: settings.hidden_tabs.includes(tab.id),
+      restricted: (settings as any).hidden_tabs?.includes(tab.id) || false,
     }))
   })).filter(section => section.items.length > 0)
 
   const myCfg       = PRESENCE[myStatus]
   const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
 
-  // ── RENDER CONTENT ──────────────────────────
   const allTabsFlat = ALL_NAV.flatMap(s => s.items)
   const activeTabMeta = allTabsFlat.find(t => t.id === activeTab)
-  const isActiveTabRestricted = settings.hidden_tabs.includes(activeTab)
+  const isActiveTabRestricted = (settings as any).hidden_tabs?.includes(activeTab) || false
 
   const renderContent = () => {
     if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
@@ -588,20 +488,15 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "commandes":  return <CommandesModule       activeSociety={activeSociety} profile={profile} />
       case "playlists":  return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
       case "tournees":   return <TourneesModule        activeSociety={activeSociety} profile={profile}
-          onLaunchOnMap={(t: any) => setActiveTournee(t)}
-          onSwitchToMap={() => setActiveTab("map")} />
+          onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
       case "prospects":  return <ProspectsModule       activeSociety={activeSociety} profile={profile}
-          onShowOnMap={(p: any) => setFocusProspect(p)}
-          onSwitchToMap={() => setActiveTab("map")}
-          onSwitchToTournees={() => setActiveTab("tournees")} />
+          onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => setActiveTab("map")} onSwitchToTournees={() => setActiveTab("tournees")} />
       case "map":        return <MapModule             activeSociety={activeSociety} profile={profile}
-          focusProspect={focusProspect}
-          activeTournee={activeTournee}
-          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }}
-          onSwitchToProspects={() => setActiveTab("prospects")} />
+          focusProspect={focusProspect} activeTournee={activeTournee}
+          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => setActiveTab("prospects")} />
       case "messages":   return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres": return <ParametresModule      activeSociety={activeSociety} profile={profile} />
-      case "agenda":     return <AgendaModule      activeSociety={activeSociety} profile={profile} />
+      case "agenda":     return <AgendaModule          activeSociety={activeSociety} profile={profile} />
       case "admin":      return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":         return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
@@ -622,20 +517,11 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const cardRadius   = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
   const stockAlertPopup = stockAlerts.length > 0 && showStockAlert && (
-    <StockAlertPopup
-      alerts={stockAlerts}
-      onGoToStock={() => { setActiveTab("stocks"); setShowStockAlert(false) }}
-      onClose={() => setShowStockAlert(false)}
-    />
+    <StockAlertPopup alerts={stockAlerts} onGoToStock={() => { setActiveTab("stocks"); setShowStockAlert(false) }} onClose={() => setShowStockAlert(false)} />
   )
-
   const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
-    <UnreadMessagesPopup
-      notifs={unreadNotifs}
-      ACCENT={ACCENT}
-      onGoToMessages={() => { setActiveTab("messages"); setShowUnreadPopup(false) }}
-      onClose={() => setShowUnreadPopup(false)}
-    />
+    <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
+      onGoToMessages={() => { setActiveTab("messages"); setShowUnreadPopup(false) }} onClose={() => setShowUnreadPopup(false)} />
   )
 
   if (APP_THEME === "2") return (
@@ -663,11 +549,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     <div className="h-screen text-white flex overflow-hidden"
       style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
 
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
+      {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* DESKTOP sidebar */}
+      {/* ── DESKTOP SIDEBAR ── */}
       <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden"
         style={{ backgroundColor: SIDEBAR_BG }}>
         <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
@@ -681,12 +565,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           {/* Global Search */}
           <div className="relative mt-2">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">🔍</span>
-            <input
-              type="text" placeholder="Recherche globale..." value={globalSearch}
+            <input type="text" placeholder="Recherche globale..." value={globalSearch}
               onChange={e => { setGlobalSearch(e.target.value); runGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
               onFocus={() => setShowGlobalSearch(true)}
-              className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/40"
-            />
+              className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/40"/>
             {showGlobalSearch && globalSearch.length >= 2 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto">
                 {searchLoading ? (
@@ -713,22 +595,57 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         </div>
 
+        {/* ── NAV DESKTOP ── */}
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
           {visibleNav.map(({ section, items }) => (
             <div key={section}>
-              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
               {items.map(tab => {
                 const isActive = activeTab === tab.id
                 return (
-                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 group relative mb-0.5"
+                  <button key={tab.id}
+                    onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 group relative mb-1"
                     style={{
-                      backgroundColor: isActive ? (tab.restricted ? "#ef444418" : ACCENT + "18") : undefined,
-                      color: tab.restricted ? (isActive ? "#ef4444" : "#7f1d1d") : (isActive ? ACCENT : "#71717a")
+                      backgroundColor: isActive
+                        ? (tab.restricted ? "#ef444415" : ACCENT + "12")
+                        : "transparent",
+                      color: tab.restricted
+                        ? (isActive ? "#ef4444" : "#4a1515")
+                        : (isActive ? ACCENT : "#52525b"),
+                      border: isActive
+                        ? `1px solid ${tab.restricted ? "#ef444445" : ACCENT + "55"}`
+                        : "1px solid #27272a",
+                      boxShadow: isActive
+                        ? `0 0 14px ${tab.restricted ? "#ef444418" : ACCENT + "18"}, inset 0 1px 0 ${tab.restricted ? "#ef444415" : ACCENT + "12"}`
+                        : "none",
                     }}
-                    onMouseEnter={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = tab.restricted ? "#ef444412" : ACCENT + "12"; el.style.color = tab.restricted ? "#ef4444" : ACCENT } }}
-                    onMouseLeave={e => { const el = e.currentTarget as HTMLElement; if (!isActive) { el.style.backgroundColor = ""; el.style.color = tab.restricted ? "#7f1d1d" : "#71717a" } }}>
-                    {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-full" style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT }} />}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = tab.restricted ? "#ef444410" : ACCENT + "0e"
+                        el.style.borderColor = tab.restricted ? "#ef444430" : ACCENT + "40"
+                        el.style.color = tab.restricted ? "#ef4444" : ACCENT
+                        el.style.boxShadow = `0 0 8px ${tab.restricted ? "#ef444412" : ACCENT + "12"}`
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = "transparent"
+                        el.style.borderColor = "#27272a"
+                        el.style.color = tab.restricted ? "#4a1515" : "#52525b"
+                        el.style.boxShadow = "none"
+                      }
+                    }}>
+                    {/* Trait gauche actif avec lueur */}
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+                        style={{
+                          backgroundColor: tab.restricted ? "#ef4444" : ACCENT,
+                          boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}`,
+                        }} />
+                    )}
                     <span className="text-sm">{tab.icon}</span>
                     <span className="flex-1 truncate">{tab.label}</span>
                     {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
@@ -745,6 +662,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           ))}
         </nav>
 
+        {/* Équipe en ligne */}
         {onlineUsers.length > 0 && (
           <div className="border-t border-zinc-900 px-2 pt-2 pb-1">
             <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
@@ -767,6 +685,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         )}
 
+        {/* Profil / statut */}
         <div className="border-t border-zinc-900 p-2">
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
@@ -803,7 +722,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </div>
       </aside>
 
-      {/* MOBILE drawer */}
+      {/* ── MOBILE DRAWER ── */}
       {sidebarOpen && (
         <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
           style={{ backgroundColor: SIDEBAR_BG }}>
@@ -818,14 +737,23 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
             {visibleNav.map(({ section, items }) => (
               <div key={section}>
-                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1">{section}</p>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
                 {items.map(tab => {
                   const isActive = activeTab === tab.id
                   return (
-                    <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-0.5 relative"
-                      style={{ backgroundColor: isActive ? ACCENT + "18" : undefined, color: isActive ? ACCENT : "#71717a" }}>
-                      {isActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full" style={{ backgroundColor: ACCENT }} />}
+                    <button key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-1 relative transition-all duration-200"
+                      style={{
+                        backgroundColor: isActive ? ACCENT + "12" : "transparent",
+                        color: isActive ? ACCENT : "#52525b",
+                        border: isActive ? `1px solid ${ACCENT}50` : "1px solid #27272a",
+                        boxShadow: isActive ? `0 0 12px ${ACCENT}18` : "none",
+                      }}>
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+                          style={{ backgroundColor: ACCENT, boxShadow: `0 0 6px ${ACCENT}` }} />
+                      )}
                       <span className="text-base">{tab.icon}</span>
                       <span className="flex-1 truncate">{tab.label}</span>
                       {tab.id === "messages" && unreadMessages > 0 && (
@@ -850,7 +778,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </aside>
       )}
 
-      {/* MAIN */}
+      {/* ── MAIN ── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
         <button onClick={() => setSidebarOpen(true)}
           className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
@@ -876,25 +804,18 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
                 <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
                   <span className="text-zinc-500 text-sm">Début</span>
-                  <span className="text-white text-sm font-semibold">
-                    {new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-                  </span>
+                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
                 </div>
                 <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
                   <span className="text-zinc-500 text-sm">Fin</span>
-                  <span className="text-white text-sm font-semibold">
-                    {new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
-                  </span>
+                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
                 </div>
               </div>
               <div className="px-6 pb-6 space-y-2">
                 <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
-                  className="w-full py-3 rounded-xl text-black font-bold text-sm transition-colors"
-                  style={{ backgroundColor: ACCENT }}>📋 Aller à la convention</button>
+                  className="w-full py-3 rounded-xl text-black font-bold text-sm transition-colors" style={{ backgroundColor: ACCENT }}>📋 Aller à la convention</button>
                 <button onClick={() => setShowConvPopup(false)}
-                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800 transition-colors">
-                  Continuer vers l'accueil
-                </button>
+                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800 transition-colors">Continuer vers l'accueil</button>
               </div>
             </div>
           </div>
@@ -922,13 +843,9 @@ export default function DashboardPage() {
       if (!session) { router.push("/"); return }
       let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
       if (!prof) {
-        const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name
-          || session.user.email?.split("@")[0] || "Utilisateur"
+        const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Utilisateur"
         const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
-        await supabase.from("profiles").insert({
-          id: session.user.id, nom, email: session.user.email,
-          society_id: soc?.id, role: "vendeur", is_active: true,
-        })
+        await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
         const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
         prof = newProf
       }
@@ -950,10 +867,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
       <p className="text-white font-bold text-lg">Problème de chargement</p>
       <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
-      <button onClick={() => window.location.reload()}
-        className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors">Réessayer</button>
-      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }}
-        className="text-zinc-500 text-sm hover:text-white transition-colors">Se déconnecter</button>
+      <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400 transition-colors">Réessayer</button>
+      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }} className="text-zinc-500 text-sm hover:text-white transition-colors">Se déconnecter</button>
     </div>
   )
 
@@ -988,8 +903,7 @@ function Theme2Layout({
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
             {activeSociety && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-                style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
                 <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: NEON }} />
                 <span className="text-xs font-bold" style={{ color: NEON }}>{activeSociety.name}</span>
               </div>
@@ -1003,17 +917,14 @@ function Theme2Layout({
               </div>
             )}
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-black"
-                style={{ backgroundColor: NEON }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-black" style={{ backgroundColor: NEON }}>
                 {profile?.nom?.charAt(0)?.toUpperCase() || "?"}
               </div>
               <span className="text-zinc-300 text-sm font-medium hidden sm:block">{profile?.nom}</span>
             </div>
             {showStatusMenu && (
-              <div ref={statusMenuRef} className="absolute top-14 right-4 bg-zinc-900 border rounded-xl shadow-2xl z-50 overflow-hidden w-40"
-                style={{ borderColor: NEON + "30" }}>
-                <button onClick={() => { logout(); setShowStatusMenu(false) }}
-                  className="w-full flex items-center gap-2 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-sm">
+              <div ref={statusMenuRef} className="absolute top-14 right-4 bg-zinc-900 border rounded-xl shadow-2xl z-50 overflow-hidden w-40" style={{ borderColor: NEON + "30" }}>
+                <button onClick={() => { logout(); setShowStatusMenu(false) }} className="w-full flex items-center gap-2 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-sm">
                   🚪 Déconnexion
                 </button>
               </div>
@@ -1034,8 +945,7 @@ function Theme2Layout({
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
                 {tab.id === "messages" && unreadMessages > 0 && (
-                  <span className="text-black text-[9px] font-black min-w-[14px] h-3.5 px-1 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: NEON }}>
+                  <span className="text-black text-[9px] font-black min-w-[14px] h-3.5 px-1 rounded-full flex items-center justify-center" style={{ backgroundColor: NEON }}>
                     {unreadMessages > 9 ? "9+" : unreadMessages}
                   </span>
                 )}
@@ -1051,8 +961,7 @@ function Theme2Layout({
 
       {showConvPopup && activeConvention && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border"
-            style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40", boxShadow: `0 0 40px ${NEON}20` }}>
+          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border" style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40", boxShadow: `0 0 40px ${NEON}20` }}>
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl">🎪</span>
               <div>
@@ -1063,11 +972,8 @@ function Theme2Layout({
             {activeConvention.lieu && <p className="text-zinc-400 text-sm mb-4">📍 {activeConvention.lieu}</p>}
             <div className="flex gap-2">
               <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black" style={{ backgroundColor: NEON }}>
-                📋 Aller à la convention
-              </button>
-              <button onClick={() => setShowConvPopup(false)}
-                className="px-4 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300">Plus tard</button>
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black" style={{ backgroundColor: NEON }}>📋 Aller à la convention</button>
+              <button onClick={() => setShowConvPopup(false)} className="px-4 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300">Plus tard</button>
             </div>
           </div>
         </div>
