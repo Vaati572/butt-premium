@@ -46,7 +46,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
 
       const { data: ventes, error: ventesError } = await supabase
         .from("ventes")
-        .select("id,created_at,total_ttc,client_nom,mode_paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
+        .select("id,created_at,total_ttc,client_nom,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
         .eq("society_id", activeSociety.id)
         .order("created_at", { ascending: false })
 
@@ -123,11 +123,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     if (v.client_nom) clientStats[v.client_nom] = (clientStats[v.client_nom]||0) + Number(v.total_ttc||0)
   })
   const topClients = Object.entries(clientStats).sort((a,b)=>b[1]-a[1]).slice(0,5)
-  const pmtStats: Record<string,number> = {}
-  ventesMonth.forEach((v:any) => {
-    if (v.mode_paiement) pmtStats[v.mode_paiement] = (pmtStats[v.mode_paiement]||0) + Number(v.total_ttc||0)
-  })
-  const pmtEntries = Object.entries(pmtStats).sort((a,b)=>b[1]-a[1])
+  const pmtEntries: [string,number][] = []
 
   // ── Calculs jour ──
   const ventesDay = allVentesRaw.filter(v => {
@@ -462,7 +458,6 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                         <p className="text-white text-sm font-semibold">{v.client_nom||"—"}</p>
                         <p className="text-zinc-500 text-xs">
                           {new Date(v.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
-                          {v.mode_paiement&&<span className="ml-2 text-zinc-600">{v.mode_paiement}</span>}
                         </p>
                         {(v.vente_items||[]).length>0 && (
                           <p className="text-zinc-600 text-[10px] mt-0.5">
