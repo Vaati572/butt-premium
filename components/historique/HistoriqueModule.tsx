@@ -61,7 +61,8 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
   const [depenses, setDepenses] = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState("")
-  const [typeFilter, setTypeFilter] = useState<"all"|"vente"|"stock"|"depense"|"offert">("all")
+  // ── Par défaut : afficher uniquement les ventes ──
+  const [typeFilter, setTypeFilter] = useState<"all"|"vente"|"stock"|"depense"|"offert">("vente")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo]     = useState("")
   const [editVente, setEditVente] = useState<any>(null)
@@ -100,7 +101,7 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
     setDepenses(prev => prev.filter(d => d.id !== id))
   }
 
-  // Build entries — 1 ligne par vente
+  // Build entries
   const allEntries: any[] = []
 
   ventes.forEach(v => {
@@ -145,16 +146,34 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
     const a = document.createElement("a"); a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(rows.map(r=>r.join(";")).join("\n")); a.download="historique.csv"; a.click()
   }
 
+  const FILTERS = [
+    { id: "vente",   l: "🛒 Ventes"   },
+    { id: "stock",   l: "📦 Stock"    },
+    { id: "depense", l: "💸 Dépenses" },
+    { id: "offert",  l: "🎁 Offerts"  },
+    { id: "all",     l: "Tout"        },
+  ] as const
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-          <div><h1 className="text-2xl font-bold text-white">🕒 Historique</h1><p className="text-zinc-500 text-sm mt-0.5">{allEntries.length} entrée{allEntries.length>1?"s":""}</p></div>
-          <button onClick={exportCSV} className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:bg-zinc-800"><Download size={13}/> Export CSV</button>
+          <div>
+            <h1 className="text-2xl font-bold text-white">🕒 Historique</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">{allEntries.length} entrée{allEntries.length>1?"s":""}</p>
+          </div>
+          <button onClick={exportCSV} className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:bg-zinc-800">
+            <Download size={13}/> Export CSV
+          </button>
         </div>
 
+        {/* KPIs */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          {[{label:"CA Ventes",val:totalVentes,c:"text-yellow-400",sub:`${ventes.length} vente${ventes.length>1?"s":""}`},{label:"Dépenses",val:totalDepenses,c:"text-red-400",sub:""},{label:"Offerts",val:totalOfferts,c:"text-purple-400",sub:""}].map(({label,val,c,sub})=>(
+          {[
+            { label:"CA Ventes",  val:totalVentes,   c:"text-yellow-400", sub:`${ventes.length} vente${ventes.length>1?"s":""}` },
+            { label:"Dépenses",   val:totalDepenses, c:"text-red-400",    sub:"" },
+            { label:"Offerts",    val:totalOfferts,  c:"text-purple-400", sub:"" },
+          ].map(({label,val,c,sub})=>(
             <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
               <p className="text-zinc-500 text-[10px] uppercase tracking-wider mb-1">{label}</p>
               <p className={`text-lg font-bold ${c}`}>{val.toFixed(2)}€</p>
@@ -163,26 +182,49 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
           ))}
         </div>
 
+        {/* Filtres */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <div className="relative flex-1 min-w-[160px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
-            <input type="text" placeholder="Rechercher..." value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/50"/>
+            <input type="text" placeholder="Rechercher..." value={search}
+              onChange={e=>{setSearch(e.target.value);setPage(1)}}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/50"/>
           </div>
+
+          {/* Boutons filtre — ventes en premier et actif par défaut */}
           <div className="flex gap-1 flex-wrap">
-            {([{id:"all",l:"Tout"},{id:"vente",l:"🛒 Ventes"},{id:"stock",l:"📦 Stock"},{id:"depense",l:"💸 Dépenses"},{id:"offert",l:"🎁 Offerts"}] as const).map(t=>(
-              <button key={t.id} onClick={()=>{setTypeFilter(t.id as any);setPage(1)}} className={`px-3 py-2 rounded-lg text-[11px] font-semibold border transition-colors ${typeFilter===t.id?"bg-yellow-500 text-black border-yellow-500":"bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"}`}>{t.l}</button>
+            {FILTERS.map(t=>(
+              <button key={t.id} onClick={()=>{setTypeFilter(t.id as any);setPage(1)}}
+                className={`px-3 py-2 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  typeFilter===t.id
+                    ? "bg-yellow-500 text-black border-yellow-500"
+                    : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"
+                }`}>
+                {t.l}
+              </button>
             ))}
           </div>
-          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
+
+          {/* Dates */}
+          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
           <span className="text-zinc-600 text-xs">→</span>
-          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
-          {(dateFrom||dateTo) && <button onClick={()=>{setDateFrom("");setDateTo("")}} className="text-zinc-500 hover:text-white">✕</button>}
+          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
+          {(dateFrom||dateTo) && (
+            <button onClick={()=>{setDateFrom("");setDateTo("")}} className="text-zinc-500 hover:text-white">✕</button>
+          )}
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
+          </div>
         ) : allEntries.length===0 ? (
-          <div className="text-center py-24 text-zinc-600"><p className="text-4xl mb-3">📭</p><p className="text-sm">Aucune entrée</p></div>
+          <div className="text-center py-24 text-zinc-600">
+            <p className="text-4xl mb-3">📭</p>
+            <p className="text-sm">Aucune entrée</p>
+          </div>
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="divide-y divide-zinc-800">
