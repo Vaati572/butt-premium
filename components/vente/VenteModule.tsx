@@ -10,7 +10,6 @@ import {
 
 interface Product { id: string; name: string; gamme: string; pv: number; cf: number }
 interface Client { id: string; nom: string; contrat: string; telephone?: string }
-interface Pharmacie { id: string; nom: string; ville?: string; telephone?: string }
 interface CartItem { product_id: string; nom: string; gamme: string; quantite: number; pv: number; cf: number }
 interface Props { activeSociety: any; profile: any }
 
@@ -165,6 +164,7 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
   const [saving, setSaving] = useState(false)
   const total = items.reduce((s, i) => s + i.quantite * i.pv, 0)
   const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
+
   const handleSave = async () => {
     const validItems = items.filter(i => i.nom.trim() && i.pv > 0)
     if (!validItems.length) return
@@ -180,9 +180,22 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
         vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
         pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
       })))
+      // Auto-création facture
+      await supabase.from("factures").insert({
+        society_id: societyId,
+        numero: `FAC-${Date.now()}`,
+        client_nom: selectedClient?.nom || "Client de passage",
+        montant: total,
+        statut: "en_attente",
+        source: "vente",
+        vente_id: vente.id,
+        date_emission: new Date().toISOString().slice(0, 10),
+        notes: "Facture générée automatiquement via l'onglet Vente (vente manuelle)",
+      })
     }
     setSaving(false); onDone(); onClose()
   }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-md h-full flex flex-col shadow-2xl">
@@ -397,14 +410,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     setCart(prev => prev.map(i => i.product_id === productId ? { ...i, pv: price } : i))
   }
 
-  const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
-  const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
-  const totalTTC = totalHT + portVal
-  const urssaf = totalTTC * urssafRate
-  const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
+  const portVal      = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
+  const totalHT      = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
+  const totalTTC     = totalHT + portVal
+  const urssaf       = totalTTC * urssafRate
+  const cfTotal      = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
   const fraisColisVal = parseFloat(fraisColis.replace(",", ".")) || 0
-  const resultat = totalTTC - urssaf - cfTotal - fraisColisVal
-  const cartCount = cart.reduce((s, i) => s + i.quantite, 0)
+  const resultat     = totalTTC - urssaf - cfTotal - fraisColisVal
+  const cartCount    = cart.reduce((s, i) => s + i.quantite, 0)
 
   const saveBrouillon = () => {
     try { localStorage.setItem("brouillon_vente_" + activeSociety.id, JSON.stringify(cart)) } catch {}
@@ -420,19 +433,46 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const handleVente = async () => {
     if (cart.length === 0) return
     setSaving(true)
+
+    const clientNomFinal = selectedClient?.nom
+      || (typeVente === "Shopify"     ? "Commande Shopify"
+        : typeVente === "Pharmacie"   ? "Pharmacie"
+        : typeVente === "Convention"  ? "Convention"
+        : "Client de passage")
+
     const { data: vente, error } = await supabase.from("ventes").insert({
-      society_id: activeSociety.id, user_id: profile.id,
+      society_id: activeSociety.id,
+      user_id: profile.id,
       client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : typeVente === "Convention" ? "Convention" : "Client de passage"),
+      client_nom: clientNomFinal,
       created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
       total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
     }).select().single()
+
     if (!error && vente) {
+      // 1. Vente items
       await supabase.from("vente_items").insert(cart.map(item => ({
         vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
         gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
         cf_unitaire: item.cf, total: item.pv * item.quantite,
       })))
+
+      // 2. Facture automatique
+      const d = new Date()
+      const numFac = `FAC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*9000)+1000}`
+      await supabase.from("factures").insert({
+        society_id: activeSociety.id,
+        numero: numFac,
+        client_nom: clientNomFinal,
+        montant: totalTTC,
+        statut: "en_attente",
+        source: "vente",
+        vente_id: vente.id,
+        date_emission: new Date().toISOString().slice(0, 10),
+        notes: `Facture générée automatiquement via l'onglet Vente — ${paiement}`,
+      })
+
+      // 3. Stock
       const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
       const allStock = allStockData || []
       for (const item of cart) {
@@ -449,7 +489,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             if (stockItem) {
               const newQty = stockItem.quantite - totalADeduire
               await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-              await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${selectedClient?.nom || "passage"}` })
+              await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${clientNomFinal}` })
               stockItem.quantite = newQty
             }
           }
@@ -458,11 +498,12 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           if (stockItem) {
             const newQty = stockItem.quantite - item.quantite
             await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-            await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${selectedClient?.nom || "passage"}` })
+            await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${clientNomFinal}` })
             stockItem.quantite = newQty
           }
         }
       }
+
       setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
       setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso(""); setFraisColis("")
       setSuccess(true)
@@ -474,9 +515,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   const gammeConfig = GAMMES.find(g => g.val === activeGamme) || GAMMES[0]
 
-  /* ─────────────────────────────────────────────
-     CATALOGUE (partagé desktop + mobile)
-  ───────────────────────────────────────────── */
+  /* ── CATALOGUE ── */
   const Catalogue = (
     <div className="flex-1 flex flex-col overflow-hidden border-r border-zinc-900 min-w-0">
       <div className="p-4 border-b border-zinc-900 space-y-3">
@@ -617,9 +656,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     </div>
   )
 
-  /* ─────────────────────────────────────────────
-     PANIER (partagé desktop + mobile)
-  ───────────────────────────────────────────── */
+  /* ── PANIER ── */
   const Panier = (
     <div className="flex-1 md:flex-none md:w-96 bg-[#111111] flex flex-col overflow-hidden">
       <div className="p-4 border-b border-zinc-800">
@@ -712,7 +749,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
       {cart.length > 0 && (
         <div className="border-t border-zinc-800 p-4 space-y-3">
-          {/* TARIF PERSO — applique les prix client/pharmacie sauvegardés */}
           {selectedClient && cart.length > 0 && (
             <button onClick={async () => {
               const { data: prixData } = await supabase.from("client_prix").select("*").eq("client_id", selectedClient.id)
@@ -797,33 +833,22 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     </div>
   )
 
-  /* ─────────────────────────────────────────────
-     RENDER
-  ───────────────────────────────────────────── */
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] relative flex flex-col">
-
-      {/* ── DESKTOP (md+) : côte à côte ── */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {Catalogue}
         {Panier}
       </div>
-
-      {/* ── MOBILE : un seul panneau à la fois ── */}
       <div className="flex md:hidden flex-1 overflow-hidden">
         {mobileTab === "catalogue" ? Catalogue : Panier}
       </div>
-
-      {/* ── BARRE DE NAV MOBILE (fixe en bas) ── */}
       <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-[#111111]">
-        <button
-          onClick={() => setMobileTab("catalogue")}
+        <button onClick={() => setMobileTab("catalogue")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors ${mobileTab === "catalogue" ? "text-yellow-500" : "text-zinc-500"}`}>
           <Package size={22} />
           <span className="text-[10px] font-bold">Catalogue</span>
         </button>
-        <button
-          onClick={() => setMobileTab("panier")}
+        <button onClick={() => setMobileTab("panier")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors relative ${mobileTab === "panier" ? "text-yellow-500" : "text-zinc-500"}`}>
           <div className="relative">
             <ShoppingCart size={22} />
@@ -840,7 +865,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
       </div>
 
       {showHistorique && <HistoriquePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowHistorique(false)} />}
-      {showManuelle && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
+      {showManuelle   && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
       {showAddProduct && <AddProductPanel societyId={activeSociety.id} onClose={() => setShowAddProduct(false)} onDone={loadData} />}
     </div>
   )
