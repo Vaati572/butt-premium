@@ -26,6 +26,7 @@ import PlaylistsModule from "@/components/playlists/PlaylistsModule"
 import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 import IAModule from "@/components/IAModule"
+import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -59,10 +60,11 @@ const ALL_NAV = [
     { id: "stocks",      label: "Stock",             icon: "📦" },
   ]},
   { section: "Gestion", items: [
-    { id: "commandes",  label: "Fournisseurs",        icon: "🏭" },
-    { id: "depenses",   label: "Dépenses & Offerts",  icon: "💸" },
-    { id: "contrats",   label: "Contrats",            icon: "📑" },
-    { id: "pharmacies", label: "Pharmacies",          icon: "🏥" },
+    { id: "commandes",     label: "Fournisseurs",       icon: "🏭" },
+    { id: "depenses",      label: "Dépenses & Offerts", icon: "💸" },
+    { id: "contrats",      label: "Contrats",           icon: "📑" },
+    { id: "facturesdevis", label: "Factures & Devis",   icon: "📄" },
+    { id: "pharmacies",    label: "Pharmacies",         icon: "🏥" },
   ]},
   { section: "Analyse", items: [
     { id: "stats",      label: "Statistiques", icon: "📊" },
@@ -463,32 +465,33 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const renderContent = () => {
     if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
     switch (activeTab) {
-      case "accueil":     return <AccueilModule         activeSociety={activeSociety} profile={profile} />
-      case "clients":     return <ClientsModule         activeSociety={activeSociety} profile={profile} />
-      case "conventions": return <ConventionModule      activeSociety={activeSociety} profile={profile} />
-      case "stocks":      return <StocksModule          activeSociety={activeSociety} profile={profile} />
-      case "vente":       return <VenteModule           activeSociety={activeSociety} profile={profile} />
-      case "depenses":    return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
-      case "stats":       return <StatsModule           activeSociety={activeSociety} profile={profile} />
-      case "notes":       return <NotesModule           activeSociety={activeSociety} profile={profile} />
-      case "documents":   return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
-      case "historique":  return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
-      case "contrats":    return <ContratsModule        activeSociety={activeSociety} profile={profile} />
-      case "pharmacies":  return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
-      case "commandes":   return <CommandesModule       activeSociety={activeSociety} profile={profile} />
-      case "playlists":   return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
-      case "tournees":    return <TourneesModule        activeSociety={activeSociety} profile={profile}
+      case "accueil":      return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":      return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "conventions":  return <ConventionModule      activeSociety={activeSociety} profile={profile} />
+      case "stocks":       return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":        return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":     return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":        return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":        return <NotesModule           activeSociety={activeSociety} profile={profile} />
+      case "documents":    return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
+      case "historique":   return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
+      case "contrats":     return <ContratsModule        activeSociety={activeSociety} profile={profile} />
+      case "facturesdevis":return <FacturesDevisModule   activeSociety={activeSociety} profile={profile} />
+      case "pharmacies":   return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
+      case "commandes":    return <CommandesModule       activeSociety={activeSociety} profile={profile} />
+      case "playlists":    return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
+      case "tournees":     return <TourneesModule        activeSociety={activeSociety} profile={profile}
           onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
-      case "prospects":   return <ProspectsModule       activeSociety={activeSociety} profile={profile}
+      case "prospects":    return <ProspectsModule       activeSociety={activeSociety} profile={profile}
           onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => setActiveTab("map")} onSwitchToTournees={() => setActiveTab("tournees")} />
-      case "map":         return <MapModule             activeSociety={activeSociety} profile={profile}
+      case "map":          return <MapModule             activeSociety={activeSociety} profile={profile}
           focusProspect={focusProspect} activeTournee={activeTournee}
           onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => setActiveTab("prospects")} />
-      case "messages":    return <MessagesModule        activeSociety={activeSociety} profile={profile} />
-      case "parametres":  return <ParametresModule      activeSociety={activeSociety} profile={profile} />
-      case "agenda":      return <AgendaModule          activeSociety={activeSociety} profile={profile} />
-      case "admin":       return <AdminGate             activeSociety={activeSociety} profile={profile} />
-      case "ia":          return <IAModule              activeSociety={activeSociety} profile={profile} />
+      case "messages":     return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres":   return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "agenda":       return <AgendaModule          activeSociety={activeSociety} profile={profile} />
+      case "admin":        return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      case "ia":           return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -806,20 +809,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push("/"); return }
-      let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
-      if (!prof) {
-        const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Utilisateur"
-        const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
-        await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
-        const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
-        prof = newProf
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { router.push("/"); return }
+        let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        if (!prof) {
+          const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Utilisateur"
+          const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
+          await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
+          const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+          prof = newProf
+        }
+        if (prof) setProfile({ ...prof, email: session.user.email })
+        const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
+        if (socs?.length) setActiveSociety(socs[0])
+      } catch (err) {
+        console.error("init error:", err)
+      } finally {
+        setLoading(false)
       }
-      if (prof) setProfile({ ...prof, email: session.user.email })
-      const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
-      if (socs?.length) setActiveSociety(socs[0])
-      setLoading(false)
     }
     init()
   }, [router])
