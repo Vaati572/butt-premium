@@ -33,6 +33,20 @@ const GAMMES = [
   { val: "Convention",     label: "🎪 Convention",      active: "bg-orange-500 text-black border-orange-500 shadow-lg shadow-orange-500/20",  hover: "hover:border-orange-500/50", gradient: "from-orange-500/20", iconBg: "bg-orange-500/20", iconColor: "text-orange-500/60", pvBg: "bg-orange-500/15", pvText: "text-orange-400" },
 ]
 
+const createFacture = async (societyId: string, venteId: string, clientNom: string, montant: number, notesText: string) => {
+  try {
+    const d = new Date()
+    const num = `FAC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*9000)+1000}`
+    await supabase.from("factures").insert({
+      society_id: societyId, numero: num, client_nom: clientNom,
+      montant, statut: "en_attente", source: "vente",
+      vente_id: venteId,
+      date_emission: new Date().toISOString().slice(0, 10),
+      notes: notesText,
+    })
+  } catch { /* silencieux si table absente */ }
+}
+
 /* ── HISTORIQUE ─────────────────────────────── */
 function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; profile: any; onClose: () => void }) {
   const [ventes, setVentes] = useState<any[]>([])
@@ -169,31 +183,28 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
     const validItems = items.filter(i => i.nom.trim() && i.pv > 0)
     if (!validItems.length) return
     setSaving(true)
-    const { data: vente } = await supabase.from("ventes").insert({
-      society_id: societyId, user_id: profile.id,
-      client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || "Client de passage",
-      total_ht: total, port: 0, remise: 0, total_ttc: total, paiement, notes,
-    }).select().single()
-    if (vente) {
-      await supabase.from("vente_items").insert(validItems.map(i => ({
-        vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
-        pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
-      })))
-      // Auto-création facture
-      await supabase.from("factures").insert({
-        society_id: societyId,
-        numero: `FAC-${Date.now()}`,
+    try {
+      const { data: vente } = await supabase.from("ventes").insert({
+        society_id: societyId, user_id: profile.id,
+        client_id: selectedClient?.id || null,
         client_nom: selectedClient?.nom || "Client de passage",
-        montant: total,
-        statut: "en_attente",
-        source: "vente",
-        vente_id: vente.id,
-        date_emission: new Date().toISOString().slice(0, 10),
-        notes: "Facture générée automatiquement via l'onglet Vente (vente manuelle)",
-      })
+        total_ht: total, port: 0, remise: 0, total_ttc: total, paiement, notes,
+      }).select().single()
+      if (vente) {
+        await supabase.from("vente_items").insert(validItems.map(i => ({
+          vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
+          pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
+        })))
+        await createFacture(
+          societyId, vente.id,
+          selectedClient?.nom || "Client de passage",
+          total,
+          "Facture générée automatiquement via l'onglet Vente (vente manuelle)"
+        )
+      }
+    } finally {
+      setSaving(false); onDone(); onClose()
     }
-    setSaving(false); onDone(); onClose()
   }
 
   return (
@@ -366,22 +377,27 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   const loadData = async () => {
     setLoading(true)
-    const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }, { data: pharmas }] = await Promise.all([
-      supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
-      supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
-      supabase.from("stock").select("*").eq("society_id", activeSociety.id),
-      supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
-      supabase.from("pharmacies").select("id, nom, ville, telephone").eq("society_id", activeSociety.id).order("nom"),
-    ])
-    setProducts(prods || [])
-    setClients(cls || [])
-    setPharmacies(pharmas || [])
-    if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
-    const alerts = (stockData || [])
-      .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
-      .map((s: any) => s.quantite === 0 ? `⚠ RUPTURE: ${s.produit_nom}` : `⚠ Faible: ${s.produit_nom} (${s.quantite})`)
-    setStockAlerts(alerts)
-    setLoading(false)
+    try {
+      const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }, { data: pharmas }] = await Promise.all([
+        supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
+        supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
+        supabase.from("stock").select("*").eq("society_id", activeSociety.id),
+        supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
+        supabase.from("pharmacies").select("id, nom, ville, telephone").eq("society_id", activeSociety.id).order("nom"),
+      ])
+      setProducts(prods || [])
+      setClients(cls || [])
+      setPharmacies(pharmas || [])
+      if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
+      const alerts = (stockData || [])
+        .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+        .map((s: any) => s.quantite === 0 ? `⚠ RUPTURE: ${s.produit_nom}` : `⚠ Faible: ${s.produit_nom} (${s.quantite})`)
+      setStockAlerts(alerts)
+    } catch (err) {
+      console.error("VenteModule loadData error:", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredProducts = activeGamme
@@ -410,14 +426,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     setCart(prev => prev.map(i => i.product_id === productId ? { ...i, pv: price } : i))
   }
 
-  const portVal      = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
-  const totalHT      = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
-  const totalTTC     = totalHT + portVal
-  const urssaf       = totalTTC * urssafRate
-  const cfTotal      = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
+  const portVal       = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
+  const totalHT       = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
+  const totalTTC      = totalHT + portVal
+  const urssaf        = totalTTC * urssafRate
+  const cfTotal       = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
   const fraisColisVal = parseFloat(fraisColis.replace(",", ".")) || 0
-  const resultat     = totalTTC - urssaf - cfTotal - fraisColisVal
-  const cartCount    = cart.reduce((s, i) => s + i.quantite, 0)
+  const resultat      = totalTTC - urssaf - cfTotal - fraisColisVal
+  const cartCount     = cart.reduce((s, i) => s + i.quantite, 0)
 
   const saveBrouillon = () => {
     try { localStorage.setItem("brouillon_vente_" + activeSociety.id, JSON.stringify(cart)) } catch {}
@@ -435,87 +451,78 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     setSaving(true)
 
     const clientNomFinal = selectedClient?.nom
-      || (typeVente === "Shopify"     ? "Commande Shopify"
-        : typeVente === "Pharmacie"   ? "Pharmacie"
-        : typeVente === "Convention"  ? "Convention"
+      || (typeVente === "Shopify"    ? "Commande Shopify"
+        : typeVente === "Pharmacie"  ? "Pharmacie"
+        : typeVente === "Convention" ? "Convention"
         : "Client de passage")
 
-    const { data: vente, error } = await supabase.from("ventes").insert({
-      society_id: activeSociety.id,
-      user_id: profile.id,
-      client_id: selectedClient?.id || null,
-      client_nom: clientNomFinal,
-      created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
-      total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
-    }).select().single()
-
-    if (!error && vente) {
-      // 1. Vente items
-      await supabase.from("vente_items").insert(cart.map(item => ({
-        vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
-        gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
-        cf_unitaire: item.cf, total: item.pv * item.quantite,
-      })))
-
-      // 2. Facture automatique
-      const d = new Date()
-      const numFac = `FAC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*9000)+1000}`
-      await supabase.from("factures").insert({
-        society_id: activeSociety.id,
-        numero: numFac,
+    try {
+      const { data: vente, error } = await supabase.from("ventes").insert({
+        society_id: activeSociety.id, user_id: profile.id,
+        client_id: selectedClient?.id || null,
         client_nom: clientNomFinal,
-        montant: totalTTC,
-        statut: "en_attente",
-        source: "vente",
-        vente_id: vente.id,
-        date_emission: new Date().toISOString().slice(0, 10),
-        notes: `Facture générée automatiquement via l'onglet Vente — ${paiement}`,
-      })
+        created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
+        total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
+      }).select().single()
 
-      // 3. Stock
-      const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
-      const allStock = allStockData || []
-      for (const item of cart) {
-        const { data: fullProduct } = await supabase.from("products").select("composition, in_stock").eq("id", item.product_id).single()
-        let composition: Record<string, number> = {}
-        if (fullProduct?.composition) {
-          composition = typeof fullProduct.composition === "string" ? JSON.parse(fullProduct.composition) : fullProduct.composition
-        }
-        const compoEntries = Object.entries(composition)
-        if (compoEntries.length > 0) {
-          for (const [compNom, qtyParUnite] of compoEntries) {
-            const totalADeduire = item.quantite * Number(qtyParUnite)
-            const stockItem = allStock.find((s: any) => s.produit_nom.toLowerCase().trim() === compNom.toLowerCase().trim())
+      if (!error && vente) {
+        await supabase.from("vente_items").insert(cart.map(item => ({
+          vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
+          gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
+          cf_unitaire: item.cf, total: item.pv * item.quantite,
+        })))
+
+        await createFacture(
+          activeSociety.id, vente.id, clientNomFinal, totalTTC,
+          `Facture générée automatiquement via l'onglet Vente — ${paiement}`
+        )
+
+        const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
+        const allStock = allStockData || []
+        for (const item of cart) {
+          const { data: fullProduct } = await supabase.from("products").select("composition, in_stock").eq("id", item.product_id).single()
+          let composition: Record<string, number> = {}
+          if (fullProduct?.composition) {
+            composition = typeof fullProduct.composition === "string" ? JSON.parse(fullProduct.composition) : fullProduct.composition
+          }
+          const compoEntries = Object.entries(composition)
+          if (compoEntries.length > 0) {
+            for (const [compNom, qtyParUnite] of compoEntries) {
+              const totalADeduire = item.quantite * Number(qtyParUnite)
+              const stockItem = allStock.find((s: any) => s.produit_nom.toLowerCase().trim() === compNom.toLowerCase().trim())
+              if (stockItem) {
+                const newQty = stockItem.quantite - totalADeduire
+                await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
+                await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${clientNomFinal}` })
+                stockItem.quantite = newQty
+              }
+            }
+          } else {
+            const stockItem = allStock.find((s: any) => s.product_id === item.product_id)
             if (stockItem) {
-              const newQty = stockItem.quantite - totalADeduire
+              const newQty = stockItem.quantite - item.quantite
               await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-              await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${clientNomFinal}` })
+              await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${clientNomFinal}` })
               stockItem.quantite = newQty
             }
           }
-        } else {
-          const stockItem = allStock.find((s: any) => s.product_id === item.product_id)
-          if (stockItem) {
-            const newQty = stockItem.quantite - item.quantite
-            await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-            await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${clientNomFinal}` })
-            stockItem.quantite = newQty
-          }
         }
-      }
 
-      setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
-      setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso(""); setFraisColis("")
-      setSuccess(true)
-      setMobileTab("catalogue")
-      setTimeout(() => { setSuccess(false); loadData() }, 2500)
+        setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
+        setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso(""); setFraisColis("")
+        setSuccess(true)
+        setMobileTab("catalogue")
+        setTimeout(() => { setSuccess(false); loadData() }, 2500)
+      }
+    } catch (err) {
+      console.error("handleVente error:", err)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   const gammeConfig = GAMMES.find(g => g.val === activeGamme) || GAMMES[0]
 
-  /* ── CATALOGUE ── */
   const Catalogue = (
     <div className="flex-1 flex flex-col overflow-hidden border-r border-zinc-900 min-w-0">
       <div className="p-4 border-b border-zinc-900 space-y-3">
@@ -530,14 +537,12 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             </button>
           </div>
         </div>
-
         {stockAlerts.length > 0 && (
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2">
             <AlertTriangle size={13} className="text-red-400 shrink-0" />
             <p className="text-red-400 text-[11px] font-semibold truncate">{stockAlerts.slice(0, 3).join(" | ")}</p>
           </div>
         )}
-
         <div className="flex gap-1.5 flex-wrap">
           {["Particulier", "Shopify", "Clients", "Pharmacie"].map(t => (
             <button key={t} onClick={() => { setTypeVente(t); setSelectedClient(null) }}
@@ -546,7 +551,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             </button>
           ))}
         </div>
-
         <div className="flex gap-2">
           {GAMMES.map(({ val, label, active }) => (
             <button key={val} onClick={() => setActiveGamme(activeGamme === val ? null : val)}
@@ -555,7 +559,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             </button>
           ))}
         </div>
-
         {activeGamme && (
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -656,7 +659,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     </div>
   )
 
-  /* ── PANIER ── */
   const Panier = (
     <div className="flex-1 md:flex-none md:w-96 bg-[#111111] flex flex-col overflow-hidden">
       <div className="p-4 border-b border-zinc-800">
@@ -749,7 +751,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
       {cart.length > 0 && (
         <div className="border-t border-zinc-800 p-4 space-y-3">
-          {selectedClient && cart.length > 0 && (
+          {selectedClient && (
             <button onClick={async () => {
               const { data: prixData } = await supabase.from("client_prix").select("*").eq("client_id", selectedClient.id)
               if (prixData && prixData.length > 0) {
@@ -863,7 +865,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           </span>
         </button>
       </div>
-
       {showHistorique && <HistoriquePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowHistorique(false)} />}
       {showManuelle   && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
       {showAddProduct && <AddProductPanel societyId={activeSociety.id} onClose={() => setShowAddProduct(false)} onDone={loadData} />}
