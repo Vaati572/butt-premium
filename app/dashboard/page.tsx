@@ -2,846 +2,941 @@
 
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabase"
-import {
-  ShoppingCart, Plus, X, Search, User,
-  Receipt, ChevronDown, Minus, Check, Package,
-  AlertTriangle, Pencil, Save, RotateCcw, Trash2,
-} from "lucide-react"
+import { useRouter } from "next/navigation"
+import { UserSettingsProvider, useUserSettings } from "@/lib/UserSettingsContext"
+import ClientsModule from "@/components/clients/ClientsModule"
+import StocksModule from "@/components/stocks/StocksModule"
+import VenteModule from "@/components/vente/VenteModule"
+import AdminModule from "@/components/admin/AdminModule"
+import AccueilModule from "@/components/accueil/AccueilModule"
+import DepensesOffertsModule from "@/components/depenses/DepensesModule"
+import StatsModule from "@/components/stats/StatsModule"
+import MessagesModule from "@/components/messages/MessagesModule"
+import ProspectsModule from "@/components/prospects/ProspectsModule"
+import NotesModule from "@/components/notes/NotesModule"
+import DocumentsModule from "@/components/documents/DocumentsModule"
+import HistoriqueModule from "@/components/historique/HistoriqueModule"
+import ContratsModule from "@/components/contrats/ContratsModule"
+import PharmaciesModule from "@/components/pharmacies/PharmaciesModule"
+import AgendaModule from "@/components/agenda/AgendaModule"
+import CommandesModule from "@/components/commandes/CommandesModule"
+import TourneesModule from "@/components/tournees/TourneesModule"
+import ConventionModule from "@/components/conventions/ConventionModule"
+import PlaylistsModule from "@/components/playlists/PlaylistsModule"
+import MapModule from "@/components/map/MapModule"
+import ParametresModule from "@/components/parametres/ParametresModule"
+import IAModule from "@/components/IAModule"
 
-interface Product { id: string; name: string; gamme: string; pv: number; cf: number }
-interface Client { id: string; nom: string; contrat: string; telephone?: string }
-interface Pharmacie { id: string; nom: string; ville?: string; telephone?: string }
-interface CartItem { product_id: string; nom: string; gamme: string; quantite: number; pv: number; cf: number }
-interface Props { activeSociety: any; profile: any }
+const ADMIN_PIN = "18072209"
 
-const PAIEMENTS = ["Espèces", "Carte Bancaire", "Virement", "Chèque", "En attente"]
-const PORT_OPTIONS = [
-  "0.00€ ( Sans frais )",
-  "6.84€ ( 0.200 - 0.300 )",
-  "7.71€ ( 0.300 - 0.500 )",
-  "8.60€ ( 0.500 - 0.750 )",
-  "9.34€ ( 0.750 - 1kg )",
-  "10.48€ ( 1kg - 2kg )",
-  "11€ ( 2kg - 3kg )",
+type PresenceStatus = "online" | "busy" | "away" | "meeting" | "offline"
+
+interface OnlineUser {
+  id: string; nom: string; avatar_url?: string; color?: string
+  status: PresenceStatus
+}
+
+interface UnreadNotif {
+  sender_nom: string; content: string; file_name?: string | null
+  conv_name: string; conv_id: string; count: number
+}
+
+const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: string }> = {
+  online:  { label: "En ligne",   color: "text-green-400",  dot: "bg-green-400"  },
+  busy:    { label: "Occupé",     color: "text-red-400",    dot: "bg-red-400"    },
+  away:    { label: "Absent",     color: "text-yellow-400", dot: "bg-yellow-400" },
+  meeting: { label: "En réunion", color: "text-purple-400", dot: "bg-purple-400" },
+  offline: { label: "Hors ligne", color: "text-zinc-500",   dot: "bg-zinc-600"   },
+}
+
+const ALL_NAV = [
+  { section: "Principal", items: [
+    { id: "accueil",     label: "Accueil",           icon: "🏠" },
+    { id: "vente",       label: "Vente",             icon: "🛒" },
+    { id: "conventions", label: "Conventions",       icon: "🎪" },
+    { id: "clients",     label: "Clients",           icon: "👤" },
+    { id: "playlists",   label: "Playlists clients", icon: "🎵" },
+    { id: "stocks",      label: "Stock",             icon: "📦" },
+  ]},
+  { section: "Gestion", items: [
+    { id: "commandes",  label: "Fournisseurs",        icon: "🏭" },
+    { id: "depenses",   label: "Dépenses & Offerts",  icon: "💸" },
+    { id: "contrats",   label: "Contrats",            icon: "📑" },
+    { id: "pharmacies", label: "Pharmacies",          icon: "🏥" },
+  ]},
+  { section: "Analyse", items: [
+    { id: "stats",      label: "Statistiques", icon: "📊" },
+    { id: "historique", label: "Historique",   icon: "🕓" },
+  ]},
+  { section: "Outils", items: [
+    { id: "messages",  label: "Messages",  icon: "💬" },
+    { id: "notes",     label: "Notes",     icon: "📝" },
+    { id: "documents", label: "Documents", icon: "📁" },
+  ]},
+  { section: "Démarchage", items: [
+    { id: "prospects", label: "Prospects",      icon: "🎯" },
+    { id: "tournees",  label: "Tournées",       icon: "🛣️" },
+    { id: "map",       label: "Map & Tournées", icon: "🗺️" },
+    { id: "ia",        label: "IA",             icon: "🤖" },
+  ]},
+  { section: "Système", items: [
+    { id: "agenda",     label: "Agenda & Tâches", icon: "📅" },
+    { id: "admin",      label: "Admin",           icon: "🔒" },
+    { id: "parametres", label: "Paramètres",      icon: "⚙️" },
+  ]},
 ]
-const DEFAULT_URSSAF_RATE = 0.138
-const parsePort = (p: string) => { const m = p.match(/^([\d.,]+)€/); return m ? parseFloat(m[1].replace(",", ".")) : 0 }
 
-const GAMMES = [
-  { val: "Particuliers",   label: "👤 Particuliers",   active: "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20",  hover: "hover:border-yellow-500/50", gradient: "from-yellow-500/20", iconBg: "bg-yellow-500/20", iconColor: "text-yellow-500/60", pvBg: "bg-yellow-500/15", pvText: "text-yellow-400"  },
-  { val: "Professionnels", label: "🏢 Professionnels", active: "bg-purple-500 text-white border-purple-500 shadow-lg shadow-purple-500/20",  hover: "hover:border-purple-500/50", gradient: "from-purple-500/20", iconBg: "bg-purple-500/20", iconColor: "text-purple-400/60", pvBg: "bg-purple-500/15", pvText: "text-purple-300" },
-  { val: "Shopify",        label: "🛍️ Shopify",         active: "bg-green-500 text-black border-green-500 shadow-lg shadow-green-500/20",    hover: "hover:border-green-500/50",  gradient: "from-green-500/20",  iconBg: "bg-green-500/20",  iconColor: "text-green-500/60",  pvBg: "bg-green-500/15",  pvText: "text-green-400"  },
-  { val: "Convention",     label: "🎪 Convention",      active: "bg-orange-500 text-black border-orange-500 shadow-lg shadow-orange-500/20",  hover: "hover:border-orange-500/50", gradient: "from-orange-500/20", iconBg: "bg-orange-500/20", iconColor: "text-orange-500/60", pvBg: "bg-orange-500/15", pvText: "text-orange-400" },
-]
-
-/* ── HISTORIQUE ─────────────────────────────── */
-function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; profile: any; onClose: () => void }) {
-  const [ventes, setVentes] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [editVente, setEditVente] = useState<any>(null)
-  const [editFields, setEditFields] = useState<{ clientNom: string; paiement: string; notes: string }>({ clientNom: "", paiement: "", notes: "" })
-  const [search, setSearch] = useState("")
-
-  const loadVentes = () => {
-    setLoading(true)
-    supabase.from("ventes").select("*, vente_items(*)")
-      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(200)
-      .then(({ data }) => { setVentes(data || []); setLoading(false) })
+/* ── ADMIN GATE ── */
+function AdminGate({ activeSociety, profile }: { activeSociety: any; profile: any }) {
+  const [pin, setPin] = useState(""); const [unlocked, setUnlocked] = useState(false)
+  const [error, setError] = useState(false); const [shake, setShake] = useState(false)
+  const handle = (d: string) => {
+    if (pin.length >= 8) return
+    const next = pin + d; setPin(next); setError(false)
+    if (next.length === 8) {
+      if (next === ADMIN_PIN) setUnlocked(true)
+      else { setShake(true); setError(true); setTimeout(() => { setPin(""); setShake(false) }, 600) }
+    }
   }
-  useEffect(() => { loadVentes() }, [])
-
-  const deleteVente = async (id: string) => {
-    if (!confirm("Supprimer cette vente ? Le stock ne sera pas restauré.")) return
-    await supabase.from("vente_items").delete().eq("vente_id", id)
-    await supabase.from("ventes").delete().eq("id", id)
-    setVentes(prev => prev.filter(v => v.id !== id))
-  }
-
-  const saveEdit = async () => {
-    await supabase.from("ventes").update({
-      client_nom: editFields.clientNom,
-      paiement: editFields.paiement,
-      notes: editFields.notes,
-    }).eq("id", editVente.id)
-    setEditVente(null)
-    loadVentes()
-  }
-
-  const filtered = search
-    ? ventes.filter(v => (v.client_nom||"").toLowerCase().includes(search.toLowerCase()) || (v.notes||"").toLowerCase().includes(search.toLowerCase()))
-    : ventes
-  const totalCA = filtered.reduce((s, v) => s + Number(v.total_ttc), 0)
-
+  if (unlocked) return <AdminModule activeSociety={activeSociety} profile={profile} />
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div>
-            <h3 className="text-base font-bold text-white">Historique des ventes</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{filtered.length} ventes — CA : <span className="text-yellow-500 font-bold">{totalCA.toFixed(2)}€</span></p>
-          </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className={`bg-[#111111] border border-zinc-800 rounded-3xl p-8 w-80 text-center shadow-2xl ${shake ? "animate-bounce" : ""}`}>
+        <p className="text-2xl mb-1">🔒</p>
+        <p className="text-white font-bold text-lg mb-1">Panneau Admin</p>
+        <p className="text-zinc-500 text-xs mb-6">Entrez le code PIN administrateur</p>
+        <div className="flex justify-center gap-3 mb-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`w-3 h-3 rounded-full ${i < pin.length ? (error ? "bg-red-500" : "bg-yellow-500") : "bg-zinc-700"}`} />
+          ))}
         </div>
-        <div className="px-4 py-2 border-b border-zinc-900">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none" />
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {loading
-            ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" /></div>
-            : filtered.length === 0
-              ? <div className="text-center py-12 text-zinc-600"><Receipt size={32} className="mx-auto mb-3 opacity-20" /><p className="text-sm">Aucune vente</p></div>
-              : filtered.map(v => (
-                <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 group">
-                  {editVente?.id === v.id ? (
-                    <div className="space-y-2">
-                      <input value={editFields.clientNom} onChange={e => setEditFields(p => ({...p, clientNom: e.target.value}))}
-                        placeholder="Client" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {["Espèces","Carte Bancaire","Virement","Chèque","En attente"].map(p => (
-                          <button key={p} onClick={() => setEditFields(prev => ({...prev, paiement: p}))}
-                            className={`px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${editFields.paiement===p ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-700 text-zinc-400 border-zinc-600"}`}>{p}</button>
-                        ))}
-                      </div>
-                      <input value={editFields.notes} onChange={e => setEditFields(p => ({...p, notes: e.target.value}))}
-                        placeholder="Notes" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
-                      <div className="flex gap-2">
-                        <button onClick={saveEdit} className="flex-1 py-1.5 bg-yellow-500 text-black font-bold rounded-lg text-xs">Sauvegarder</button>
-                        <button onClick={() => setEditVente(null)} className="px-3 py-1.5 bg-zinc-700 text-zinc-300 rounded-lg text-xs">Annuler</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="text-white text-sm font-semibold">{v.client_nom || "Passage"}</p>
-                          <p className="text-zinc-500 text-xs">{new Date(v.created_at).toLocaleString("fr-FR")}</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <div className="text-right">
-                            <p className="text-yellow-500 font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
-                            <span className="text-[10px] text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">{v.paiement}</span>
-                          </div>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { setEditVente(v); setEditFields({ clientNom: v.client_nom||"", paiement: v.paiement||"Espèces", notes: v.notes||"" }) }}
-                              className="p-1 text-zinc-400 hover:text-white"><Pencil size={12}/></button>
-                            <button onClick={() => deleteVente(v.id)} className="p-1 text-red-500 hover:text-red-400"><Trash2 size={12}/></button>
-                          </div>
-                        </div>
-                      </div>
-                      {v.vente_items?.length > 0 && (
-                        <div className="space-y-0.5 mt-2 pt-2 border-t border-zinc-800">
-                          {v.vente_items.map((item: any) => (
-                            <div key={item.id} className="flex justify-between text-[11px] text-zinc-500">
-                              <span>{item.produit_nom} x{item.quantite}</span>
-                              <span>{Number(item.total).toFixed(2)}€</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
+        {error && <p className="text-red-400 text-xs mb-3 font-semibold">Code incorrect</p>}
+        <div className="grid grid-cols-3 gap-3">
+          {["1","2","3","4","5","6","7","8","9","","0","⌫"].map((d, i) => (
+            <button key={i} onClick={() => d === "⌫" ? setPin(p => p.slice(0,-1)) : d ? handle(d) : null}
+              className={`h-14 rounded-2xl text-lg font-bold transition-all ${d === "⌫" ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-400" : d === "" ? "invisible" : "bg-zinc-800 hover:bg-yellow-500 hover:text-black text-white active:scale-95"}`}>
+              {d}
+            </button>
+          ))}
         </div>
       </div>
     </div>
   )
 }
 
-/* ── VENTE MANUELLE ─────────────────────────── */
-function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
-  profile: any; societyId: string; clients: Client[]; onClose: () => void; onDone: () => void
-}) {
-  const [items, setItems] = useState([{ nom: "", quantite: 1, pv: 0 }])
-  const [clientSearch, setClientSearch] = useState("")
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [showClients, setShowClients] = useState(false)
-  const [paiement, setPaiement] = useState("Espèces")
-  const [notes, setNotes] = useState("")
-  const [saving, setSaving] = useState(false)
-  const total = items.reduce((s, i) => s + i.quantite * i.pv, 0)
-  const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
-  const handleSave = async () => {
-    const validItems = items.filter(i => i.nom.trim() && i.pv > 0)
-    if (!validItems.length) return
-    setSaving(true)
-    const { data: vente } = await supabase.from("ventes").insert({
-      society_id: societyId, user_id: profile.id,
-      client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || "Client de passage",
-      total_ht: total, port: 0, remise: 0, total_ttc: total, paiement, notes,
-    }).select().single()
-    if (vente) {
-      await supabase.from("vente_items").insert(validItems.map(i => ({
-        vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
-        pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
-      })))
-    }
-    setSaving(false); onDone(); onClose()
-  }
+function UserAvatar({ nom, url, color, size = 30 }: { nom: string; url?: string; color?: string; size?: number }) {
+  const colors = ["#d97706","#b45309","#f59e0b","#92400e"]
+  const bg = color || colors[(nom?.charCodeAt(0) || 0) % colors.length]
+  const initials = nom?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-md h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div><h3 className="text-base font-bold text-white">Vente manuelle</h3><p className="text-xs text-zinc-500 mt-0.5">Produits et prix libres</p></div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+    <div className="rounded-full overflow-hidden flex items-center justify-center text-black font-bold shrink-0"
+      style={{ width: size, height: size, backgroundColor: url ? undefined : bg, fontSize: size * 0.35 }}>
+      {url ? <img src={url} className="w-full h-full object-cover" alt={nom} /> : initials}
+    </div>
+  )
+}
+
+function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
+  notifs: UnreadNotif[]; onGoToMessages: () => void; onClose: () => void; ACCENT: string
+}) {
+  const total = notifs.reduce((sum, n) => sum + n.count, 0)
+  const [progress, setProgress] = useState(100)
+  useEffect(() => {
+    const duration = 8000; const interval = 50; const step = (interval / duration) * 100
+    const timer = setInterval(() => {
+      setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - step })
+    }, interval)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] w-80">
+      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
+        style={{ boxShadow: `0 8px 40px ${ACCENT}20, 0 0 0 1px ${ACCENT}15` }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80"
+          style={{ background: `linear-gradient(135deg, ${ACCENT}15, transparent)` }}>
+          <div className="flex items-center gap-2.5">
+            <div className="relative shrink-0">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl"
+                style={{ backgroundColor: ACCENT + "20", border: `1px solid ${ACCENT}30` }}>💬</div>
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full text-black text-[9px] font-black flex items-center justify-center"
+                style={{ backgroundColor: ACCENT }}>{total > 9 ? "9+" : total}</span>
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-tight">Messages non lus</p>
+              <p className="text-zinc-400 text-[11px]">{total} message{total > 1 ? "s" : ""} pendant votre absence</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white shrink-0">✕</button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div className="relative">
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Client</label>
-            <button onClick={() => setShowClients(!showClients)}
-              className="w-full flex items-center gap-3 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 hover:border-yellow-500/40 transition-colors">
-              <User size={14} className="text-yellow-500 shrink-0" />
-              <span className="text-white text-sm flex-1 text-left">{selectedClient?.nom || "Client de passage"}</span>
-              <ChevronDown size={14} className="text-zinc-500" />
-            </button>
-            {showClients && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
-                <div className="p-2"><input type="text" placeholder="Rechercher..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" /></div>
-                <div className="max-h-40 overflow-y-auto">
-                  <button onClick={() => { setSelectedClient(null); setShowClients(false) }} className="w-full text-left px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800">Client de passage</button>
-                  {filteredClients.map(c => (
-                    <button key={c.id} onClick={() => { setSelectedClient(c); setShowClients(false) }} className="w-full text-left px-4 py-2 hover:bg-zinc-800">
-                      <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
-                    </button>
-                  ))}
+        <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800/50">
+          {notifs.slice(0, 5).map((n, i) => (
+            <div key={i} className="px-4 py-2.5 hover:bg-zinc-800/30 cursor-default">
+              <div className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold text-[11px] shrink-0 mt-0.5"
+                  style={{ backgroundColor: ACCENT }}>{n.sender_nom?.charAt(0)?.toUpperCase() || "?"}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className="text-white text-xs font-semibold truncate">{n.sender_nom}</p>
+                    {n.count > 1 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT + "20", color: ACCENT }}>{n.count} msg</span>}
+                  </div>
+                  {n.conv_name !== n.sender_nom && <p className="text-zinc-600 text-[10px] truncate">dans {n.conv_name}</p>}
+                  <p className="text-zinc-400 text-[11px] truncate mt-0.5">
+                    {n.content ? `"${n.content.slice(0, 50)}${n.content.length > 50 ? "…" : ""}"` : n.file_name ? `📎 ${n.file_name}` : "Nouveau message"}
+                  </p>
                 </div>
               </div>
-            )}
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Articles</label>
-            <div className="space-y-2">
-              {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <input type="text" placeholder="Article" value={item.nom}
-                    onChange={e => setItems(prev => prev.map((i, j) => j === idx ? { ...i, nom: e.target.value } : i))}
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-                  <input type="number" placeholder="Qté" value={item.quantite} min={1}
-                    onChange={e => setItems(prev => prev.map((i, j) => j === idx ? { ...i, quantite: parseInt(e.target.value) || 1 } : i))}
-                    className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none" />
-                  <input type="number" placeholder="Prix" value={item.pv} min={0} step={0.01}
-                    onChange={e => setItems(prev => prev.map((i, j) => j === idx ? { ...i, pv: parseFloat(e.target.value) || 0 } : i))}
-                    className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none" />
-                  <button onClick={() => setItems(prev => prev.filter((_, j) => j !== idx))} className="text-zinc-600 hover:text-red-400"><X size={14} /></button>
-                </div>
-              ))}
-              <button onClick={() => setItems(prev => [...prev, { nom: "", quantite: 1, pv: 0 }])}
-                className="flex items-center gap-2 text-[11px] font-semibold text-yellow-500 hover:text-yellow-400">
-                <Plus size={12} /> Ajouter un article
-              </button>
             </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Paiement</label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {PAIEMENTS.map(p => <button key={p} onClick={() => setPaiement(p)} className={`py-2 rounded-lg text-[11px] font-semibold border transition-colors ${paiement === p ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500"}`}>{p}</button>)}
-            </div>
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Notes</label>
-            <input type="text" placeholder="Optionnel" value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
-            <p className="text-zinc-500 text-xs mb-1">Total</p>
-            <p className="text-yellow-500 text-2xl font-bold">{total.toFixed(2)}€</p>
-          </div>
+          ))}
         </div>
-        <div className="p-5 border-t border-zinc-800 space-y-3">
-          <button onClick={handleSave} disabled={saving} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2"><Check size={16} /> Valider</button>
-          <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">Annuler</button>
+        <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
+          <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-black font-bold text-xs" style={{ backgroundColor: ACCENT }}>Voir les messages →</button>
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
         </div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full transition-all duration-50" style={{ width: `${progress}%`, backgroundColor: ACCENT }} /></div>
       </div>
     </div>
   )
 }
 
-/* ── AJOUT PRODUIT ──────────────────────────── */
-function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; onClose: () => void; onDone: () => void }) {
-  const [nom, setNom] = useState("")
-  const [pv, setPv] = useState("")
-  const [cf, setCf] = useState("")
-  const [gamme, setGamme] = useState("Particuliers")
-  const [saving, setSaving] = useState(false)
-  const handleSave = async () => {
-    if (!nom.trim() || !pv) return
-    setSaving(true)
-    await supabase.from("products").insert({ society_id: societyId, name: nom, pv: parseFloat(pv) || 0, cf: parseFloat(cf) || 0, gamme, in_stock: true })
-    setSaving(false); onDone(); onClose()
-  }
+function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGoToStock: ()=>void; onClose: ()=>void }) {
+  const [progress, setProgress] = useState(100)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - 0.5 })
+    }, 50)
+    return () => clearInterval(timer)
+  }, [])
+  const neg = alerts.filter((a:any)=>a.quantite<0).length
+  const low = alerts.filter((a:any)=>a.quantite>=0).length
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div><h3 className="text-base font-bold text-white">Nouveau produit</h3><p className="text-xs text-zinc-500 mt-0.5">Ajouter au catalogue</p></div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
-        </div>
-        <div className="flex-1 p-6 space-y-4">
-          {[
-            { label: "Nom du produit", value: nom, set: setNom, placeholder: "Ex: Crème hydratante 50ml", type: "text" },
-            { label: "Prix de vente (€)", value: pv, set: setPv, placeholder: "0.00", type: "number" },
-            { label: "Coût de fabrication (€)", value: cf, set: setCf, placeholder: "0.00", type: "number" },
-          ].map(({ label, value, set, placeholder, type }) => (
-            <div key={label}>
-              <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">{label}</label>
-              <input type={type} placeholder={placeholder} value={value} onChange={e => set(e.target.value)} step={type === "number" ? "0.01" : undefined}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60" />
-            </div>
-          ))}
-          <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Gamme</label>
-            <div className="flex gap-2">
-              {[
-                { val: "Particuliers",   color: "bg-yellow-500 text-black border-yellow-500" },
-                { val: "Professionnels", color: "bg-purple-500 text-white border-purple-500" },
-                { val: "Shopify",        color: "bg-green-500 text-black border-green-500" },
-              ].map(({ val, color }) => (
-                <button key={val} onClick={() => setGamme(val)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${gamme === val ? color : "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
-                  {val === "Shopify" ? "🛍️ Shopify" : val === "Particuliers" ? "👤 Part." : "🏢 Pro"}
-                </button>
-              ))}
+    <div className="fixed bottom-6 left-6 z-[100] w-72">
+      <div className="bg-[#18181b] border border-red-500/30 rounded-2xl shadow-2xl overflow-hidden" style={{ boxShadow: "0 8px 40px #ef444420" }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80" style={{ background: "linear-gradient(135deg, #ef444415, transparent)" }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-lg">⚠️</div>
+            <div>
+              <p className="text-white font-bold text-sm">Stocks critiques</p>
+              <p className="text-zinc-400 text-[11px]">{neg > 0 && `${neg} négatif${neg>1?"s":""}`}{neg>0&&low>0&&" · "}{low>0&&`${low} en alerte`}</p>
             </div>
           </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white text-sm">✕</button>
         </div>
-        <div className="p-6 border-t border-zinc-800 space-y-3">
-          <button onClick={handleSave} disabled={saving || !nom.trim() || !pv} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2"><Plus size={16} /> Ajouter le produit</button>
-          <button onClick={onClose} className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold py-2.5 rounded-xl text-sm">Annuler</button>
+        <div className="px-4 py-2.5 max-h-36 overflow-y-auto space-y-1">
+          {alerts.slice(0,5).map((a:any,i:number) => (
+            <div key={i} className="flex items-center justify-between">
+              <span className="text-zinc-300 text-xs truncate">{a.produit_nom}</span>
+              <span className={`text-xs font-bold ml-2 shrink-0 ${a.quantite<0?"text-red-500":"text-orange-400"}`}>{a.quantite} {a.unite||"u."}</span>
+            </div>
+          ))}
         </div>
+        <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
+          <button onClick={onGoToStock} className="flex-1 py-2 rounded-xl text-black font-bold text-xs bg-red-500 hover:bg-red-400">Voir le stock →</button>
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
+        </div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${progress}%` }}/></div>
+      </div>
+    </div>
+  )
+}
+
+function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
+  return (
+    <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
+      <div className="text-center p-8 max-w-sm">
+        <div className="w-24 h-24 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-6"><span className="text-5xl">🚫</span></div>
+        <h2 className="text-white text-xl font-bold mb-2">Accès non autorisé</h2>
+        <p className="text-zinc-500 text-sm mb-4">Tu n&apos;as pas la permission d&apos;accéder à l&apos;onglet <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.</p>
+        <p className="text-zinc-700 text-xs">Contacte un administrateur pour obtenir l&apos;accès.</p>
       </div>
     </div>
   )
 }
 
 /* ══════════════════════════════════════════════
-   MAIN
+   INNER DASHBOARD
 ══════════════════════════════════════════════ */
-export default function VenteModule({ activeSociety, profile }: Props) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [pharmacies, setPharmacies] = useState<any[]>([])
-  const [urssafRate, setUrssafRate] = useState(DEFAULT_URSSAF_RATE)
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [search, setSearch] = useState("")
-  const [searchClient, setSearchClient] = useState("")
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [clientPrixMap, setClientPrixMap] = useState<Record<string, number>>({})
-  const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
-  const [showClients, setShowClients] = useState(false)
-  const [typeVente, setTypeVente] = useState("Particulier")
-  const [paiement, setPaiement] = useState("Espèces")
-  const [port, setPort] = useState(PORT_OPTIONS[0])
-  const [portPerso, setPortPerso] = useState("")
-  const [fraisColis, setFraisColis] = useState("")
-  const [notes, setNotes] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [showHistorique, setShowHistorique] = useState(false)
-  const [showManuelle, setShowManuelle] = useState(false)
-  const [showAddProduct, setShowAddProduct] = useState(false)
-  const [activeGamme, setActiveGamme] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [stockAlerts, setStockAlerts] = useState<string[]>([])
-  const [mobileTab, setMobileTab] = useState<"catalogue" | "panier">("catalogue")
-  const barcodeRef = useRef<HTMLInputElement>(null)
+function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
+  const { settings } = useUserSettings()
+  const [activeTab, setActiveTab]           = useState(settings.start_page || "vente")
+  const [myStatus, setMyStatus]             = useState<PresenceStatus>("online")
+  const [onlineUsers, setOnlineUsers]       = useState<OnlineUser[]>([])
+  const [showStatusMenu, setShowStatusMenu] = useState(false)
+  const [unreadMessages, setUnreadMessages] = useState(0)
+  const [sidebarOpen, setSidebarOpen]       = useState(false)
+  const [focusProspect, setFocusProspect]   = useState<any>(null)
+  const [activeConvention, setActiveConvention] = useState<any>(null)
+  const [showConvPopup, setShowConvPopup]   = useState(false)
+  const [activeTournee, setActiveTournee]   = useState<any>(null)
+  const [unreadNotifs, setUnreadNotifs]     = useState<UnreadNotif[]>([])
+  const [showUnreadPopup, setShowUnreadPopup] = useState(false)
+  const [stockAlerts, setStockAlerts]       = useState<any[]>([])
+  const [showStockAlert, setShowStockAlert] = useState(false)
+  const [globalSearch, setGlobalSearch]     = useState("")
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
+  const [globalResults, setGlobalResults]   = useState<any[]>([])
+  const [searchLoading, setSearchLoading]   = useState(false)
 
-  useEffect(() => { if (activeSociety) loadData() }, [activeSociety])
+  const heartbeatRef  = useRef<NodeJS.Timeout | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  const router        = useRouter()
 
-  const loadData = async () => {
-    setLoading(true)
-    const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }, { data: pharmas }] = await Promise.all([
-      supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
-      supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
-      supabase.from("stock").select("*").eq("society_id", activeSociety.id),
-      supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
-      supabase.from("pharmacies").select("id, nom, ville, telephone").eq("society_id", activeSociety.id).order("nom"),
-    ])
-    setProducts(prods || [])
-    setClients(cls || [])
-    setPharmacies(pharmas || [])
-    if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
-    const alerts = (stockData || [])
-      .filter((s: any) => s.quantite === 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
-      .map((s: any) => s.quantite === 0 ? `⚠ RUPTURE: ${s.produit_nom}` : `⚠ Faible: ${s.produit_nom} (${s.quantite})`)
-    setStockAlerts(alerts)
-    setLoading(false)
-  }
+  const ACCENT      = settings.accent_color || "#eab308"
+  const BG          = settings.background   || "#0a0a0a"
+  const SIDEBAR_BG  = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
+  const APP_THEME   = (settings as any).app_theme  || "1"
+  const BG_GRADIENT = (settings as any).bg_gradient || ""
 
-  const filteredProducts = activeGamme
-    ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && p.gamme === activeGamme)
-    : []
+  useEffect(() => { if (settings.start_page) setActiveTab(settings.start_page) }, [settings.start_page])
 
-  const filteredClients = typeVente === "Pharmacie"
-    ? pharmacies.filter((p: any) => p.nom.toLowerCase().includes(searchClient.toLowerCase())).map((p: any) => ({ id: p.id, nom: p.nom, contrat: p.ville || "Pharmacie", telephone: p.telephone }))
-    : clients.filter(c => c.nom.toLowerCase().includes(searchClient.toLowerCase()))
+  useEffect(() => {
+    if (!activeSociety) return
+    const todayStr = new Date().toISOString().split("T")[0]
+    supabase.from("conventions").select("*").eq("society_id", activeSociety.id)
+      .lte("date_debut", todayStr).gte("date_fin", todayStr)
+      .order("date_debut", { ascending: false }).limit(1).single()
+      .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
+    supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite").eq("society_id", activeSociety.id)
+      .then(({ data }) => {
+        const alerts = (data||[]).filter((s:any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+        if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
+      })
+  }, [activeSociety])
 
-  const addToCart = (product: Product) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.product_id === product.id)
-      const prix = clientPrixMap[product.id] ?? product.pv
-      if (existing) return prev.map(i => i.product_id === product.id ? { ...i, quantite: i.quantite + 1 } : i)
-      return [...prev, { product_id: product.id, nom: product.name, gamme: product.gamme, quantite: 1, pv: prix, cf: product.cf }]
-    })
-  }
-
-  const updateQty = (productId: string, qty: number) => {
-    if (qty <= 0) { setCart(prev => prev.filter(i => i.product_id !== productId)); return }
-    setCart(prev => prev.map(i => i.product_id === productId ? { ...i, quantite: qty } : i))
-  }
-
-  const updatePrice = (productId: string, price: number) => {
-    setCart(prev => prev.map(i => i.product_id === productId ? { ...i, pv: price } : i))
-  }
-
-  const portVal = portPerso ? parseFloat(portPerso.replace(",", ".")) || 0 : parsePort(port)
-  const totalHT = cart.reduce((sum, i) => sum + i.pv * i.quantite, 0)
-  const totalTTC = totalHT + portVal
-  const urssaf = totalTTC * urssafRate
-  const cfTotal = cart.reduce((sum, i) => sum + i.cf * i.quantite, 0)
-  const fraisColisVal = parseFloat(fraisColis.replace(",", ".")) || 0
-  const resultat = totalTTC - urssaf - cfTotal - fraisColisVal
-  const cartCount = cart.reduce((s, i) => s + i.quantite, 0)
-
-  const saveBrouillon = () => {
-    try { localStorage.setItem("brouillon_vente_" + activeSociety.id, JSON.stringify(cart)) } catch {}
-    alert("Brouillon sauvegardé !")
-  }
-  const loadBrouillon = () => {
-    try {
-      const data = localStorage.getItem("brouillon_vente_" + activeSociety.id)
-      if (data) setCart(JSON.parse(data))
-    } catch {}
-  }
-
-  const handleVente = async () => {
-    if (cart.length === 0) return
-    setSaving(true)
-    const { data: vente, error } = await supabase.from("ventes").insert({
-      society_id: activeSociety.id, user_id: profile.id,
-      client_id: selectedClient?.id || null,
-      client_nom: selectedClient?.nom || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : typeVente === "Convention" ? "Convention" : "Client de passage"),
-      created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
-      total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
-    }).select().single()
-    if (!error && vente) {
-      await supabase.from("vente_items").insert(cart.map(item => ({
-        vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
-        gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
-        cf_unitaire: item.cf, total: item.pv * item.quantite,
-      })))
-      const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
-      const allStock = allStockData || []
-      for (const item of cart) {
-        const { data: fullProduct } = await supabase.from("products").select("composition, in_stock").eq("id", item.product_id).single()
-        let composition: Record<string, number> = {}
-        if (fullProduct?.composition) {
-          composition = typeof fullProduct.composition === "string" ? JSON.parse(fullProduct.composition) : fullProduct.composition
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    const check = async () => {
+      const { data: convs } = await supabase.from("conversations").select("id, name, type, member_ids").eq("society_id", activeSociety.id).contains("member_ids", [profile.id])
+      if (!convs || convs.length === 0) return
+      const allMemberIds = [...new Set(convs.flatMap((c: any) => c.member_ids || []))]
+      const { data: memberProfiles } = await supabase.from("profiles").select("id, nom").in("id", allMemberIds)
+      const profileMap: Record<string, string> = {}
+      ;(memberProfiles || []).forEach((p: any) => { profileMap[p.id] = p.nom })
+      const notifs: UnreadNotif[] = []
+      await Promise.all(convs.map(async (conv: any) => {
+        const { data: unreadMsgs } = await supabase.from("messages").select("id, sender_nom, sender_id, content, file_name")
+          .eq("conversation_id", conv.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
+          .order("created_at", { ascending: false }).limit(20)
+        if (!unreadMsgs || unreadMsgs.length === 0) return
+        let convName = conv.name
+        if (conv.type === "direct" && !conv.name) {
+          const otherId = (conv.member_ids || []).find((id: string) => id !== profile.id)
+          convName = otherId ? profileMap[otherId] || "Conversation directe" : "Conversation directe"
         }
-        const compoEntries = Object.entries(composition)
-        if (compoEntries.length > 0) {
-          for (const [compNom, qtyParUnite] of compoEntries) {
-            const totalADeduire = item.quantite * Number(qtyParUnite)
-            const stockItem = allStock.find((s: any) => s.produit_nom.toLowerCase().trim() === compNom.toLowerCase().trim())
-            if (stockItem) {
-              const newQty = stockItem.quantite - totalADeduire
-              await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-              await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} via composition — ${selectedClient?.nom || "passage"}` })
-              stockItem.quantite = newQty
-            }
-          }
-        } else {
-          const stockItem = allStock.find((s: any) => s.product_id === item.product_id)
-          if (stockItem) {
-            const newQty = stockItem.quantite - item.quantite
-            await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-            await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${selectedClient?.nom || "passage"}` })
-            stockItem.quantite = newQty
-          }
-        }
-      }
-      setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
-      setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso(""); setFraisColis("")
-      setSuccess(true)
-      setMobileTab("catalogue")
-      setTimeout(() => { setSuccess(false); loadData() }, 2500)
+        const bySender: Record<string, { nom: string; msgs: typeof unreadMsgs }> = {}
+        unreadMsgs.forEach((m: any) => {
+          if (!bySender[m.sender_id]) bySender[m.sender_id] = { nom: m.sender_nom, msgs: [] }
+          bySender[m.sender_id].msgs.push(m)
+        })
+        Object.values(bySender).forEach(({ nom, msgs }) => {
+          notifs.push({ sender_nom: nom, content: msgs[0].content || "", file_name: msgs[0].file_name, conv_name: convName, conv_id: conv.id, count: msgs.length })
+        })
+      }))
+      if (notifs.length > 0) setTimeout(() => { setUnreadNotifs(notifs); setShowUnreadPopup(true) }, 1200)
     }
-    setSaving(false)
+    check()
+  }, [profile, activeSociety])
+
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    supabase.from("user_presence").upsert({ user_id: profile.id, society_id: activeSociety.id, status: "online", last_seen: new Date().toISOString() }, { onConflict: "user_id" })
+      .then(() => { setMyStatus("online"); loadUsers() })
+    heartbeatRef.current = setInterval(() => {
+      supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+    }, 30000)
+    channel = supabase.channel(`presence_${activeSociety.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers).subscribe()
+    const bye = () => { supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id) }
+    window.addEventListener("beforeunload", bye)
+    return () => {
+      if (channel) supabase.removeChannel(channel)
+      window.removeEventListener("beforeunload", bye)
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    }
+  }, [profile, activeSociety])
+
+  useEffect(() => {
+    if (!profile || !activeSociety) return
+    const countUnread = () => {
+      supabase.from("messages").select("*", { count: "exact", head: true })
+        .eq("society_id", activeSociety.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
+        .then(({ count: c }) => setUnreadMessages(c || 0))
+    }
+    countUnread()
+    const ch = supabase.channel(`unread_${profile.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, countUnread).subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [profile, activeSociety])
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(e.target as Node)) setShowStatusMenu(false)
+      const target = e.target as HTMLElement
+      if (!target.closest("[data-global-search]")) setShowGlobalSearch(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const map: Record<string, string> = {
+        [settings.shortcut_vente]:      "vente",
+        [settings.shortcut_clients]:    "clients",
+        [settings.shortcut_stocks]:     "stocks",
+        [settings.shortcut_stats]:      "stats",
+        [settings.shortcut_messages]:   "messages",
+        [settings.shortcut_notes]:      "notes",
+        [settings.shortcut_parametres]: "parametres",
+      }
+      const target = map[e.key]
+      if (target) { e.preventDefault(); setActiveTab(target) }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [settings])
+
+  const loadUsers = async () => {
+    const [{ data: members }, { data: presences }] = await Promise.all([
+      supabase.from("profiles").select("id, nom, avatar_url, color").eq("society_id", activeSociety.id),
+      supabase.from("user_presence").select("*").eq("society_id", activeSociety.id),
+    ])
+    const ORDER: Record<PresenceStatus, number> = { online: 0, meeting: 1, busy: 2, away: 3, offline: 4 }
+    const users: OnlineUser[] = (members || [])
+      .filter(m => m.id !== profile.id)
+      .map(m => {
+        const p = presences?.find(x => x.user_id === m.id)
+        const minsAgo = p ? (Date.now() - new Date(p.last_seen).getTime()) / 60000 : 999
+        const status: PresenceStatus = !p ? "offline" : minsAgo > 2 ? "offline" : p.status
+        return { id: m.id, nom: m.nom, avatar_url: m.avatar_url, color: m.color, status }
+      })
+      .sort((a, b) => (ORDER[a.status] ?? 5) - (ORDER[b.status] ?? 5))
+    setOnlineUsers(users)
   }
 
-  const gammeConfig = GAMMES.find(g => g.val === activeGamme) || GAMMES[0]
+  const updateStatus = async (s: PresenceStatus) => {
+    setMyStatus(s); setShowStatusMenu(false)
+    await supabase.from("user_presence").update({ status: s, last_seen: new Date().toISOString() }).eq("user_id", profile.id)
+  }
 
-  /* ─────────────────────────────────────────────
-     CATALOGUE (partagé desktop + mobile)
-  ───────────────────────────────────────────── */
-  const Catalogue = (
-    <div className="flex-1 flex flex-col overflow-hidden border-r border-zinc-900 min-w-0">
-      <div className="p-4 border-b border-zinc-900 space-y-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-white">🛒 Vente</h1>
-          <div className="flex gap-2">
-            <button onClick={() => setShowManuelle(true)} className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600">
-              <Pencil size={13} /> Manuelle
-            </button>
-            <button onClick={() => setShowHistorique(true)} className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600">
-              <Receipt size={13} /> Historique
-            </button>
+  const runGlobalSearch = async (q: string) => {
+    if (!q.trim() || q.length < 2) { setGlobalResults([]); return }
+    if (!activeSociety?.id) return
+    setSearchLoading(true)
+    const [{ data: clients }, { data: pharmacies }, { data: prospects }, { data: ventes }] = await Promise.all([
+      supabase.from("clients").select("id,nom,telephone,email").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("pharmacies").select("id,nom,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("prospects").select("id,nom,entreprise,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
+      supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id",activeSociety.id).ilike("client_nom",`%${q}%`).order("created_at",{ascending:false}).limit(5),
+    ])
+    const results: any[] = [
+      ...(clients||[]).map((c:any) => ({ type:"client",    icon:"👤", label:c.nom,                   sub:c.telephone||c.email||"", tab:"clients",    id:c.id })),
+      ...(pharmacies||[]).map((p:any) => ({ type:"pharmacie", icon:"🏥", label:p.nom,               sub:p.ville||"",              tab:"pharmacies", id:p.id })),
+      ...(prospects||[]).map((p:any) => ({ type:"prospect",  icon:"🎯", label:p.entreprise||p.nom,  sub:p.ville||"",              tab:"prospects",  id:p.id })),
+      ...(ventes||[]).map((v:any) => ({ type:"vente",       icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€ · "+new Date(v.created_at).toLocaleDateString("fr-FR"), tab:"historique", id:v.id })),
+    ]
+    setGlobalResults(results)
+    setSearchLoading(false)
+  }
+
+  const logout = async () => {
+    if (profile) await supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id)
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    await supabase.auth.signOut(); router.push("/")
+  }
+
+  const visibleNav = ALL_NAV.map(section => ({
+    ...section,
+    items: section.items.map(tab => ({
+      ...tab,
+      restricted: (settings as any).hidden_tabs?.includes(tab.id) || false,
+    }))
+  })).filter(section => section.items.length > 0)
+
+  const myCfg       = PRESENCE[myStatus]
+  const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
+  const allTabsFlat = ALL_NAV.flatMap(s => s.items)
+  const activeTabMeta = allTabsFlat.find(t => t.id === activeTab)
+  const isActiveTabRestricted = (settings as any).hidden_tabs?.includes(activeTab) || false
+
+  const renderContent = () => {
+    if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
+    switch (activeTab) {
+      case "accueil":     return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":     return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "conventions": return <ConventionModule      activeSociety={activeSociety} profile={profile} />
+      case "stocks":      return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":       return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":    return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":       return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":       return <NotesModule           activeSociety={activeSociety} profile={profile} />
+      case "documents":   return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
+      case "historique":  return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
+      case "contrats":    return <ContratsModule        activeSociety={activeSociety} profile={profile} />
+      case "pharmacies":  return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
+      case "commandes":   return <CommandesModule       activeSociety={activeSociety} profile={profile} />
+      case "playlists":   return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
+      case "tournees":    return <TourneesModule        activeSociety={activeSociety} profile={profile}
+          onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
+      case "prospects":   return <ProspectsModule       activeSociety={activeSociety} profile={profile}
+          onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => setActiveTab("map")} onSwitchToTournees={() => setActiveTab("tournees")} />
+      case "map":         return <MapModule             activeSociety={activeSociety} profile={profile}
+          focusProspect={focusProspect} activeTournee={activeTournee}
+          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => setActiveTab("prospects")} />
+      case "messages":    return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres":  return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "agenda":      return <AgendaModule          activeSociety={activeSociety} profile={profile} />
+      case "admin":       return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      case "ia":          return <IAModule              activeSociety={activeSociety} profile={profile} />
+      default: return (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-5xl mb-4">🚧</p>
+            <p className="text-white text-xl font-bold">{ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.label}</p>
+            <p className="text-zinc-500 text-sm mt-2">Module en cours de construction</p>
+          </div>
+        </div>
+      )
+    }
+  }
+
+  const fontSizeMap  = { small: "13px", normal: "14px", large: "16px" }
+  const baseFontSize = fontSizeMap[settings.font_size as keyof typeof fontSizeMap] || "14px"
+  const radiusMap    = { rounded: "12px", sharp: "4px", pill: "20px" }
+  const cardRadius   = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
+
+  const stockAlertPopup = stockAlerts.length > 0 && showStockAlert && (
+    <StockAlertPopup alerts={stockAlerts} onGoToStock={() => { setActiveTab("stocks"); setShowStockAlert(false) }} onClose={() => setShowStockAlert(false)} />
+  )
+  const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
+    <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
+      onGoToMessages={() => { setActiveTab("messages"); setShowUnreadPopup(false) }} onClose={() => setShowUnreadPopup(false)} />
+  )
+
+  if (APP_THEME === "2") return (
+    <>
+      <Theme2Layout
+        activeSociety={activeSociety} profile={profile}
+        activeTab={activeTab} setActiveTab={setActiveTab}
+        visibleNav={visibleNav} renderContent={renderContent}
+        ACCENT={ACCENT} BG={BG} BG_GRADIENT={BG_GRADIENT}
+        baseFontSize={baseFontSize} cardRadius={cardRadius}
+        unreadMessages={unreadMessages}
+        sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}
+        onlineUsers={onlineUsers} onlineCount={onlineCount}
+        myStatus={myStatus} showStatusMenu={showStatusMenu}
+        setShowStatusMenu={setShowStatusMenu} statusMenuRef={statusMenuRef}
+        logout={logout} showConvPopup={showConvPopup}
+        setShowConvPopup={setShowConvPopup} activeConvention={activeConvention}
+      />
+      {unreadPopup}{stockAlertPopup}
+    </>
+  )
+
+  return (
+    <div className="h-screen text-white flex overflow-hidden"
+      style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+
+      {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
+
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden"
+        style={{ backgroundColor: SIDEBAR_BG }}>
+        <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
+          <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
+          {activeSociety && (
+            <div className="flex items-center gap-1 mt-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
+              <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
+            </div>
+          )}
+          <div className="relative mt-2">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">🔍</span>
+            <input type="text" placeholder="Recherche globale..." value={globalSearch}
+              onChange={e => { setGlobalSearch(e.target.value); runGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
+              onFocus={() => setShowGlobalSearch(true)}
+              className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/40"/>
+            {showGlobalSearch && globalSearch.length >= 2 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+                {searchLoading ? (
+                  <p className="text-zinc-500 text-xs px-3 py-3 text-center">Recherche...</p>
+                ) : globalResults.length === 0 ? (
+                  <p className="text-zinc-600 text-xs px-3 py-3 text-center">Aucun résultat</p>
+                ) : (
+                  <div className="py-1">
+                    {globalResults.map((r,i) => (
+                      <button key={i} onClick={() => { setActiveTab(r.tab); setShowGlobalSearch(false); setGlobalSearch("") }}
+                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-800 transition-colors text-left">
+                        <span className="text-sm shrink-0">{r.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-xs font-medium truncate">{r.label}</p>
+                          {r.sub && <p className="text-zinc-500 text-[10px] truncate">{r.sub}</p>}
+                        </div>
+                        <span className="text-zinc-600 text-[9px] uppercase shrink-0">{r.type}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {stockAlerts.length > 0 && (
-          <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2">
-            <AlertTriangle size={13} className="text-red-400 shrink-0" />
-            <p className="text-red-400 text-[11px] font-semibold truncate">{stockAlerts.slice(0, 3).join(" | ")}</p>
-          </div>
-        )}
-
-        <div className="flex gap-1.5 flex-wrap">
-          {["Particulier", "Shopify", "Clients", "Pharmacie"].map(t => (
-            <button key={t} onClick={() => { setTypeVente(t); setSelectedClient(null) }}
-              className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-colors ${typeVente === t ? "bg-yellow-500 text-black border-yellow-500" : "text-zinc-400 border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}>
-              {t === "Pharmacie" ? "🏥 " : ""}{t}
-            </button>
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+          {visibleNav.map(({ section, items }) => (
+            <div key={section}>
+              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
+              {items.map(tab => {
+                const isActive = activeTab === tab.id
+                return (
+                  <button key={tab.id}
+                    onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 group relative mb-1"
+                    style={{
+                      backgroundColor: isActive ? (tab.restricted ? "#ef444415" : ACCENT + "12") : "transparent",
+                      color: tab.restricted ? (isActive ? "#ef4444" : "#4a1515") : (isActive ? ACCENT : "#52525b"),
+                      border: isActive ? `1px solid ${tab.restricted ? "#ef444445" : ACCENT + "55"}` : "1px solid #27272a",
+                      boxShadow: isActive ? `0 0 14px ${tab.restricted ? "#ef444418" : ACCENT + "18"}, inset 0 1px 0 ${tab.restricted ? "#ef444415" : ACCENT + "12"}` : "none",
+                    }}
+                    onMouseEnter={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = tab.restricted ? "#ef444410" : ACCENT + "0e"
+                        el.style.borderColor = tab.restricted ? "#ef444430" : ACCENT + "40"
+                        el.style.color = tab.restricted ? "#ef4444" : ACCENT
+                        el.style.boxShadow = `0 0 8px ${tab.restricted ? "#ef444412" : ACCENT + "12"}`
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      const el = e.currentTarget as HTMLElement
+                      if (!isActive) {
+                        el.style.backgroundColor = "transparent"
+                        el.style.borderColor = "#27272a"
+                        el.style.color = tab.restricted ? "#4a1515" : "#52525b"
+                        el.style.boxShadow = "none"
+                      }
+                    }}>
+                    {isActive && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+                        style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT, boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}` }} />
+                    )}
+                    <span className="text-sm">{tab.icon}</span>
+                    <span className="flex-1 truncate">{tab.label}</span>
+                    {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
+                    {tab.id === "messages" && unreadMessages > 0 && (
+                      <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           ))}
-        </div>
+        </nav>
 
-        <div className="flex gap-2">
-          {GAMMES.map(({ val, label, active }) => (
-            <button key={val} onClick={() => setActiveGamme(activeGamme === val ? null : val)}
-              className={`flex-1 py-2 text-[11px] md:text-sm font-bold rounded-xl border transition-all duration-200 ${activeGamme === val ? active : "text-zinc-400 border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {activeGamme && (
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input type="text" placeholder={`Rechercher dans ${activeGamme}...`} value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/50" />
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : !activeGamme ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="text-5xl mb-4">🛒</div>
-            <p className="text-white text-lg font-bold mb-2">Choisissez une gamme</p>
-            <p className="text-zinc-500 text-sm mb-8">Sélectionnez une gamme pour afficher le catalogue</p>
-            <div className="flex gap-3 flex-wrap justify-center">
-              {GAMMES.map(({ val, label, hover }) => (
-                <button key={val} onClick={() => setActiveGamme(val)}
-                  className={`flex flex-col items-center gap-3 bg-zinc-900 border border-zinc-800 ${hover} rounded-2xl p-5 transition-all hover:bg-zinc-800/60`}>
-                  <span className="text-4xl">{label.split(" ")[0]}</span>
-                  <p className="text-white font-bold">{val}</p>
-                  <p className="text-zinc-500 text-xs">{products.filter(p => p.gamme === val).length} produits</p>
+        {onlineUsers.length > 0 && (
+          <div className="border-t border-zinc-900 px-2 pt-2 pb-1">
+            <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
+              Équipe · <span className={onlineCount > 0 ? "text-green-500" : "text-zinc-600"}>
+                {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
+              </span>
+            </p>
+            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+              {onlineUsers.slice(0, 5).map(u => (
+                <button key={u.id} onClick={() => setActiveTab("messages")}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
+                  <div className="relative shrink-0">
+                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={24} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${PRESENCE[u.status].dot} ring-1 ring-[#0d0d0d]`} />
+                  </div>
+                  <p className="text-zinc-400 text-[11px] font-medium truncate group-hover:text-zinc-200">{u.nom}</p>
                 </button>
               ))}
             </div>
           </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-16 text-zinc-600">
-            <Package size={36} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm">Aucun produit trouvé</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-            {filteredProducts.map(product => {
-              const inCart = cart.find(i => i.product_id === product.id)
-              const prod = product as any
-              const composition: Record<string, number> = prod.composition
-                ? (typeof prod.composition === "string" ? JSON.parse(prod.composition) : prod.composition)
-                : {}
-              const hasCompo = Object.keys(composition).length > 0
-              const marge = product.pv - product.cf
-              return (
-                <button key={product.id} onClick={() => addToCart(product)}
-                  className={`relative text-left rounded-2xl border transition-all duration-200 overflow-hidden ${
-                    inCart ? "bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10" : "bg-zinc-900 border-zinc-800 hover:border-yellow-500/30 hover:bg-zinc-800/60"
-                  }`}>
-                  {inCart && (
-                    <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black text-xs font-bold shadow-lg">
-                      {inCart.quantite}
-                    </div>
-                  )}
-                  <div className={`w-full h-32 md:h-44 flex items-center justify-center relative overflow-hidden bg-gradient-to-br ${gammeConfig.gradient} to-zinc-900`}>
-                    {prod.avatar_url ? (
-                      <img src={prod.avatar_url} alt={product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl flex items-center justify-center ${gammeConfig.iconBg}`}>
-                        <Package size={24} className={gammeConfig.iconColor} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <p className="text-white text-xs md:text-sm font-bold leading-tight mb-2">{product.name}</p>
-                    <div className="grid grid-cols-2 gap-1.5 mb-2">
-                      <div className="bg-zinc-800 rounded-lg px-2 py-1">
-                        <p className="text-zinc-500 text-[9px] uppercase font-semibold">CF</p>
-                        <p className="text-zinc-300 text-xs font-bold">{Number(product.cf).toFixed(2)}€</p>
-                      </div>
-                      <div className={`rounded-lg px-2 py-1 ${gammeConfig.pvBg}`}>
-                        <p className="text-zinc-500 text-[9px] uppercase font-semibold">PV</p>
-                        <p className={`text-xs font-bold ${gammeConfig.pvText}`}>{Number(product.pv).toFixed(2)}€</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-zinc-600 text-[10px]">Marge</span>
-                      <span className={`text-[11px] font-semibold ${marge >= 0 ? "text-green-400" : "text-red-400"}`}>+{marge.toFixed(2)}€</span>
-                    </div>
-                    {hasCompo && (
-                      <div className="border-t border-zinc-800 pt-2 mt-2">
-                        <div className="flex flex-wrap gap-1">
-                          {Object.entries(composition).map(([name, qty]) => (
-                            <span key={name} className="text-[9px] bg-zinc-800 border border-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded-full">{qty}× {name}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
         )}
-      </div>
-    </div>
-  )
 
-  /* ─────────────────────────────────────────────
-     PANIER (partagé desktop + mobile)
-  ───────────────────────────────────────────── */
-  const Panier = (
-    <div className="flex-1 md:flex-none md:w-96 bg-[#111111] flex flex-col overflow-hidden">
-      <div className="p-4 border-b border-zinc-800">
-        {(typeVente === "Clients" || typeVente === "Pharmacie") ? (
-          <div className="relative">
-            <button onClick={() => setShowClients(!showClients)}
-              className="w-full flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 hover:border-yellow-500/40 transition-colors">
-              <div className="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center shrink-0">
-                <User size={13} className="text-yellow-500" />
+        <div className="border-t border-zinc-900 p-2">
+          <div className="relative" ref={statusMenuRef}>
+            <button onClick={() => setShowStatusMenu(p => !p)}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 transition-colors">
+              <div className="relative shrink-0">
+                <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${myCfg.dot} ring-1 ring-[#0d0d0d]`} />
               </div>
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-white text-sm font-medium truncate">{selectedClient?.nom || "Sélectionner un client"}</p>
-                {selectedClient && <p className="text-zinc-500 text-[11px]">{selectedClient.contrat}</p>}
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-white text-[11px] font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className={`text-[9px] font-medium ${myCfg.color}`}>{myCfg.label}</p>
               </div>
-              <ChevronDown size={13} className="text-zinc-500 shrink-0" />
+              <span className="text-zinc-700 text-[10px]">▾</span>
             </button>
-            {showClients && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
-                <div className="p-2"><input type="text" placeholder="Rechercher..." value={searchClient} onChange={e => setSearchClient(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" /></div>
-                <div className="max-h-48 overflow-y-auto">
-                  {filteredClients.map(c => (
-                    <button key={c.id} onClick={async () => {
-                      setSelectedClient(c); setShowClients(false)
-                      const { data } = await supabase.from("client_prix").select("*").eq("client_id", c.id)
-                      const map: Record<string, number> = {}
-                      ;(data || []).forEach((p: any) => { map[p.product_id] = p.prix })
-                      setClientPrixMap(map)
-                    }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
-                      <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
-                    </button>
-                  ))}
+            {showStatusMenu && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50">
+                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider px-3 pt-2 pb-1">Mon statut</p>
+                {(Object.entries(PRESENCE) as [PresenceStatus, typeof PRESENCE[PresenceStatus]][]).map(([s, cfg]) => (
+                  <button key={s} onClick={() => updateStatus(s)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 transition-colors ${myStatus === s ? "bg-zinc-800/60" : ""}`}>
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                    <span className={`text-[13px] ${myStatus === s ? "text-white font-semibold" : "text-zinc-400"}`}>{cfg.label}</span>
+                    {myStatus === s && <span className="ml-auto text-[11px] font-bold" style={{ color: ACCENT }}>✓</span>}
+                  </button>
+                ))}
+                <div className="border-t border-zinc-800 mt-1">
+                  <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2 text-red-400 hover:bg-red-500/10 transition-colors text-[13px]">
+                    <span>→</span> Déconnexion
+                  </button>
                 </div>
               </div>
             )}
           </div>
-        ) : (
-          <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
-            <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center shrink-0">
-              <User size={13} className="text-zinc-500" />
+        </div>
+      </aside>
+
+      {sidebarOpen && (
+        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          <button onClick={() => setSidebarOpen(false)}
+            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">✕</button>
+          <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
+            <div className="flex items-center gap-2.5">
+              <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+              {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
             </div>
-            <p className="text-zinc-400 text-sm">{typeVente === "Shopify" ? "🛍️ Commande Shopify" : typeVente === "Pharmacie" ? "🏥 Pharmacie" : "Client de passage"}</p>
+          </div>
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
+            {visibleNav.map(({ section, items }) => (
+              <div key={section}>
+                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
+                {items.map(tab => {
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-1 relative transition-all duration-200"
+                      style={{
+                        backgroundColor: isActive ? ACCENT + "12" : "transparent",
+                        color: isActive ? ACCENT : "#52525b",
+                        border: isActive ? `1px solid ${ACCENT}50` : "1px solid #27272a",
+                        boxShadow: isActive ? `0 0 12px ${ACCENT}18` : "none",
+                      }}>
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+                          style={{ backgroundColor: ACCENT, boxShadow: `0 0 6px ${ACCENT}` }} />
+                      )}
+                      <span className="text-base">{tab.icon}</span>
+                      <span className="flex-1 truncate">{tab.label}</span>
+                      {tab.id === "messages" && unreadMessages > 0 && (
+                        <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </nav>
+          <div className="border-t border-zinc-900 p-3">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
+              <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className="text-zinc-500 text-[10px]">En ligne</p>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+        <button onClick={() => setSidebarOpen(true)}
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
+          style={{ backgroundColor: SIDEBAR_BG }}>
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+          <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
+        </button>
+        {renderContent()}
+
+        {showConvPopup && activeConvention && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+              <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
+                <div className="text-5xl mb-3">🎪</div>
+                <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span className="text-green-400 text-xs font-bold">Convention en cours</span>
+                </div>
+                <h2 className="text-white font-bold text-xl">{activeConvention.nom}</h2>
+                {activeConvention.lieu && <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>}
+              </div>
+              <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Début</span>
+                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+                </div>
+                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                  <span className="text-zinc-500 text-sm">Fin</span>
+                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+                </div>
+              </div>
+              <div className="px-6 pb-6 space-y-2">
+                <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+                  className="w-full py-3 rounded-xl text-black font-bold text-sm" style={{ backgroundColor: ACCENT }}>📋 Aller à la convention</button>
+                <button onClick={() => setShowConvPopup(false)}
+                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800">Continuer vers l'accueil</button>
+              </div>
+            </div>
           </div>
         )}
-      </div>
+      </main>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 md:pb-4">
-        {cart.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-700">
-            <ShoppingCart size={36} className="mb-3 opacity-30" />
-            <p className="text-sm">Panier vide</p>
-            <p className="text-xs mt-1 text-center">Allez sur "Catalogue" pour ajouter des produits</p>
-          </div>
-        ) : cart.map(item => (
-          <div key={item.product_id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1 mr-2">
-                <p className="text-white text-sm font-medium leading-tight">{item.nom}</p>
-                <p className="text-zinc-600 text-[11px]">{item.gamme}</p>
-              </div>
-              <button onClick={() => setCart(prev => prev.filter(i => i.product_id !== item.product_id))} className="text-zinc-600 hover:text-red-400">
-                <X size={13} />
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-zinc-800 rounded-lg">
-                <button onClick={() => updateQty(item.product_id, item.quantite - 1)} className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white"><Minus size={11} /></button>
-                <span className="text-white text-sm font-bold w-6 text-center">{item.quantite}</span>
-                <button onClick={() => updateQty(item.product_id, item.quantite + 1)} className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white"><Plus size={11} /></button>
-              </div>
-              <input type="number" step="0.01" value={item.pv}
-                onChange={e => updatePrice(item.product_id, parseFloat(e.target.value) || 0)}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60" />
-              <span className="text-zinc-500 text-xs">€</span>
-              <p className="text-yellow-500 font-bold text-sm w-16 text-right shrink-0">{(item.pv * item.quantite).toFixed(2)}€</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {unreadPopup}{stockAlertPopup}
+    </div>
+  )
+}
 
-      {cart.length > 0 && (
-        <div className="px-4 py-2 border-t border-zinc-900 flex gap-3">
-          <button onClick={saveBrouillon} className="flex items-center gap-1 text-[11px] font-semibold text-zinc-500 hover:text-yellow-500 transition-colors">
-            <Save size={11} /> ⏸ En attente
-          </button>
-          <button onClick={loadBrouillon} className="flex items-center gap-1 text-[11px] font-semibold text-zinc-500 hover:text-yellow-500 transition-colors">
-            <RotateCcw size={11} /> ▶ Reprendre
-          </button>
-        </div>
-      )}
+/* ══════════════════════════════════════════════
+   ROOT
+══════════════════════════════════════════════ */
+export default function DashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading]             = useState(true)
+  const [activeSociety, setActiveSociety] = useState<any>(null)
+  const [profile, setProfile]             = useState<any>(null)
 
-      {cart.length > 0 && (
-        <div className="border-t border-zinc-800 p-4 space-y-3">
-          {/* TARIF PERSO — applique les prix client/pharmacie sauvegardés */}
-          {selectedClient && cart.length > 0 && (
-            <button onClick={async () => {
-              const { data: prixData } = await supabase.from("client_prix").select("*").eq("client_id", selectedClient.id)
-              if (prixData && prixData.length > 0) {
-                const map: Record<string, number> = {}
-                prixData.forEach((p: any) => { map[p.product_id] = p.prix })
-                setClientPrixMap(map)
-                setCart(prev => prev.map(item => map[item.product_id] != null ? { ...item, pv: map[item.product_id] } : item))
-                alert(`✅ Tarifs de ${selectedClient.nom} appliqués`)
-              } else {
-                alert(`Aucun tarif personnalisé trouvé pour ${selectedClient.nom}`)
-              }
-            }}
-              className="w-full py-2 rounded-xl text-sm font-bold border border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 transition-colors flex items-center justify-center gap-2">
-              💰 Appliquer tarif perso de {selectedClient.nom}
-            </button>
-          )}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">PORT</label>
-              <select value={port} onChange={e => setPort(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-white focus:outline-none">
-                {PORT_OPTIONS.map(p => <option key={p}>{p}</option>)}
-              </select>
-            </div>
-            <div className="w-24">
-              <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">PORT PERSO</label>
-              <input type="text" placeholder="0.00" value={portPerso} onChange={e => setPortPerso(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">NOTES</label>
-            <input type="text" placeholder="Notes de la vente..." value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none" />
-          </div>
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">FRAIS COLIS <span className="normal-case text-zinc-600 font-normal">(optionnel)</span></label>
-            <div className="relative">
-              <input type="text" placeholder="0.00" value={fraisColis} onChange={e => setFraisColis(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-red-500/40" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">€</span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mb-1">PAIEMENT</label>
-            <div className="grid grid-cols-3 gap-1">
-              {PAIEMENTS.map(p => (
-                <button key={p} onClick={() => setPaiement(p)}
-                  className={`py-1.5 rounded-lg text-[10px] font-semibold border transition-colors ${paiement === p ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500"}`}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-            <span className="text-zinc-500 text-xs whitespace-nowrap">📅 Date :</span>
-            <input type="date" value={venteDate} onChange={e => setVenteDate(e.target.value)} className="flex-1 bg-transparent text-xs text-white focus:outline-none" />
-            {venteDate !== new Date().toISOString().split("T")[0] && (
-              <span className="text-orange-400 text-[10px] font-bold whitespace-nowrap">≠ Aujourd'hui</span>
-            )}
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-1">
-            <div className="flex justify-between text-xs text-zinc-400"><span>CA Brut</span><span>{totalHT.toFixed(3)}€</span></div>
-            {portVal > 0 && <div className="flex justify-between text-xs text-zinc-400"><span>Port</span><span>+{portVal.toFixed(3)}€</span></div>}
-            <div className="flex justify-between text-xs text-zinc-500 border-t border-zinc-800 pt-1"><span>Sous-total</span><span>{totalTTC.toFixed(3)}€</span></div>
-            <div className="flex justify-between text-xs text-zinc-600"><span>URSSAF ({(urssafRate * 100).toFixed(1)}%)</span><span>-{urssaf.toFixed(3)}€</span></div>
-            <div className="flex justify-between text-xs text-orange-400/80"><span>Après URSSAF</span><span>{(totalTTC - urssaf).toFixed(3)}€</span></div>
-            <div className="flex justify-between text-xs text-zinc-600"><span>Coût fabrication</span><span>-{cfTotal.toFixed(3)}€</span></div>
-            {fraisColisVal > 0 && <div className="flex justify-between text-xs text-red-400/80"><span>Frais colis</span><span>-{fraisColisVal.toFixed(3)}€</span></div>}
-            <div className={`flex justify-between text-sm font-bold border-t border-zinc-800 pt-1.5 ${resultat >= 0 ? "text-green-400" : "text-red-400"}`}>
-              <span>Résultat net</span><span>{resultat.toFixed(3)}€</span>
-            </div>
-            <div className="flex justify-between text-base font-bold text-white border-t border-zinc-800 pt-1.5">
-              <span>TOTAL CLIENT</span><span className="text-yellow-500 text-lg">{totalTTC.toFixed(2)}€</span>
-            </div>
-          </div>
-          <button onClick={handleVente} disabled={saving || cart.length === 0}
-            className={`w-full font-bold py-3.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${success ? "bg-green-500 text-white" : "bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black shadow-lg shadow-yellow-500/20"}`}>
-            {success ? <><Check size={16} /> ✔ Vente enregistrée !</>
-              : saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              : <><ShoppingCart size={15} /> ✔ VALIDER — {totalTTC.toFixed(2)}€</>}
-          </button>
-        </div>
-      )}
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push("/"); return }
+      let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+      if (!prof) {
+        const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Utilisateur"
+        const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
+        await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
+        const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
+        prof = newProf
+      }
+      if (prof) setProfile({ ...prof, email: session.user.email })
+      const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
+      if (socs?.length) setActiveSociety(socs[0])
+      setLoading(false)
+    }
+    init()
+  }, [router])
+
+  if (loading) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
-  /* ─────────────────────────────────────────────
-     RENDER
-  ───────────────────────────────────────────── */
+  if (!profile) return (
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
+      <p className="text-white font-bold text-lg">Problème de chargement</p>
+      <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
+      <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400">Réessayer</button>
+      <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }} className="text-zinc-500 text-sm hover:text-white">Se déconnecter</button>
+    </div>
+  )
+
   return (
-    <div className="flex-1 overflow-hidden bg-[#0a0a0a] relative flex flex-col">
+    <UserSettingsProvider userId={profile.id}>
+      <InnerDashboard profile={profile} activeSociety={activeSociety} />
+    </UserSettingsProvider>
+  )
+}
 
-      {/* ── DESKTOP (md+) : côte à côte ── */}
-      <div className="hidden md:flex flex-1 overflow-hidden">
-        {Catalogue}
-        {Panier}
-      </div>
-
-      {/* ── MOBILE : un seul panneau à la fois ── */}
-      <div className="flex md:hidden flex-1 overflow-hidden">
-        {mobileTab === "catalogue" ? Catalogue : Panier}
-      </div>
-
-      {/* ── BARRE DE NAV MOBILE (fixe en bas) ── */}
-      <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-[#111111]">
-        <button
-          onClick={() => setMobileTab("catalogue")}
-          className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors ${mobileTab === "catalogue" ? "text-yellow-500" : "text-zinc-500"}`}>
-          <Package size={22} />
-          <span className="text-[10px] font-bold">Catalogue</span>
-        </button>
-        <button
-          onClick={() => setMobileTab("panier")}
-          className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors relative ${mobileTab === "panier" ? "text-yellow-500" : "text-zinc-500"}`}>
-          <div className="relative">
-            <ShoppingCart size={22} />
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-3 w-5 h-5 bg-yellow-500 text-black text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
-                {cartCount > 9 ? "9+" : cartCount}
-              </span>
+/* ══════════════════════════════════════════════
+   THEME 2 — NEON
+══════════════════════════════════════════════ */
+function Theme2Layout({
+  activeSociety, profile, activeTab, setActiveTab, visibleNav,
+  renderContent, ACCENT, BG, BG_GRADIENT, baseFontSize, cardRadius,
+  unreadMessages, sidebarOpen, setSidebarOpen,
+  onlineUsers, onlineCount, myStatus, showStatusMenu,
+  setShowStatusMenu, statusMenuRef, logout,
+  showConvPopup, setShowConvPopup, activeConvention,
+}: any) {
+  const allTabs = visibleNav.flatMap((s: any) => s.items)
+  const NEON = "#a855f7"
+  return (
+    <div className="h-screen text-white flex flex-col overflow-hidden"
+      style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
+      <header className="shrink-0 border-b z-30"
+        style={{ backgroundColor: BG === "#0a0a0a" ? "#08080f" : BG + "ee", borderColor: NEON + "30" }}>
+        <div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: NEON + "20" }}>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+            {activeSociety && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: NEON + "15", border: `1px solid ${NEON}30` }}>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: NEON }} />
+                <span className="text-xs font-bold" style={{ color: NEON }}>{activeSociety.name}</span>
+              </div>
             )}
           </div>
-          <span className="text-[10px] font-bold">
-            {cartCount > 0 ? `Panier · ${totalTTC.toFixed(0)}€` : "Panier"}
-          </span>
-        </button>
-      </div>
-
-      {showHistorique && <HistoriquePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowHistorique(false)} />}
-      {showManuelle && <VenteManuellePanel profile={profile} societyId={activeSociety.id} clients={clients} onClose={() => setShowManuelle(false)} onDone={loadData} />}
-      {showAddProduct && <AddProductPanel societyId={activeSociety.id} onClose={() => setShowAddProduct(false)} onDone={loadData} />}
+          <div className="flex items-center gap-3">
+            {onlineCount > 0 && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-green-400 text-xs font-semibold">{onlineCount} en ligne</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-black" style={{ backgroundColor: NEON }}>
+                {profile?.nom?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+              <span className="text-zinc-300 text-sm font-medium hidden sm:block">{profile?.nom}</span>
+            </div>
+            {showStatusMenu && (
+              <div ref={statusMenuRef} className="absolute top-14 right-4 bg-zinc-900 border rounded-xl shadow-2xl z-50 overflow-hidden w-40" style={{ borderColor: NEON + "30" }}>
+                <button onClick={() => { logout(); setShowStatusMenu(false) }} className="w-full flex items-center gap-2 px-4 py-3 text-red-400 hover:bg-red-500/10 text-sm">
+                  🚪 Déconnexion
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <nav className="flex overflow-x-auto gap-0.5 px-2 py-1.5 scrollbar-hide">
+          {allTabs.map((tab: any) => {
+            const isActive = activeTab === tab.id
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 relative"
+                style={isActive ? { backgroundColor: NEON + "20", color: NEON, border: `1px solid ${NEON}50` } : { color: "#52525b", border: "1px solid transparent" }}>
+                {isActive && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full" style={{ backgroundColor: NEON }} />}
+                <span>{tab.icon}</span><span>{tab.label}</span>
+                {tab.id === "messages" && unreadMessages > 0 && (
+                  <span className="text-black text-[9px] font-black min-w-[14px] h-3.5 px-1 rounded-full flex items-center justify-center" style={{ backgroundColor: NEON }}>
+                    {unreadMessages > 9 ? "9+" : unreadMessages}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+      </header>
+      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+        {renderContent()}
+      </main>
+      {showConvPopup && activeConvention && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border" style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40", boxShadow: `0 0 40px ${NEON}20` }}>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">🎪</span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: NEON }}>Convention en cours</p>
+                <h2 className="text-white font-bold text-lg">{activeConvention.nom}</h2>
+              </div>
+            </div>
+            {activeConvention.lieu && <p className="text-zinc-400 text-sm mb-4">📍 {activeConvention.lieu}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black" style={{ backgroundColor: NEON }}>📋 Aller à la convention</button>
+              <button onClick={() => setShowConvPopup(false)} className="px-4 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300">Plus tard</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
