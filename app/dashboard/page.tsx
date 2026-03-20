@@ -27,6 +27,7 @@ import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 import IAModule from "@/components/IAModule"
 import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
+import PublicationModule from "@/components/publications/PublicationModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -71,9 +72,10 @@ const ALL_NAV = [
     { id: "historique", label: "Historique",   icon: "🕓" },
   ]},
   { section: "Outils", items: [
-    { id: "messages",  label: "Messages",  icon: "💬" },
-    { id: "notes",     label: "Notes",     icon: "📝" },
-    { id: "documents", label: "Documents", icon: "📁" },
+    { id: "messages",      label: "Messages",     icon: "💬" },
+    { id: "notes",         label: "Notes",        icon: "📝" },
+    { id: "documents",     label: "Documents",    icon: "📁" },
+    { id: "publications",  label: "Publications", icon: "📣" },
   ]},
   { section: "Démarchage", items: [
     { id: "prospects", label: "Prospects",      icon: "🎯" },
@@ -480,6 +482,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "pharmacies":   return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
       case "commandes":    return <CommandesModule       activeSociety={activeSociety} profile={profile} />
       case "playlists":    return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
+      case "publications": return <PublicationModule     activeSociety={activeSociety} profile={profile} />
       case "tournees":     return <TourneesModule        activeSociety={activeSociety} profile={profile}
           onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
       case "prospects":    return <ProspectsModule       activeSociety={activeSociety} profile={profile}
