@@ -195,12 +195,8 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
           vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
           pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
         })))
-        await createFacture(
-          societyId, vente.id,
-          selectedClient?.nom || "Client de passage",
-          total,
-          "Facture générée automatiquement via l'onglet Vente (vente manuelle)"
-        )
+        await createFacture(societyId, vente.id, selectedClient?.nom || "Client de passage", total,
+          "Facture générée automatiquement via l'onglet Vente (vente manuelle)")
       }
     } finally {
       setSaving(false); onDone(); onClose()
@@ -449,34 +445,23 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const handleVente = async () => {
     if (cart.length === 0) return
     setSaving(true)
-
     const clientNomFinal = selectedClient?.nom
-      || (typeVente === "Shopify"    ? "Commande Shopify"
-        : typeVente === "Pharmacie"  ? "Pharmacie"
-        : typeVente === "Convention" ? "Convention"
-        : "Client de passage")
-
+      || (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : typeVente === "Convention" ? "Convention" : "Client de passage")
     try {
       const { data: vente, error } = await supabase.from("ventes").insert({
         society_id: activeSociety.id, user_id: profile.id,
-        client_id: selectedClient?.id || null,
-        client_nom: clientNomFinal,
+        client_id: selectedClient?.id || null, client_nom: clientNomFinal,
         created_at: venteDate ? new Date(venteDate + "T12:00:00").toISOString() : new Date().toISOString(),
         total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
       }).select().single()
-
       if (!error && vente) {
         await supabase.from("vente_items").insert(cart.map(item => ({
           vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
           gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv,
           cf_unitaire: item.cf, total: item.pv * item.quantite,
         })))
-
-        await createFacture(
-          activeSociety.id, vente.id, clientNomFinal, totalTTC,
-          `Facture générée automatiquement via l'onglet Vente — ${paiement}`
-        )
-
+        await createFacture(activeSociety.id, vente.id, clientNomFinal, totalTTC,
+          `Facture générée automatiquement via l'onglet Vente — ${paiement}`)
         const { data: allStockData } = await supabase.from("stock").select("*").eq("society_id", activeSociety.id)
         const allStock = allStockData || []
         for (const item of cart) {
@@ -507,11 +492,9 @@ export default function VenteModule({ activeSociety, profile }: Props) {
             }
           }
         }
-
         setCart([]); setSelectedClient(null); setNotes(""); setClientPrixMap({})
         setPaiement("Espèces"); setPort(PORT_OPTIONS[0]); setPortPerso(""); setFraisColis("")
-        setSuccess(true)
-        setMobileTab("catalogue")
+        setSuccess(true); setMobileTab("catalogue")
         setTimeout(() => { setSuccess(false); loadData() }, 2500)
       }
     } catch (err) {
@@ -568,7 +551,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           </div>
         )}
       </div>
-
       <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -601,15 +583,12 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               const inCart = cart.find(i => i.product_id === product.id)
               const prod = product as any
               const composition: Record<string, number> = prod.composition
-                ? (typeof prod.composition === "string" ? JSON.parse(prod.composition) : prod.composition)
-                : {}
+                ? (typeof prod.composition === "string" ? JSON.parse(prod.composition) : prod.composition) : {}
               const hasCompo = Object.keys(composition).length > 0
               const marge = product.pv - product.cf
               return (
                 <button key={product.id} onClick={() => addToCart(product)}
-                  className={`relative text-left rounded-2xl border transition-all duration-200 overflow-hidden ${
-                    inCart ? "bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10" : "bg-zinc-900 border-zinc-800 hover:border-yellow-500/30 hover:bg-zinc-800/60"
-                  }`}>
+                  className={`relative text-left rounded-2xl border transition-all duration-200 overflow-hidden ${inCart ? "bg-yellow-500/10 border-yellow-500/50 shadow-lg shadow-yellow-500/10" : "bg-zinc-900 border-zinc-800 hover:border-yellow-500/30 hover:bg-zinc-800/60"}`}>
                   {inCart && (
                     <div className="absolute top-2 right-2 z-10 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black text-xs font-bold shadow-lg">
                       {inCart.quantite}
@@ -714,25 +693,26 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         ) : cart.map(item => (
           <div key={item.product_id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
             <div className="flex items-start justify-between mb-2">
-              <div className="flex-1 mr-2">
-                <p className="text-white text-sm font-medium leading-tight">{item.nom}</p>
+              <div className="flex-1 min-w-0 mr-2">
+                <p className="text-white text-sm font-medium leading-tight truncate">{item.nom}</p>
                 <p className="text-zinc-600 text-[11px]">{item.gamme}</p>
               </div>
-              <button onClick={() => setCart(prev => prev.filter(i => i.product_id !== item.product_id))} className="text-zinc-600 hover:text-red-400">
+              <button onClick={() => setCart(prev => prev.filter(i => i.product_id !== item.product_id))} className="text-zinc-600 hover:text-red-400 shrink-0">
                 <X size={13} />
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-zinc-800 rounded-lg">
+            {/* ── FIX OVERFLOW PRIX ── */}
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <div className="flex items-center gap-1 bg-zinc-800 rounded-lg shrink-0">
                 <button onClick={() => updateQty(item.product_id, item.quantite - 1)} className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white"><Minus size={11} /></button>
                 <span className="text-white text-sm font-bold w-6 text-center">{item.quantite}</span>
                 <button onClick={() => updateQty(item.product_id, item.quantite + 1)} className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white"><Plus size={11} /></button>
               </div>
               <input type="number" step="0.01" value={item.pv}
                 onChange={e => updatePrice(item.product_id, parseFloat(e.target.value) || 0)}
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60" />
-              <span className="text-zinc-500 text-xs">€</span>
-              <p className="text-yellow-500 font-bold text-sm w-16 text-right shrink-0">{(item.pv * item.quantite).toFixed(2)}€</p>
+                className="w-16 bg-zinc-800 border border-zinc-700 rounded-lg px-1 py-1.5 text-sm text-white text-center focus:outline-none focus:border-yellow-500/60 shrink-0" />
+              <span className="text-zinc-500 text-xs shrink-0">€</span>
+              <p className="text-yellow-500 font-bold text-sm text-right shrink-0 ml-auto">{(item.pv * item.quantite).toFixed(2)}€</p>
             </div>
           </div>
         ))}
@@ -837,18 +817,12 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] relative flex flex-col">
-      <div className="hidden md:flex flex-1 overflow-hidden">
-        {Catalogue}
-        {Panier}
-      </div>
-      <div className="flex md:hidden flex-1 overflow-hidden">
-        {mobileTab === "catalogue" ? Catalogue : Panier}
-      </div>
+      <div className="hidden md:flex flex-1 overflow-hidden">{Catalogue}{Panier}</div>
+      <div className="flex md:hidden flex-1 overflow-hidden">{mobileTab === "catalogue" ? Catalogue : Panier}</div>
       <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-[#111111]">
         <button onClick={() => setMobileTab("catalogue")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors ${mobileTab === "catalogue" ? "text-yellow-500" : "text-zinc-500"}`}>
-          <Package size={22} />
-          <span className="text-[10px] font-bold">Catalogue</span>
+          <Package size={22} /><span className="text-[10px] font-bold">Catalogue</span>
         </button>
         <button onClick={() => setMobileTab("panier")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition-colors relative ${mobileTab === "panier" ? "text-yellow-500" : "text-zinc-500"}`}>
@@ -860,9 +834,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               </span>
             )}
           </div>
-          <span className="text-[10px] font-bold">
-            {cartCount > 0 ? `Panier · ${totalTTC.toFixed(0)}€` : "Panier"}
-          </span>
+          <span className="text-[10px] font-bold">{cartCount > 0 ? `Panier · ${totalTTC.toFixed(0)}€` : "Panier"}</span>
         </button>
       </div>
       {showHistorique && <HistoriquePanel societyId={activeSociety.id} profile={profile} onClose={() => setShowHistorique(false)} />}
