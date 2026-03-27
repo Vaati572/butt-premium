@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 
 interface Product { id: string; name: string; gamme: string; pv: number; cf: number }
-interface Client { id: string; nom: string; contrat: string; telephone?: string }
+interface Client { id: string; nom: string; prenom?: string; nom_shop?: string; contrat: string; telephone?: string }
 interface CartItem { product_id: string; nom: string; gamme: string; quantite: number; pv: number; cf: number }
 interface Props { activeSociety: any; profile: any }
 
@@ -39,15 +39,13 @@ const createFacture = async (societyId: string, venteId: string, clientNom: stri
     const num = `FAC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*9000)+1000}`
     await supabase.from("factures").insert({
       society_id: societyId, numero: num, client_nom: clientNom,
-      montant, statut: "en_attente", source: "vente",
-      vente_id: venteId,
-      date_emission: new Date().toISOString().slice(0, 10),
-      notes: notesText,
+      montant, statut: "en_attente", source: "vente", vente_id: venteId,
+      date_emission: new Date().toISOString().slice(0, 10), notes: notesText,
     })
   } catch { /* silencieux si table absente */ }
 }
 
-/* ── HISTORIQUE ─────────────────────────────── */
+/* ── HISTORIQUE ── */
 function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; profile: any; onClose: () => void }) {
   const [ventes, setVentes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,12 +70,9 @@ function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; p
 
   const saveEdit = async () => {
     await supabase.from("ventes").update({
-      client_nom: editFields.clientNom,
-      paiement: editFields.paiement,
-      notes: editFields.notes,
+      client_nom: editFields.clientNom, paiement: editFields.paiement, notes: editFields.notes,
     }).eq("id", editVente.id)
-    setEditVente(null)
-    loadVentes()
+    setEditVente(null); loadVentes()
   }
 
   const filtered = search
@@ -165,7 +160,7 @@ function HistoriquePanel({ societyId, profile, onClose }: { societyId: string; p
   )
 }
 
-/* ── VENTE MANUELLE ─────────────────────────── */
+/* ── VENTE MANUELLE ── */
 function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
   profile: any; societyId: string; clients: Client[]; onClose: () => void; onDone: () => void
 }) {
@@ -177,7 +172,13 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const total = items.reduce((s, i) => s + i.quantite * i.pv, 0)
-  const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
+
+  const filteredClients = clients.filter(c => {
+    const s = clientSearch.toLowerCase()
+    return c.nom?.toLowerCase().includes(s)
+      || c.prenom?.toLowerCase().includes(s)
+      || c.nom_shop?.toLowerCase().includes(s)
+  })
 
   const handleSave = async () => {
     const validItems = items.filter(i => i.nom.trim() && i.pv > 0)
@@ -198,9 +199,7 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
         await createFacture(societyId, vente.id, selectedClient?.nom || "Client de passage", total,
           "Facture générée automatiquement via l'onglet Vente (vente manuelle)")
       }
-    } finally {
-      setSaving(false); onDone(); onClose()
-    }
+    } finally { setSaving(false); onDone(); onClose() }
   }
 
   return (
@@ -221,12 +220,17 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
             </button>
             {showClients && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
-                <div className="p-2"><input type="text" placeholder="Rechercher..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" /></div>
+                <div className="p-2">
+                  <input type="text" placeholder="Nom, prénom, shop..." value={clientSearch}
+                    onChange={e => setClientSearch(e.target.value)} autoFocus
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
                 <div className="max-h-40 overflow-y-auto">
                   <button onClick={() => { setSelectedClient(null); setShowClients(false) }} className="w-full text-left px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800">Client de passage</button>
                   {filteredClients.map(c => (
                     <button key={c.id} onClick={() => { setSelectedClient(c); setShowClients(false) }} className="w-full text-left px-4 py-2 hover:bg-zinc-800">
-                      <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
+                      <p className="text-white text-sm">{c.prenom ? `${c.prenom} ${c.nom}` : c.nom}</p>
+                      <p className="text-zinc-500 text-[11px]">{c.nom_shop ? `🏪 ${c.nom_shop}` : c.contrat}</p>
                     </button>
                   ))}
                 </div>
@@ -280,7 +284,7 @@ function VenteManuellePanel({ profile, societyId, clients, onClose, onDone }: {
   )
 }
 
-/* ── AJOUT PRODUIT ──────────────────────────── */
+/* ── AJOUT PRODUIT ── */
 function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; onClose: () => void; onDone: () => void }) {
   const [nom, setNom] = useState("")
   const [pv, setPv] = useState("")
@@ -341,32 +345,32 @@ function AddProductPanel({ societyId, onClose, onDone }: { societyId: string; on
    MAIN
 ══════════════════════════════════════════════ */
 export default function VenteModule({ activeSociety, profile }: Props) {
-  const [products, setProducts] = useState<Product[]>([])
-  const [clients, setClients] = useState<Client[]>([])
-  const [pharmacies, setPharmacies] = useState<any[]>([])
-  const [urssafRate, setUrssafRate] = useState(DEFAULT_URSSAF_RATE)
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [search, setSearch] = useState("")
+  const [products, setProducts]         = useState<Product[]>([])
+  const [clients, setClients]           = useState<Client[]>([])
+  const [pharmacies, setPharmacies]     = useState<any[]>([])
+  const [urssafRate, setUrssafRate]     = useState(DEFAULT_URSSAF_RATE)
+  const [cart, setCart]                 = useState<CartItem[]>([])
+  const [search, setSearch]             = useState("")
   const [searchClient, setSearchClient] = useState("")
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [clientPrixMap, setClientPrixMap] = useState<Record<string, number>>({})
-  const [venteDate, setVenteDate] = useState<string>(new Date().toISOString().split("T")[0])
-  const [showClients, setShowClients] = useState(false)
-  const [typeVente, setTypeVente] = useState("Particulier")
-  const [paiement, setPaiement] = useState("Espèces")
-  const [port, setPort] = useState(PORT_OPTIONS[0])
-  const [portPerso, setPortPerso] = useState("")
-  const [fraisColis, setFraisColis] = useState("")
-  const [notes, setNotes] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [clientPrixMap, setClientPrixMap]   = useState<Record<string, number>>({})
+  const [venteDate, setVenteDate]       = useState<string>(new Date().toISOString().split("T")[0])
+  const [showClients, setShowClients]   = useState(false)
+  const [typeVente, setTypeVente]       = useState("Particulier")
+  const [paiement, setPaiement]         = useState("Espèces")
+  const [port, setPort]                 = useState(PORT_OPTIONS[0])
+  const [portPerso, setPortPerso]       = useState("")
+  const [fraisColis, setFraisColis]     = useState("")
+  const [notes, setNotes]               = useState("")
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
   const [showHistorique, setShowHistorique] = useState(false)
-  const [showManuelle, setShowManuelle] = useState(false)
+  const [showManuelle, setShowManuelle]     = useState(false)
   const [showAddProduct, setShowAddProduct] = useState(false)
-  const [activeGamme, setActiveGamme] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [stockAlerts, setStockAlerts] = useState<string[]>([])
-  const [mobileTab, setMobileTab] = useState<"catalogue" | "panier">("catalogue")
+  const [activeGamme, setActiveGamme]   = useState<string | null>(null)
+  const [success, setSuccess]           = useState(false)
+  const [stockAlerts, setStockAlerts]   = useState<string[]>([])
+  const [mobileTab, setMobileTab]       = useState<"catalogue" | "panier">("catalogue")
   const barcodeRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (activeSociety) loadData() }, [activeSociety])
@@ -376,7 +380,8 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     try {
       const [{ data: prods }, { data: cls }, { data: stockData }, { data: cfgData }, { data: pharmas }] = await Promise.all([
         supabase.from("products").select("*").eq("society_id", activeSociety.id).order("gamme").order("name"),
-        supabase.from("clients").select("id, nom, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
+        // ── Inclut prenom et nom_shop pour la recherche ──
+        supabase.from("clients").select("id, nom, prenom, nom_shop, contrat, telephone").eq("society_id", activeSociety.id).order("nom"),
         supabase.from("stock").select("*").eq("society_id", activeSociety.id),
         supabase.from("settings").select("key, value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
         supabase.from("pharmacies").select("id, nom, ville, telephone").eq("society_id", activeSociety.id).order("nom"),
@@ -400,9 +405,16 @@ export default function VenteModule({ activeSociety, profile }: Props) {
     ? products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()) && p.gamme === activeGamme)
     : []
 
+  // ── Recherche client : nom + prénom + shop ──
   const filteredClients = typeVente === "Pharmacie"
-    ? pharmacies.filter((p: any) => p.nom.toLowerCase().includes(searchClient.toLowerCase())).map((p: any) => ({ id: p.id, nom: p.nom, contrat: p.ville || "Pharmacie", telephone: p.telephone }))
-    : clients.filter(c => c.nom.toLowerCase().includes(searchClient.toLowerCase()))
+    ? pharmacies.filter((p: any) => p.nom.toLowerCase().includes(searchClient.toLowerCase()))
+        .map((p: any) => ({ id: p.id, nom: p.nom, prenom: undefined, nom_shop: undefined, contrat: p.ville || "Pharmacie", telephone: p.telephone }))
+    : clients.filter(c => {
+        const s = searchClient.toLowerCase()
+        return c.nom?.toLowerCase().includes(s)
+          || c.prenom?.toLowerCase().includes(s)
+          || c.nom_shop?.toLowerCase().includes(s)
+      })
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -551,6 +563,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           </div>
         )}
       </div>
+
       <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -650,13 +663,21 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="text-white text-sm font-medium truncate">{selectedClient?.nom || "Sélectionner un client"}</p>
-                {selectedClient && <p className="text-zinc-500 text-[11px]">{selectedClient.contrat}</p>}
+                {selectedClient && (
+                  <p className="text-zinc-500 text-[11px]">
+                    {selectedClient.nom_shop ? `🏪 ${selectedClient.nom_shop}` : selectedClient.contrat}
+                  </p>
+                )}
               </div>
               <ChevronDown size={13} className="text-zinc-500 shrink-0" />
             </button>
             {showClients && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
-                <div className="p-2"><input type="text" placeholder="Rechercher..." value={searchClient} onChange={e => setSearchClient(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" /></div>
+                <div className="p-2">
+                  <input type="text" placeholder="Nom, prénom, shop..." value={searchClient}
+                    onChange={e => setSearchClient(e.target.value)} autoFocus
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
+                </div>
                 <div className="max-h-48 overflow-y-auto">
                   {filteredClients.map(c => (
                     <button key={c.id} onClick={async () => {
@@ -666,9 +687,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                       ;(data || []).forEach((p: any) => { map[p.product_id] = p.prix })
                       setClientPrixMap(map)
                     }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
-                      <p className="text-white text-sm">{c.nom}</p><p className="text-zinc-500 text-[11px]">{c.contrat}</p>
+                      <p className="text-white text-sm">{c.prenom ? `${c.prenom} ${c.nom}` : c.nom}</p>
+                      <p className="text-zinc-500 text-[11px]">{c.nom_shop ? `🏪 ${c.nom_shop}` : c.contrat}</p>
                     </button>
                   ))}
+                  {filteredClients.length === 0 && (
+                    <p className="text-zinc-600 text-xs text-center py-4">Aucun client trouvé</p>
+                  )}
                 </div>
               </div>
             )}
@@ -701,7 +726,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                 <X size={13} />
               </button>
             </div>
-            {/* ── FIX OVERFLOW PRIX ── */}
             <div className="flex items-center gap-1.5 overflow-hidden">
               <div className="flex items-center gap-1 bg-zinc-800 rounded-lg shrink-0">
                 <button onClick={() => updateQty(item.product_id, item.quantite - 1)} className="w-7 h-7 flex items-center justify-center text-zinc-400 hover:text-white"><Minus size={11} /></button>
