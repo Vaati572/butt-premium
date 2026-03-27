@@ -41,8 +41,7 @@ function EditVenteModal({ vente, onClose, onDone }: { vente: any; onClose: () =>
               {["Espèces","Carte Bancaire","Virement","Chèque","En attente"].map(p=>(
                 <button key={p} onClick={()=>setPaiement(p)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${paiement===p?"bg-yellow-500 text-black border-yellow-500":"bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{p}</button>
               ))}
-            </div>
-          </div>
+            </div></div>
           <div><label className="block text-[11px] text-zinc-500 uppercase tracking-wider font-semibold mb-1.5">Notes</label>
             <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Notes..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/></div>
         </div>
@@ -61,24 +60,26 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
   const [depenses, setDepenses] = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState("")
-  // ── Par défaut : afficher uniquement les ventes ──
   const [typeFilter, setTypeFilter] = useState<"all"|"vente"|"stock"|"depense"|"offert">("vente")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo]     = useState("")
   const [editVente, setEditVente] = useState<any>(null)
   const [expanded, setExpanded] = useState<string|null>(null)
   const [page, setPage]         = useState(1)
+  const [urssafRate, setUrssafRate] = useState(0.138)
   const PER_PAGE = 60
 
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
     setLoading(true)
-    const [{ data: v }, { data: s }, { data: d }] = await Promise.all([
+    const [{ data: v }, { data: s }, { data: d }, { data: cfg }] = await Promise.all([
       supabase.from("ventes").select("*, vente_items(*)").eq("society_id", activeSociety.id).order("created_at", { ascending: false }).limit(500),
       supabase.from("stock_history").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("depenses").select("*").eq("society_id", activeSociety.id).order("created_at", { ascending: false }).limit(500),
+      supabase.from("settings").select("value").eq("society_id", activeSociety.id).eq("key", "urssaf_rate_global").single(),
     ])
     setVentes(v||[]); setStocks(s||[]); setDepenses(d||[])
+    if (cfg?.value != null) setUrssafRate(Number(cfg.value))
     setLoading(false)
   }, [activeSociety?.id])
 
@@ -108,7 +109,10 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
     if (typeFilter !== "all" && typeFilter !== "vente") return
     const label = v.client_nom || "Client de passage"
     const details = (v.vente_items||[]).map((i:any)=>`${i.produit_nom} ×${i.quantite}`).join(", ")
-    if (search) { const s=search.toLowerCase(); if (!label.toLowerCase().includes(s) && !details.toLowerCase().includes(s) && !(v.notes||"").toLowerCase().includes(s)) return }
+    if (search) {
+      const s=search.toLowerCase()
+      if (!label.toLowerCase().includes(s) && !details.toLowerCase().includes(s) && !(v.notes||"").toLowerCase().includes(s)) return
+    }
     if (dateFrom && v.created_at < dateFrom) return
     if (dateTo && v.created_at > dateTo+"T23:59:59") return
     allEntries.push({ _type:"vente", _date:v.created_at, _id:v.id, _raw:v, label, details, montant:Number(v.total_ttc), paiement:v.paiement, items:v.vente_items||[] })
@@ -190,22 +194,14 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
               onChange={e=>{setSearch(e.target.value);setPage(1)}}
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/50"/>
           </div>
-
-          {/* Boutons filtre — ventes en premier et actif par défaut */}
           <div className="flex gap-1 flex-wrap">
             {FILTERS.map(t=>(
               <button key={t.id} onClick={()=>{setTypeFilter(t.id as any);setPage(1)}}
                 className={`px-3 py-2 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  typeFilter===t.id
-                    ? "bg-yellow-500 text-black border-yellow-500"
-                    : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"
-                }`}>
-                {t.l}
-              </button>
+                  typeFilter===t.id ? "bg-yellow-500 text-black border-yellow-500" : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600"
+                }`}>{t.l}</button>
             ))}
           </div>
-
-          {/* Dates */}
           <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
             className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"/>
           <span className="text-zinc-600 text-xs">→</span>
@@ -222,8 +218,7 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
           </div>
         ) : allEntries.length===0 ? (
           <div className="text-center py-24 text-zinc-600">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="text-sm">Aucune entrée</p>
+            <p className="text-4xl mb-3">📭</p><p className="text-sm">Aucune entrée</p>
           </div>
         ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -232,6 +227,14 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
                 const cfg = TYPE_CONFIG[entry._type as keyof typeof TYPE_CONFIG]
                 const isExpanded = expanded === entry._id
                 const isVente = entry._type === "vente"
+
+                // Calculs détaillés vente
+                const cfTotal = isVente
+                  ? (entry.items||[]).reduce((s:number, it:any) => s + Number(it.cf_unitaire||0) * Number(it.quantite||0), 0)
+                  : 0
+                const urssafMontant = isVente ? entry.montant * urssafRate : 0
+                const apresUrssafEtCF = isVente ? entry.montant - urssafMontant - cfTotal : 0
+
                 return (
                   <div key={entry._id+entry._type} className="group">
                     <div className="flex items-start gap-3 px-5 py-3.5 hover:bg-zinc-800/30 transition-colors">
@@ -240,6 +243,7 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
                           {isExpanded?<ChevronUp size={14}/>:<ChevronDown size={14}/>}
                         </button>
                       ) : <span className="text-lg shrink-0 mt-0.5">{cfg.emoji}</span>}
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${cfg.color}`}>{entry.action||cfg.label}</span>
@@ -249,6 +253,7 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
                         {!isExpanded && entry.details && <p className="text-zinc-500 text-xs mt-0.5 truncate">{entry.details}</p>}
                         <p className="text-zinc-700 text-[10px] mt-0.5">{new Date(entry._date).toLocaleString("fr-FR")}</p>
                       </div>
+
                       {entry.montant!=null && (
                         <div className="shrink-0 text-right">
                           <p className={`text-sm font-bold ${entry._type==="vente"?"text-yellow-400":entry._type==="depense"?"text-red-400":"text-purple-400"}`}>
@@ -256,6 +261,7 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
                           </p>
                         </div>
                       )}
+
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         {entry._type==="vente" && (
                           <button onClick={()=>setEditVente(entry._raw)} className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700"><Pencil size={13}/></button>
@@ -267,18 +273,79 @@ export default function HistoriqueModule({ activeSociety, profile }: Props) {
                         }} className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10"><Trash2 size={13}/></button>
                       </div>
                     </div>
-                    {isExpanded && isVente && entry.items?.length>0 && (
-                      <div className="px-5 pb-3 pl-12 space-y-1 border-t border-zinc-800/60 pt-2 bg-zinc-900/30">
-                        {entry.items.map((item:any)=>(
-                          <div key={item.id} className="flex items-center justify-between">
-                            <span className="text-zinc-400 text-xs">{item.produit_nom} <span className="text-zinc-600">×{item.quantite}</span></span>
-                            <span className="text-zinc-300 text-xs font-semibold">{Number(item.total).toFixed(2)}€</span>
+
+                    {/* ── DÉTAIL ÉTENDU ── */}
+                    {isExpanded && isVente && (
+                      <div className="px-5 pb-4 pl-12 border-t border-zinc-800/60 pt-3 bg-zinc-900/40 space-y-3">
+
+                        {/* Infos principales */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-zinc-800 rounded-xl px-4 py-3">
+                            <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-semibold mb-0.5">📅 Date & heure</p>
+                            <p className="text-white text-sm font-semibold">
+                              {new Date(entry._date).toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"long", year:"numeric" })}
+                            </p>
+                            <p className="text-zinc-400 text-xs mt-0.5">
+                              {new Date(entry._date).toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })}
+                            </p>
                           </div>
-                        ))}
-                        <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
-                          <span className="text-zinc-500 text-xs">Total</span>
-                          <span className="text-yellow-400 text-sm font-bold">{entry.montant?.toFixed(2)}€</span>
+                          <div className="bg-zinc-800 rounded-xl px-4 py-3">
+                            <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-semibold mb-0.5">👤 Client</p>
+                            <p className="text-white text-sm font-semibold">{entry._raw.client_nom || "Client de passage"}</p>
+                            {entry._raw.paiement && (
+                              <p className="text-zinc-400 text-xs mt-0.5">💳 {entry._raw.paiement}</p>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Articles */}
+                        {entry.items?.length > 0 && (
+                          <div className="bg-zinc-800 rounded-xl px-4 py-3">
+                            <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-semibold mb-2">🛒 Articles</p>
+                            <div className="space-y-1">
+                              {entry.items.map((item:any) => (
+                                <div key={item.id} className="flex items-center justify-between">
+                                  <span className="text-zinc-300 text-xs">{item.produit_nom} <span className="text-zinc-600">×{item.quantite}</span></span>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-zinc-600 text-[10px]">CF: {(Number(item.cf_unitaire||0)*Number(item.quantite)).toFixed(2)}€</span>
+                                    <span className="text-zinc-300 text-xs font-semibold">{Number(item.total||0).toFixed(2)}€</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Récap financier */}
+                        <div className="bg-zinc-800 rounded-xl px-4 py-3 space-y-1.5">
+                          <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-semibold mb-2">💰 Récap financier</p>
+                          <div className="flex justify-between">
+                            <span className="text-zinc-400 text-xs">Montant total client</span>
+                            <span className="text-yellow-400 text-sm font-bold">{entry.montant.toFixed(2)}€</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-zinc-400 text-xs">URSSAF ({(urssafRate*100).toFixed(1)}%)</span>
+                            <span className="text-red-400 text-xs font-semibold">-{urssafMontant.toFixed(2)}€</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-zinc-400 text-xs">Coût de fabrication</span>
+                            <span className="text-orange-400 text-xs font-semibold">-{cfTotal.toFixed(2)}€</span>
+                          </div>
+                          <div className="h-px bg-zinc-700 my-1"/>
+                          <div className="flex justify-between">
+                            <span className="text-white text-xs font-bold">Net après URSSAF + CF</span>
+                            <span className={`text-sm font-black ${apresUrssafEtCF >= 0 ? "text-green-400" : "text-red-400"}`}>
+                              {apresUrssafEtCF.toFixed(2)}€
+                            </span>
+                          </div>
+                        </div>
+
+                        {entry._raw.notes && (
+                          <div className="bg-zinc-800/60 rounded-xl px-4 py-2.5">
+                            <p className="text-zinc-500 text-[10px] uppercase tracking-wider font-semibold mb-1">📝 Notes</p>
+                            <p className="text-zinc-400 text-xs">{entry._raw.notes}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

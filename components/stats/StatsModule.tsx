@@ -10,6 +10,15 @@ interface Props { activeSociety: any; profile: any }
 const MOIS_FR    = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 const MOIS_SHORT = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
 
+const PAIEMENT_COLORS: Record<string, string> = {
+  "Espèces":       "#22c55e",
+  "Carte Bancaire":"#3b82f6",
+  "Virement":      "#a855f7",
+  "Chèque":        "#f97316",
+  "En attente":    "#ef4444",
+}
+const getPaiementColor = (mode: string) => PAIEMENT_COLORS[mode] || "#eab308"
+
 export default function StatsModule({ activeSociety, profile }: Props) {
   const { settings } = useUserSettings()
   const ACCENT = settings.accent_color || "#eab308"
@@ -23,12 +32,10 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   const [statsView,     setStatsView]     = useState<"ca"|"marge">("ca")
   const [hoveredBar,    setHoveredBar]    = useState<number|null>(null)
 
-  // On charge TOUT sans filtre année pour éviter la race condition
   const [allVentesRaw, setAllVentesRaw] = useState<any[]>([])
   const [allDepenses,  setAllDepenses]  = useState<any[]>([])
   const [loading,      setLoading]      = useState(true)
 
-  // Taux URSSAF
   useEffect(() => {
     if (!activeSociety?.id) return
     supabase.from("settings").select("value")
@@ -36,45 +43,29 @@ export default function StatsModule({ activeSociety, profile }: Props) {
       .then(({ data }) => { if (data?.value != null) setUrssafRate(Number(data.value)) })
   }, [activeSociety?.id])
 
-  // Chargement TOUTES ventes + dépenses (sans filtre année)
   useEffect(() => {
     if (!activeSociety?.id) return
     const fetchAll = async () => {
       setLoading(true)
-
       const { data: ventes } = await supabase
         .from("ventes")
-        .select("id,created_at,total_ttc,client_nom,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
+        .select("id,created_at,total_ttc,client_nom,paiement,vente_items(produit_nom,cf_unitaire,quantite,pv_unitaire)")
         .eq("society_id", activeSociety.id)
         .order("created_at", { ascending: false })
-
-
-
-      const { data: deps } = await supabase
-        .from("depenses").select("montant,created_at")
-        .eq("society_id", activeSociety.id)
-
+      const { data: deps } = await supabase.from("depenses").select("montant,created_at").eq("society_id", activeSociety.id)
       const ventesData = ventes || []
       setAllVentesRaw(ventesData)
       setAllDepenses(deps || [])
-
-      // Caler l'année sur la vente la plus récente
-      if (ventesData.length > 0) {
-        setYear(new Date(ventesData[0].created_at).getFullYear())
-      }
-
+      if (ventesData.length > 0) setYear(new Date(ventesData[0].created_at).getFullYear())
       setLoading(false)
     }
     fetchAll()
   }, [activeSociety?.id])
 
-  // Filtrage par année côté client
   const allVentes = allVentesRaw.filter(v => new Date(v.created_at).getFullYear() === year)
-  const depenses  = allDepenses
-    .filter(d => new Date(d.created_at).getFullYear() === year)
+  const depenses  = allDepenses.filter(d => new Date(d.created_at).getFullYear() === year)
     .reduce((s:number,d:any) => s + Number(d.montant||0), 0)
 
-  // Années disponibles
   const availableYears = [...new Set(allVentesRaw.map(v => new Date(v.created_at).getFullYear()))].sort((a,b)=>b-a)
   const minYear = availableYears.length > 0 ? Math.min(...availableYears) : today.getFullYear()
 
@@ -86,9 +77,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     const m = new Date(v.created_at).getMonth()
     monthlyCA[m] += Number(v.total_ttc||0)
     monthlyNb[m] += 1
-    ;(v.vente_items||[]).forEach((it:any) => {
-      monthlyCF[m] += Number(it.cf_unitaire||0) * Number(it.quantite||0)
-    })
+    ;(v.vente_items||[]).forEach((it:any) => { monthlyCF[m] += Number(it.cf_unitaire||0) * Number(it.quantite||0) })
   })
   const totalCA       = monthlyCA.reduce((s,v)=>s+v,0)
   const totalCF       = monthlyCF.reduce((s,v)=>s+v,0)
@@ -97,7 +86,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
 
   // ── Calculs mois ──
   const ventesMonth = allVentes.filter(v => new Date(v.created_at).getMonth() === selectedMonth)
-  const caMonth = ventesMonth.reduce((s:number,v:any) => s + Number(v.total_ttc||0), 0)
+  const caMonth     = ventesMonth.reduce((s:number,v:any) => s + Number(v.total_ttc||0), 0)
   const daysInMonth = new Date(year, selectedMonth+1, 0).getDate()
   const dailyCA = new Array(daysInMonth).fill(0)
   const dailyNb = new Array(daysInMonth).fill(0)
@@ -106,6 +95,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     dailyCA[d] += Number(v.total_ttc||0)
     dailyNb[d] += 1
   })
+
   const prodStats: Record<string,{qty:number,ca:number}> = {}
   ventesMonth.forEach((v:any) => {
     ;(v.vente_items||[]).forEach((it:any) => {
@@ -116,12 +106,28 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     })
   })
   const topProduits = Object.entries(prodStats).sort((a,b)=>b[1].ca-a[1].ca).slice(0,8)
+
   const clientStats: Record<string,number> = {}
   ventesMonth.forEach((v:any) => {
     if (v.client_nom) clientStats[v.client_nom] = (clientStats[v.client_nom]||0) + Number(v.total_ttc||0)
   })
   const topClients = Object.entries(clientStats).sort((a,b)=>b[1]-a[1]).slice(0,5)
-  const pmtEntries: [string,number][] = []
+
+  // ── Modes de paiement du mois ──
+  const pmtStats: Record<string, number> = {}
+  ventesMonth.forEach((v:any) => {
+    const mode = v.paiement || "Non renseigné"
+    pmtStats[mode] = (pmtStats[mode] || 0) + Number(v.total_ttc||0)
+  })
+  const pmtEntries: [string,number][] = Object.entries(pmtStats).sort((a,b)=>b[1]-a[1])
+
+  // ── Modes de paiement de l'année ──
+  const pmtYearStats: Record<string, number> = {}
+  allVentes.forEach((v:any) => {
+    const mode = v.paiement || "Non renseigné"
+    pmtYearStats[mode] = (pmtYearStats[mode] || 0) + Number(v.total_ttc||0)
+  })
+  const pmtYearEntries: [string,number][] = Object.entries(pmtYearStats).sort((a,b)=>b[1]-a[1])
 
   // ── Calculs jour ──
   const ventesDay = allVentesRaw.filter(v => {
@@ -138,6 +144,14 @@ export default function StatsModule({ activeSociety, profile }: Props) {
   })
   const maxHourly = Math.max(...hourlyCA, 1)
 
+  // ── Modes paiement du jour ──
+  const pmtDayStats: Record<string, number> = {}
+  ventesDay.forEach((v:any) => {
+    const mode = v.paiement || "Non renseigné"
+    pmtDayStats[mode] = (pmtDayStats[mode] || 0) + Number(v.total_ttc||0)
+  })
+  const pmtDayEntries: [string,number][] = Object.entries(pmtDayStats).sort((a,b)=>b[1]-a[1])
+
   const anneeDisplay = statsView==="ca" ? monthlyCA : monthlyCA.map((ca,i)=>Math.max(0,ca-monthlyCF[i]))
   const moisDisplay  = statsView==="ca" ? dailyCA   : dailyCA.map(ca=>Math.max(0,ca))
   const maxAnnee = Math.max(...anneeDisplay, 1)
@@ -150,11 +164,54 @@ export default function StatsModule({ activeSociety, profile }: Props) {
     </div>
   )
 
+  /* ── Bloc modes de paiement ── */
+  const PaiementBlock = ({ entries, total, title }: { entries: [string,number][]; total: number; title: string }) => {
+    if (entries.length === 0) return null
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <p className="text-white font-bold text-sm mb-4">💳 {title}</p>
+        <div className="space-y-3">
+          {entries.map(([mode, ca]) => {
+            const pct = Math.round((ca / (total||1)) * 100)
+            const color = getPaiementColor(mode)
+            const nb = (view === "annee" ? allVentes : view === "mois" ? ventesMonth : ventesDay)
+              .filter((v:any) => (v.paiement || "Non renseigné") === mode).length
+            return (
+              <div key={mode}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}/>
+                    <span className="text-zinc-300 text-sm font-semibold">{mode}</span>
+                    <span className="text-zinc-600 text-xs">· {nb} vente{nb>1?"s":""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold" style={{ color }}>{ca.toFixed(2)}€</span>
+                    <span className="text-zinc-600 text-xs w-8 text-right">{pct}%</span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width:`${pct}%`, backgroundColor: color }}/>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {/* Barre colorée composée */}
+        <div className="flex h-2 rounded-full overflow-hidden mt-4 gap-0.5">
+          {entries.map(([mode, ca]) => {
+            const pct = (ca / (total||1)) * 100
+            return <div key={mode} className="h-full rounded-sm transition-all" style={{ width:`${pct}%`, backgroundColor: getPaiementColor(mode) }} title={`${mode}: ${ca.toFixed(0)}€`}/>
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <div className="p-6 max-w-6xl mx-auto space-y-6">
 
-        {/* ── HEADER ── */}
+        {/* HEADER */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold text-white">📊 Statistiques</h1>
@@ -170,22 +227,17 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 </button>
               ))}
             </div>
-
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-              <button onClick={()=>setYear(y=>y-1)} disabled={year<=minYear}
-                className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft size={14}/></button>
+              <button onClick={()=>setYear(y=>y-1)} disabled={year<=minYear} className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronLeft size={14}/></button>
               <span className="text-white font-bold text-sm px-2">{year}</span>
-              <button onClick={()=>setYear(y=>y+1)} disabled={year>=today.getFullYear()}
-                className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
+              <button onClick={()=>setYear(y=>y+1)} disabled={year>=today.getFullYear()} className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
             </div>
-
             {view==="mois" && (
               <select value={selectedMonth} onChange={e=>setSelectedMonth(Number(e.target.value))}
                 className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
                 {MOIS_FR.map((m,i)=><option key={i} value={i}>{m}</option>)}
               </select>
             )}
-
             {view==="jour" && (
               <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
                 <Calendar size={13} className="text-zinc-500"/>
@@ -194,7 +246,6 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                   className="bg-transparent text-sm text-white focus:outline-none cursor-pointer"/>
               </div>
             )}
-
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
               {(["ca","marge"] as const).map(v=>(
                 <button key={v} onClick={()=>setStatsView(v)}
@@ -215,10 +266,10 @@ export default function StatsModule({ activeSociety, profile }: Props) {
         ) : view==="annee" ? (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Kpi label="CA Brut"         value={totalCA.toFixed(2)+"€"}                      color={ACCENT}/>
-              <Kpi label="Net URSSAF"       value={(totalCA*(1-urssafRate)).toFixed(2)+"€"}      color="#22c55e"/>
-              <Kpi label="Coût fabrication" value={totalCF.toFixed(2)+"€"}                      color="#f97316"/>
-              <Kpi label="Résultat final"   value={resultatFinal.toFixed(2)+"€"}                color={resultatFinal>=0?"#22c55e":"#ef4444"}/>
+              <Kpi label="CA Brut"         value={totalCA.toFixed(2)+"€"}                color={ACCENT}/>
+              <Kpi label="Net URSSAF"       value={(totalCA*(1-urssafRate)).toFixed(2)+"€"} color="#22c55e"/>
+              <Kpi label="Coût fabrication" value={totalCF.toFixed(2)+"€"}               color="#f97316"/>
+              <Kpi label="Résultat final"   value={resultatFinal.toFixed(2)+"€"}          color={resultatFinal>=0?"#22c55e":"#ef4444"}/>
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
@@ -275,6 +326,9 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                 </div>
               </div>
             </div>
+
+            {/* Modes de paiement année */}
+            <PaiementBlock entries={pmtYearEntries} total={totalCA} title={`Modes de paiement — ${year}`}/>
           </>
 
         ) : view==="mois" ? (
@@ -307,8 +361,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                           {hoveredBar===i+100&&val>0&&(
                             <div className="text-white text-[9px] font-bold bg-zinc-800 px-1.5 py-0.5 rounded whitespace-nowrap">{val.toFixed(0)}€</div>
                           )}
-                          <div className="w-full rounded-t-sm"
-                            style={{height:`${barH}px`,backgroundColor:isToday?ACCENT:val>0?ACCENT+"60":"#3f3f46"}}/>
+                          <div className="w-full rounded-t-sm" style={{height:`${barH}px`,backgroundColor:isToday?ACCENT:val>0?ACCENT+"60":"#3f3f46"}}/>
                         </div>
                       )
                     })}
@@ -368,20 +421,8 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               </div>
             </div>
 
-            {pmtEntries.length>0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                <p className="text-white font-bold text-sm mb-3">💳 Modes de paiement</p>
-                <div className="flex gap-3 flex-wrap">
-                  {pmtEntries.map(([mode,ca])=>(
-                    <div key={mode} className="flex items-center gap-2 bg-zinc-800 rounded-xl px-4 py-2.5">
-                      <p className="text-zinc-300 text-sm font-semibold">{mode}</p>
-                      <p className="text-xs font-bold" style={{color:ACCENT}}>{ca.toFixed(0)}€</p>
-                      <p className="text-zinc-600 text-xs">{((ca/(caMonth||1))*100).toFixed(0)}%</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Modes de paiement mois */}
+            <PaiementBlock entries={pmtEntries} total={caMonth} title={`Modes de paiement — ${MOIS_FR[selectedMonth]} ${year}`}/>
           </>
 
         ) : (
@@ -427,6 +468,11 @@ export default function StatsModule({ activeSociety, profile }: Props) {
               )}
             </div>
 
+            {/* Modes de paiement jour */}
+            {pmtDayEntries.length > 0 && (
+              <PaiementBlock entries={pmtDayEntries} total={caDay} title="Modes de paiement du jour"/>
+            )}
+
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
                 <p className="text-white font-bold text-sm">Ventes du jour ({nbDay})</p>
@@ -442,6 +488,7 @@ export default function StatsModule({ activeSociety, profile }: Props) {
                         <p className="text-white text-sm font-semibold">{v.client_nom||"—"}</p>
                         <p className="text-zinc-500 text-xs">
                           {new Date(v.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+                          {v.paiement && <span className="ml-2 text-zinc-600">{v.paiement}</span>}
                         </p>
                         {(v.vente_items||[]).length>0 && (
                           <p className="text-zinc-600 text-[10px] mt-0.5">
