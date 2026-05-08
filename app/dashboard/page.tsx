@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { UserSettingsProvider, useUserSettings } from "@/lib/UserSettingsContext"
 import ClientsModule from "@/components/clients/ClientsModule"
+import SuiviModule from "@/components/suivi/SuiviModule"
 import StocksModule from "@/components/stocks/StocksModule"
 import VenteModule from "@/components/vente/VenteModule"
 import AdminModule from "@/components/admin/AdminModule"
@@ -57,6 +58,7 @@ const ALL_NAV = [
     { id: "vente",       label: "Vente",             icon: "🛒" },
     { id: "conventions", label: "Conventions",       icon: "🎪" },
     { id: "clients",     label: "Clients",           icon: "👤" },
+    { id: "suivi",       label: "Suivi",             icon: "📋" },
     { id: "playlists",   label: "Playlists clients", icon: "🎵" },
     { id: "stocks",      label: "Stock",             icon: "📦" },
   ]},
@@ -472,6 +474,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "conventions":  return <ConventionModule      activeSociety={activeSociety} profile={profile} />
       case "stocks":       return <StocksModule          activeSociety={activeSociety} profile={profile} />
       case "vente":        return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "suivi":        return <SuiviModule           activeSociety={activeSociety} profile={profile} />
       case "depenses":     return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
       case "stats":        return <StatsModule           activeSociety={activeSociety} profile={profile} />
       case "notes":        return <NotesModule           activeSociety={activeSociety} profile={profile} />
