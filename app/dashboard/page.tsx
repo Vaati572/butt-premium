@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { UserSettingsProvider, useUserSettings } from "@/lib/UserSettingsContext"
 import ClientsModule from "@/components/clients/ClientsModule"
-import SuiviModule from "@/components/suivi/SuiviModule"
 import StocksModule from "@/components/stocks/StocksModule"
 import VenteModule from "@/components/vente/VenteModule"
 import AdminModule from "@/components/admin/AdminModule"
@@ -29,6 +28,7 @@ import ParametresModule from "@/components/parametres/ParametresModule"
 import IAModule from "@/components/IAModule"
 import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import PublicationModule from "@/components/publications/PublicationModule"
+import SuiviModule from "@/components/suivi/SuiviModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -74,10 +74,10 @@ const ALL_NAV = [
     { id: "historique", label: "Historique",   icon: "🕓" },
   ]},
   { section: "Outils", items: [
-    { id: "messages",      label: "Messages",     icon: "💬" },
-    { id: "notes",         label: "Notes",        icon: "📝" },
-    { id: "documents",     label: "Documents",    icon: "📁" },
-    { id: "publications",  label: "Publications", icon: "📣" },
+    { id: "messages",     label: "Messages",     icon: "💬" },
+    { id: "notes",        label: "Notes",        icon: "📝" },
+    { id: "documents",    label: "Documents",    icon: "📁" },
+    { id: "publications", label: "Publications", icon: "📣" },
   ]},
   { section: "Démarchage", items: [
     { id: "prospects", label: "Prospects",      icon: "🎯" },
@@ -282,6 +282,16 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [globalResults, setGlobalResults]   = useState<any[]>([])
   const [searchLoading, setSearchLoading]   = useState(false)
 
+  // ── Sections repliables ──
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      next.has(section) ? next.delete(section) : next.add(section)
+      return next
+    })
+  }
+
   const heartbeatRef  = useRef<NodeJS.Timeout | null>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
   const router        = useRouter()
@@ -293,6 +303,18 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const BG_GRADIENT = (settings as any).bg_gradient || ""
 
   useEffect(() => { if (settings.start_page) setActiveTab(settings.start_page) }, [settings.start_page])
+
+  // Auto-ouvre la section de l'onglet actif
+  useEffect(() => {
+    const activeSection = ALL_NAV.find(s => s.items.some(t => t.id === activeTab))?.section
+    if (activeSection) {
+      setCollapsedSections(prev => {
+        const next = new Set(prev)
+        next.delete(activeSection)
+        return next
+      })
+    }
+  }, [activeTab])
 
   useEffect(() => {
     if (!activeSociety) return
@@ -471,10 +493,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     switch (activeTab) {
       case "accueil":      return <AccueilModule         activeSociety={activeSociety} profile={profile} />
       case "clients":      return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "suivi":        return <SuiviModule           activeSociety={activeSociety} profile={profile} />
       case "conventions":  return <ConventionModule      activeSociety={activeSociety} profile={profile} />
       case "stocks":       return <StocksModule          activeSociety={activeSociety} profile={profile} />
       case "vente":        return <VenteModule           activeSociety={activeSociety} profile={profile} />
-      case "suivi":        return <SuiviModule           activeSociety={activeSociety} profile={profile} />
       case "depenses":     return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
       case "stats":        return <StatsModule           activeSociety={activeSociety} profile={profile} />
       case "notes":        return <NotesModule           activeSociety={activeSociety} profile={profile} />
@@ -543,15 +565,60 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     </>
   )
 
+  /* ── Rendu d'un onglet sidebar ── */
+  const renderNavItem = (tab: any) => {
+    const isActive = activeTab === tab.id
+    return (
+      <button key={tab.id}
+        onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 relative"
+        style={{
+          backgroundColor: isActive ? (tab.restricted ? "#ef444415" : ACCENT + "12") : "transparent",
+          color: tab.restricted ? (isActive ? "#ef4444" : "#4a1515") : (isActive ? ACCENT : "#52525b"),
+          border: isActive ? `1px solid ${tab.restricted ? "#ef444445" : ACCENT + "55"}` : "1px solid transparent",
+          boxShadow: isActive ? `0 0 14px ${tab.restricted ? "#ef444418" : ACCENT + "18"}` : "none",
+        }}
+        onMouseEnter={e => {
+          const el = e.currentTarget as HTMLElement
+          if (!isActive) {
+            el.style.backgroundColor = tab.restricted ? "#ef444410" : ACCENT + "0e"
+            el.style.color = tab.restricted ? "#ef4444" : ACCENT
+          }
+        }}
+        onMouseLeave={e => {
+          const el = e.currentTarget as HTMLElement
+          if (!isActive) {
+            el.style.backgroundColor = "transparent"
+            el.style.color = tab.restricted ? "#4a1515" : "#52525b"
+          }
+        }}>
+        {isActive && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+            style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT, boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}` }} />
+        )}
+        <span className="text-sm">{tab.icon}</span>
+        <span className="flex-1 truncate">{tab.label}</span>
+        {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
+        {tab.id === "messages" && unreadMessages > 0 && (
+          <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+        )}
+      </button>
+    )
+  }
+
   return (
     <div className="h-screen text-white flex overflow-hidden"
       style={{ background: BG_GRADIENT || BG, fontSize: baseFontSize, ["--card-radius" as any]: cardRadius }}>
 
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
+      {/* ── SIDEBAR DESKTOP ── */}
       <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden"
         style={{ backgroundColor: SIDEBAR_BG }}>
-        <div className="px-4 pt-3 pb-3 border-b border-zinc-900">
+
+        {/* Logo + société + recherche */}
+        <div className="px-4 pt-3 pb-3 border-b border-zinc-900 shrink-0">
           <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
           {activeSociety && (
             <div className="flex items-center gap-1 mt-1.5">
@@ -591,81 +658,72 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
-          {visibleNav.map(({ section, items }) => (
-            <div key={section}>
-              <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
-              {items.map(tab => {
-                const isActive = activeTab === tab.id
-                return (
-                  <button key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 group relative mb-1"
-                    style={{
-                      backgroundColor: isActive ? (tab.restricted ? "#ef444415" : ACCENT + "12") : "transparent",
-                      color: tab.restricted ? (isActive ? "#ef4444" : "#4a1515") : (isActive ? ACCENT : "#52525b"),
-                      border: isActive ? `1px solid ${tab.restricted ? "#ef444445" : ACCENT + "55"}` : "1px solid #27272a",
-                      boxShadow: isActive ? `0 0 14px ${tab.restricted ? "#ef444418" : ACCENT + "18"}, inset 0 1px 0 ${tab.restricted ? "#ef444415" : ACCENT + "12"}` : "none",
-                    }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLElement
-                      if (!isActive) {
-                        el.style.backgroundColor = tab.restricted ? "#ef444410" : ACCENT + "0e"
-                        el.style.borderColor = tab.restricted ? "#ef444430" : ACCENT + "40"
-                        el.style.color = tab.restricted ? "#ef4444" : ACCENT
-                        el.style.boxShadow = `0 0 8px ${tab.restricted ? "#ef444412" : ACCENT + "12"}`
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLElement
-                      if (!isActive) {
-                        el.style.backgroundColor = "transparent"
-                        el.style.borderColor = "#27272a"
-                        el.style.color = tab.restricted ? "#4a1515" : "#52525b"
-                        el.style.boxShadow = "none"
-                      }
-                    }}>
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-                        style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT, boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}` }} />
+        {/* ── NAV avec sections repliables ── */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2">
+          {visibleNav.map(({ section, items }) => {
+            const isCollapsed = collapsedSections.has(section)
+            const hasActive   = items.some(t => t.id === activeTab)
+            return (
+              <div key={section} className="mb-1">
+                {/* En-tête de section cliquable */}
+                <button
+                  onClick={() => toggleSection(section)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
+                  <div className="flex items-center gap-1.5">
+                    {/* Pastille active */}
+                    {hasActive && !isCollapsed === false && (
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }}/>
                     )}
-                    <span className="text-sm">{tab.icon}</span>
-                    <span className="flex-1 truncate">{tab.label}</span>
-                    {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
-                    {tab.id === "messages" && unreadMessages > 0 && (
-                      <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                    <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-400" : "text-zinc-700 group-hover:text-zinc-500"}`}>
+                      {section}
+                    </p>
+                    {/* Pastille si section fermée avec onglet actif */}
+                    {isCollapsed && hasActive && (
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }}/>
                     )}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
+                  </div>
+                  <span className={`text-zinc-600 group-hover:text-zinc-400 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
+                    style={{ display: "inline-block" }}>
+                    ▶
+                  </span>
+                </button>
+
+                {/* Items — visibles si non replié */}
+                {!isCollapsed && (
+                  <div className="space-y-0.5 pl-0.5">
+                    {items.map(tab => renderNavItem(tab))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </nav>
 
+        {/* Équipe en ligne */}
         {onlineUsers.length > 0 && (
-          <div className="border-t border-zinc-900 px-2 pt-2 pb-1">
+          <div className="border-t border-zinc-900 px-2 pt-2 pb-1 shrink-0">
             <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
               Équipe · <span className={onlineCount > 0 ? "text-green-500" : "text-zinc-600"}>
                 {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
               </span>
             </p>
-            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+            <div className="space-y-0.5 max-h-20 overflow-y-auto">
               {onlineUsers.slice(0, 5).map(u => (
                 <button key={u.id} onClick={() => setActiveTab("messages")}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
                   <div className="relative shrink-0">
-                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={24} />
+                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={22} />
                     <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${PRESENCE[u.status].dot} ring-1 ring-[#0d0d0d]`} />
                   </div>
-                  <p className="text-zinc-400 text-[11px] font-medium truncate group-hover:text-zinc-200">{u.nom}</p>
+                  <p className="text-zinc-500 text-[11px] font-medium truncate group-hover:text-zinc-300">{u.nom}</p>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <div className="border-t border-zinc-900 p-2">
+        {/* Profil / statut */}
+        <div className="border-t border-zinc-900 p-2 shrink-0">
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 transition-colors">
@@ -701,6 +759,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </div>
       </aside>
 
+      {/* ── SIDEBAR MOBILE ── */}
       {sidebarOpen && (
         <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
           style={{ backgroundColor: SIDEBAR_BG }}>
@@ -712,39 +771,58 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
             </div>
           </div>
-          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
-            {visibleNav.map(({ section, items }) => (
-              <div key={section}>
-                <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">{section}</p>
-                {items.map(tab => {
-                  const isActive = activeTab === tab.id
-                  return (
-                    <button key={tab.id}
-                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                      className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium mb-1 relative transition-all duration-200"
-                      style={{
-                        backgroundColor: isActive ? ACCENT + "12" : "transparent",
-                        color: isActive ? ACCENT : "#52525b",
-                        border: isActive ? `1px solid ${ACCENT}50` : "1px solid #27272a",
-                        boxShadow: isActive ? `0 0 12px ${ACCENT}18` : "none",
-                      }}>
-                      {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-                          style={{ backgroundColor: ACCENT, boxShadow: `0 0 6px ${ACCENT}` }} />
+          <nav className="flex-1 overflow-y-auto py-2 px-2">
+            {visibleNav.map(({ section, items }) => {
+              const isCollapsed = collapsedSections.has(section)
+              const hasActive   = items.some(t => t.id === activeTab)
+              return (
+                <div key={section} className="mb-1">
+                  <button
+                    onClick={() => toggleSection(section)}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-400" : "text-zinc-700 group-hover:text-zinc-500"}`}>
+                        {section}
+                      </p>
+                      {isCollapsed && hasActive && (
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>
                       )}
-                      <span className="text-base">{tab.icon}</span>
-                      <span className="flex-1 truncate">{tab.label}</span>
-                      {tab.id === "messages" && unreadMessages > 0 && (
-                        <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
+                    </div>
+                    <span className={`text-zinc-600 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`} style={{ display: "inline-block" }}>▶</span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="space-y-0.5">
+                      {items.map(tab => {
+                        const isActive = activeTab === tab.id
+                        return (
+                          <button key={tab.id}
+                            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
+                            className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium relative transition-all duration-150"
+                            style={{
+                              backgroundColor: isActive ? ACCENT + "12" : "transparent",
+                              color: isActive ? ACCENT : "#52525b",
+                              border: isActive ? `1px solid ${ACCENT}50` : "1px solid transparent",
+                            }}>
+                            {isActive && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
+                                style={{ backgroundColor: ACCENT }} />
+                            )}
+                            <span className="text-base">{tab.icon}</span>
+                            <span className="flex-1 truncate">{tab.label}</span>
+                            {tab.id === "messages" && unreadMessages > 0 && (
+                              <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                                style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </nav>
-          <div className="border-t border-zinc-900 p-3">
+          <div className="border-t border-zinc-900 p-3 shrink-0">
             <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
               <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
               <div className="flex-1 min-w-0">
@@ -756,6 +834,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </aside>
       )}
 
+      {/* ── MAIN ── */}
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
         <button onClick={() => setSidebarOpen(true)}
           className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
