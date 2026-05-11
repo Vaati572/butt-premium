@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
-import { Plus, X, Search, Check, Trash2, ChevronLeft, ChevronRight, Euro, Calendar, FileText } from "lucide-react"
+import { Plus, X, Search, Check, Trash2, ChevronLeft, ChevronRight, Calendar } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
 
@@ -26,10 +26,10 @@ interface Commande {
   notes?: string
 }
 
-const MOIS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
+const MOIS      = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
 const MOIS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"]
 
-/* ── MODAL AJOUT COMMANDE ── */
+/* ── MODAL AJOUT / MODIF COMMANDE ── */
 function CommandeModal({ client, mois, annee, commande, societyId, onClose, onDone }: {
   client: SuiviClient; mois: number; annee: number
   commande?: Commande | null; societyId: string
@@ -119,7 +119,10 @@ function CommandeModal({ client, mois, annee, commande, societyId, onClose, onDo
         <div className="px-5 pb-5 flex gap-2">
           <button onClick={save} disabled={saving || !montant || parseFloat(montant) <= 0}
             className="flex-1 py-3 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40 text-black font-bold text-sm flex items-center justify-center gap-2">
-            {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={14}/> {commande ? "Mettre à jour" : "Valider la commande"}</>}
+            {saving
+              ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/>
+              : <><Check size={14}/> {commande ? "Mettre à jour" : "Valider la commande"}</>
+            }
           </button>
           {commande && (
             <button onClick={deleteCmd} className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 font-semibold text-sm">
@@ -133,7 +136,7 @@ function CommandeModal({ client, mois, annee, commande, societyId, onClose, onDo
   )
 }
 
-/* ── MODAL DÉTAIL COMMANDE ── */
+/* ── MODAL DÉTAIL ── */
 function DetailModal({ client, commande, mois, annee, onClose, onEdit }: {
   client: SuiviClient; commande: Commande; mois: number; annee: number
   onClose: () => void; onEdit: () => void
@@ -148,15 +151,14 @@ function DetailModal({ client, commande, mois, annee, onClose, onEdit }: {
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16}/></button>
         </div>
+
         <div className="p-5 space-y-3">
-          <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
-            <div>
-              <p className="text-zinc-500 text-xs">Client</p>
-              <p className="text-white font-bold text-sm">
-                {client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom}
-              </p>
-              {client.client_nom_shop && <p className="text-zinc-500 text-[11px]">🏪 {client.client_nom_shop}</p>}
-            </div>
+          <div className="bg-zinc-900 rounded-xl px-4 py-3">
+            <p className="text-zinc-500 text-xs mb-0.5">👤 Client</p>
+            <p className="text-white font-bold text-sm">
+              {client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom}
+            </p>
+            {client.client_nom_shop && <p className="text-zinc-500 text-[11px] mt-0.5">🏪 {client.client_nom_shop}</p>}
           </div>
 
           <div className="bg-zinc-900 rounded-xl px-4 py-3">
@@ -190,6 +192,7 @@ function DetailModal({ client, commande, mois, annee, onClose, onEdit }: {
             </div>
           )}
         </div>
+
         <div className="px-5 pb-5 flex gap-2">
           <button onClick={onEdit} className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-sm">Modifier</button>
           <button onClick={onClose} className="px-4 py-2.5 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-zinc-300 font-semibold text-sm">Fermer</button>
@@ -203,10 +206,10 @@ function DetailModal({ client, commande, mois, annee, onClose, onEdit }: {
 function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
   societyId: string; existingClientIds: string[]; onClose: () => void; onDone: () => void
 }) {
-  const [clients, setClients]     = useState<any[]>([])
-  const [search, setSearch]       = useState("")
-  const [selected, setSelected]   = useState<Set<string>>(new Set())
-  const [saving, setSaving]       = useState(false)
+  const [clients, setClients]   = useState<any[]>([])
+  const [search, setSearch]     = useState("")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving]     = useState(false)
 
   useEffect(() => {
     supabase.from("clients").select("id, nom, prenom, nom_shop, contrat")
@@ -267,34 +270,35 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
                 ? "Tous les clients sont déjà dans le suivi"
                 : "Aucun client trouvé"}
             </p>
-          ) : (
-            filtered.map(c => {
-              const isSelected = selected.has(c.id)
-              return (
-                <button key={c.id} onClick={() => toggle(c.id)}
-                  className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/50 transition-colors text-left ${isSelected ? "bg-green-500/5" : ""}`}>
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? "bg-green-500 border-green-500" : "border-zinc-600"}`}>
-                    {isSelected && <Check size={12} className="text-black"/>}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium">
-                      {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
-                    </p>
-                    {c.nom_shop && <p className="text-zinc-500 text-[11px]">🏪 {c.nom_shop}</p>}
-                    {!c.nom_shop && c.contrat && c.contrat !== "Aucun" && (
-                      <p className="text-zinc-600 text-[11px]">{c.contrat}</p>
-                    )}
-                  </div>
-                </button>
-              )
-            })
-          )}
+          ) : filtered.map(c => {
+            const isSelected = selected.has(c.id)
+            return (
+              <button key={c.id} onClick={() => toggle(c.id)}
+                className={`w-full flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/50 transition-colors text-left ${isSelected ? "bg-green-500/5" : ""}`}>
+                <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-all ${isSelected ? "bg-green-500 border-green-500" : "border-zinc-600"}`}>
+                  {isSelected && <Check size={12} className="text-black"/>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium">
+                    {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
+                  </p>
+                  {c.nom_shop
+                    ? <p className="text-zinc-500 text-[11px]">🏪 {c.nom_shop}</p>
+                    : c.contrat && c.contrat !== "Aucun" && <p className="text-zinc-600 text-[11px]">{c.contrat}</p>
+                  }
+                </div>
+              </button>
+            )
+          })}
         </div>
 
         <div className="px-5 py-4 border-t border-zinc-800 flex gap-2 shrink-0">
           <button onClick={save} disabled={saving || selected.size === 0}
             className="flex-1 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold text-sm flex items-center justify-center gap-2">
-            {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Plus size={14}/> Ajouter {selected.size > 0 ? `(${selected.size})` : ""}</>}
+            {saving
+              ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/>
+              : <><Plus size={14}/> Ajouter {selected.size > 0 ? `(${selected.size})` : ""}</>
+            }
           </button>
           <button onClick={onClose} className="px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-sm">Annuler</button>
         </div>
@@ -312,9 +316,9 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
   const [loading, setLoading]           = useState(true)
   const [year, setYear]                 = useState(new Date().getFullYear())
 
-  const [showAddClient, setShowAddClient] = useState(false)
-  const [commandeModal, setCommandeModal] = useState<{ client: SuiviClient; mois: number; commande?: Commande | null } | null>(null)
-  const [detailModal, setDetailModal]     = useState<{ client: SuiviClient; mois: number; commande: Commande } | null>(null)
+  const [showAddClient, setShowAddClient]   = useState(false)
+  const [commandeModal, setCommandeModal]   = useState<{ client: SuiviClient; mois: number; commande?: Commande | null } | null>(null)
+  const [detailModal, setDetailModal]       = useState<{ client: SuiviClient; mois: number; commande: Commande } | null>(null)
 
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
@@ -352,44 +356,43 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     setSuiviClients(prev => prev.filter(c => c.id !== suiviId))
   }
 
-  const getCommande = (clientId: string, mois: number): Commande | undefined => {
-    return commandes.find(c => c.client_id === clientId && c.mois === mois)
-  }
+  const getCommande = (clientId: string, mois: number): Commande | undefined =>
+    commandes.find(c => c.client_id === clientId && c.mois === mois)
 
-  const totalAnnee = commandes.reduce((s, c) => s + Number(c.montant || 0), 0)
-  const cellsVertes = commandes.length
-  const cellsTotal  = suiviClients.length * 12
-  const tauxCouverture = cellsTotal > 0 ? Math.round((cellsVertes / cellsTotal) * 100) : 0
+  const totalAnnee      = commandes.reduce((s, c) => s + Number(c.montant || 0), 0)
+  const cellsVertes     = commandes.length
+  const cellsTotal      = suiviClients.length * 12
+  const tauxCouverture  = cellsTotal > 0 ? Math.round((cellsVertes / cellsTotal) * 100) : 0
 
-  // Totaux par mois
   const totalParMois = MOIS.map((_, i) => {
     const m = i + 1
     return commandes.filter(c => c.mois === m).reduce((s, c) => s + Number(c.montant || 0), 0)
   })
 
-  // Totaux par client
-  const totalParClient = suiviClients.map(sc => {
-    return commandes.filter(c => c.client_id === sc.client_id).reduce((s, c) => s + Number(c.montant || 0), 0)
-  })
+  const totalParClient = suiviClients.map(sc =>
+    commandes.filter(c => c.client_id === sc.client_id).reduce((s, c) => s + Number(c.montant || 0), 0)
+  )
 
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] flex flex-col">
 
       {/* HEADER */}
-      <div className="border-b border-zinc-900 p-4 shrink-0">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <div className="border-b border-zinc-900 p-4 shrink-0 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-white font-bold text-xl">📋 Suivi clients</h1>
             <p className="text-zinc-500 text-xs mt-0.5">
-              {suiviClients.length} client{suiviClients.length > 1 ? "s" : ""} suivis · {tauxCouverture}% de couverture · CA {year} : <span className="text-yellow-400 font-bold">{totalAnnee.toFixed(2)}€</span>
+              {suiviClients.length} client{suiviClients.length > 1 ? "s" : ""} suivis
+              {cellsTotal > 0 && <> · <span className="text-green-400 font-semibold">{tauxCouverture}% couverture</span></>}
+              {" · "}CA {year} : <span className="text-yellow-400 font-bold">{totalAnnee.toFixed(2)}€</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Navigation année */}
             <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
               <button onClick={() => setYear(y => y - 1)} className="text-zinc-500 hover:text-white"><ChevronLeft size={14}/></button>
               <span className="text-white font-bold text-sm px-2">{year}</span>
-              <button onClick={() => setYear(y => y + 1)} disabled={year >= new Date().getFullYear()} className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
+              <button onClick={() => setYear(y => y + 1)} disabled={year >= new Date().getFullYear()}
+                className="text-zinc-500 hover:text-white disabled:opacity-30"><ChevronRight size={14}/></button>
             </div>
             <button onClick={() => setShowAddClient(true)}
               className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">
@@ -398,15 +401,15 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           </div>
         </div>
 
-        {/* Stats bar */}
+        {/* Barre de progression */}
         {suiviClients.length > 0 && (
-          <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-zinc-800">
+          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-zinc-800">
             <div className="h-full bg-green-500 rounded-full transition-all duration-700" style={{ width: `${tauxCouverture}%` }}/>
           </div>
         )}
       </div>
 
-      {/* GRILLE */}
+      {/* CONTENU */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/>
@@ -415,7 +418,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
         <div className="flex-1 flex flex-col items-center justify-center text-zinc-700 p-8">
           <div className="text-6xl mb-4">📋</div>
           <p className="text-white text-lg font-bold mb-2">Aucun client dans le suivi</p>
-          <p className="text-zinc-500 text-sm mb-6 text-center">Ajoutez vos clients professionnels pour suivre leurs commandes mois par mois</p>
+          <p className="text-zinc-500 text-sm mb-6 text-center">Ajoutez vos clients pour suivre leurs commandes mois par mois</p>
           <button onClick={() => setShowAddClient(true)}
             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-5 py-3 rounded-xl text-sm">
             <Plus size={15}/> Ajouter un client
@@ -426,20 +429,20 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           <table className="border-collapse min-w-full">
             <thead className="sticky top-0 z-20">
               <tr>
-                {/* Cellule coin haut-gauche */}
+                {/* Coin haut-gauche */}
                 <th className="sticky left-0 z-30 bg-[#0d0d0d] border-b border-r border-zinc-800 px-4 py-3 min-w-[180px] w-[180px]">
                   <span className="text-zinc-600 text-[11px] font-bold uppercase tracking-wider">Client</span>
                 </th>
-                {/* Mois */}
+                {/* Colonnes mois */}
                 {MOIS.map((m, i) => (
-                  <th key={m} className="bg-[#0d0d0d] border-b border-r border-zinc-800 px-2 py-3 min-w-[90px] text-center">
+                  <th key={m} className="bg-[#0d0d0d] border-b border-r border-zinc-800 px-2 py-3 min-w-[96px] text-center">
                     <p className="text-zinc-300 text-xs font-bold">{m}</p>
                     {totalParMois[i] > 0 && (
                       <p className="text-yellow-400 text-[10px] font-semibold mt-0.5">{totalParMois[i].toFixed(0)}€</p>
                     )}
                   </th>
                 ))}
-                {/* Colonne Total */}
+                {/* Colonne total */}
                 <th className="bg-[#0d0d0d] border-b border-zinc-800 px-3 py-3 min-w-[80px] text-center">
                   <span className="text-zinc-600 text-[11px] font-bold uppercase tracking-wider">Total</span>
                 </th>
@@ -448,19 +451,19 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
             <tbody>
               {suiviClients.map((sc, rowIdx) => (
                 <tr key={sc.id} className="group">
-                  {/* Colonne client — sticky gauche */}
+                  {/* Client — sticky */}
                   <td className="sticky left-0 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/60 border-b border-r border-zinc-800/60 px-4 py-2 transition-colors">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-white text-xs font-bold truncate">
                           {sc.client_prenom ? `${sc.client_prenom} ${sc.client_nom}` : sc.client_nom}
                         </p>
-                        {sc.client_nom_shop && (
-                          <p className="text-zinc-500 text-[10px] truncate">🏪 {sc.client_nom_shop}</p>
-                        )}
-                        {!sc.client_nom_shop && sc.client_contrat && sc.client_contrat !== "Aucun" && (
-                          <p className="text-zinc-600 text-[10px]">{sc.client_contrat}</p>
-                        )}
+                        {sc.client_nom_shop
+                          ? <p className="text-zinc-500 text-[10px] truncate">🏪 {sc.client_nom_shop}</p>
+                          : sc.client_contrat && sc.client_contrat !== "Aucun" && (
+                            <p className="text-zinc-600 text-[10px]">{sc.client_contrat}</p>
+                          )
+                        }
                       </div>
                       <button onClick={() => removeClient(sc.id)}
                         className="opacity-0 group-hover:opacity-100 text-zinc-700 hover:text-red-400 transition-all shrink-0 p-1 rounded">
@@ -471,8 +474,8 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
 
                   {/* Cellules mois */}
                   {MOIS.map((_, i) => {
-                    const mois = i + 1
-                    const cmd  = getCommande(sc.client_id, mois)
+                    const mois   = i + 1
+                    const cmd    = getCommande(sc.client_id, mois)
                     const hasCmd = !!cmd
 
                     return (
@@ -485,7 +488,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                               setCommandeModal({ client: sc, mois, commande: null })
                             }
                           }}
-                          className={`w-full h-14 rounded-xl text-center transition-all duration-200 flex flex-col items-center justify-center gap-0.5 border ${
+                          className={`w-full h-[72px] rounded-xl text-center transition-all duration-200 flex flex-col items-center justify-center gap-0.5 border ${
                             hasCmd
                               ? "bg-green-500/15 border-green-500/40 hover:bg-green-500/25 hover:border-green-500/60"
                               : "bg-red-500/10 border-red-500/20 hover:bg-red-500/15 hover:border-red-500/35"
@@ -493,19 +496,24 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                           {hasCmd ? (
                             <>
                               <span className="text-[9px]">✅</span>
-                              <p className="text-green-400 text-[10px] font-black leading-tight">
+                              <p className="text-green-400 text-[11px] font-black leading-tight">
                                 {Number(cmd.montant).toFixed(0)}€
                               </p>
+                              {cmd.date_commande && (
+                                <p className="text-green-600 text-[9px] leading-tight font-medium">
+                                  {new Date(cmd.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                                </p>
+                              )}
                             </>
                           ) : (
-                            <span className="text-red-500/40 text-lg">×</span>
+                            <span className="text-red-500/40 text-xl">×</span>
                           )}
                         </button>
                       </td>
                     )
                   })}
 
-                  {/* Colonne total client */}
+                  {/* Total client */}
                   <td className="border-b border-zinc-800/60 px-3 py-2 text-center">
                     {totalParClient[rowIdx] > 0 ? (
                       <p className="text-yellow-400 text-xs font-bold">{totalParClient[rowIdx].toFixed(0)}€</p>
@@ -516,7 +524,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                 </tr>
               ))}
 
-              {/* Ligne totaux bas */}
+              {/* Ligne totaux */}
               <tr className="bg-zinc-900/30">
                 <td className="sticky left-0 z-10 bg-zinc-900/50 border-t border-r border-zinc-700 px-4 py-2">
                   <p className="text-zinc-400 text-[11px] font-bold uppercase tracking-wider">Total mois</p>
@@ -525,11 +533,10 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                   const t = totalParMois[i]
                   return (
                     <td key={i} className="border-t border-r border-zinc-700 px-2 py-2 text-center">
-                      {t > 0 ? (
-                        <p className="text-yellow-400 text-xs font-bold">{t.toFixed(0)}€</p>
-                      ) : (
-                        <p className="text-zinc-700 text-[10px]">—</p>
-                      )}
+                      {t > 0
+                        ? <p className="text-yellow-400 text-xs font-bold">{t.toFixed(0)}€</p>
+                        : <p className="text-zinc-700 text-[10px]">—</p>
+                      }
                     </td>
                   )
                 })}
@@ -541,7 +548,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           </table>
 
           {/* Légende */}
-          <div className="flex items-center gap-4 px-4 py-3 border-t border-zinc-900">
+          <div className="flex items-center gap-6 px-4 py-3 border-t border-zinc-900">
             <div className="flex items-center gap-1.5">
               <div className="w-4 h-4 rounded-md bg-green-500/15 border border-green-500/40"/>
               <span className="text-zinc-500 text-[11px]">Commande validée — cliquer pour voir le détail</span>
