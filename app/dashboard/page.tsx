@@ -283,7 +283,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [searchLoading, setSearchLoading]   = useState(false)
 
   // ── Sections repliables ──
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    new Set(ALL_NAV.map(s => s.section))
+  )
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => {
       const next = new Set(prev)
