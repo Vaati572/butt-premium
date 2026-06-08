@@ -29,6 +29,7 @@ import IAModule from "@/components/IAModule"
 import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import PublicationModule from "@/components/publications/PublicationModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
+import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -80,10 +81,11 @@ const ALL_NAV = [
     { id: "publications", label: "Publications", icon: "📣" },
   ]},
   { section: "Démarchage", items: [
-    { id: "prospects", label: "Prospects",      icon: "🎯" },
-    { id: "tournees",  label: "Tournées",       icon: "🛣️" },
-    { id: "map",       label: "Map & Tournées", icon: "🗺️" },
-    { id: "ia",        label: "IA",             icon: "🤖" },
+    { id: "prospects",        label: "Prospects",          icon: "🎯" },
+    { id: "social_prospects", label: "Instagram & Autres", icon: "📱" },
+    { id: "tournees",         label: "Tournées",           icon: "🛣️" },
+    { id: "map",              label: "Map & Tournées",     icon: "🗺️" },
+    { id: "ia",               label: "IA",                 icon: "🤖" },
   ]},
   { section: "Système", items: [
     { id: "agenda",     label: "Agenda & Tâches", icon: "📅" },
@@ -282,7 +284,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [globalResults, setGlobalResults]   = useState<any[]>([])
   const [searchLoading, setSearchLoading]   = useState(false)
 
-  // ── Sections repliables ──
+  // ── Sections repliables — toutes fermées par défaut ──
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(ALL_NAV.map(s => s.section))
   )
@@ -493,35 +495,36 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const renderContent = () => {
     if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
     switch (activeTab) {
-      case "accueil":      return <AccueilModule         activeSociety={activeSociety} profile={profile} />
-      case "clients":      return <ClientsModule         activeSociety={activeSociety} profile={profile} />
-      case "suivi":        return <SuiviModule           activeSociety={activeSociety} profile={profile} />
-      case "conventions":  return <ConventionModule      activeSociety={activeSociety} profile={profile} />
-      case "stocks":       return <StocksModule          activeSociety={activeSociety} profile={profile} />
-      case "vente":        return <VenteModule           activeSociety={activeSociety} profile={profile} />
-      case "depenses":     return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
-      case "stats":        return <StatsModule           activeSociety={activeSociety} profile={profile} />
-      case "notes":        return <NotesModule           activeSociety={activeSociety} profile={profile} />
-      case "documents":    return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
-      case "historique":   return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
-      case "contrats":     return <ContratsModule        activeSociety={activeSociety} profile={profile} />
-      case "facturesdevis":return <FacturesDevisModule   activeSociety={activeSociety} profile={profile} />
-      case "pharmacies":   return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
-      case "commandes":    return <CommandesModule       activeSociety={activeSociety} profile={profile} />
-      case "playlists":    return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
-      case "publications": return <PublicationModule     activeSociety={activeSociety} profile={profile} />
-      case "tournees":     return <TourneesModule        activeSociety={activeSociety} profile={profile}
+      case "accueil":           return <AccueilModule         activeSociety={activeSociety} profile={profile} />
+      case "clients":           return <ClientsModule         activeSociety={activeSociety} profile={profile} />
+      case "suivi":             return <SuiviModule           activeSociety={activeSociety} profile={profile} />
+      case "conventions":       return <ConventionModule      activeSociety={activeSociety} profile={profile} />
+      case "stocks":            return <StocksModule          activeSociety={activeSociety} profile={profile} />
+      case "vente":             return <VenteModule           activeSociety={activeSociety} profile={profile} />
+      case "depenses":          return <DepensesOffertsModule activeSociety={activeSociety} profile={profile} />
+      case "stats":             return <StatsModule           activeSociety={activeSociety} profile={profile} />
+      case "notes":             return <NotesModule           activeSociety={activeSociety} profile={profile} />
+      case "documents":         return <DocumentsModule       activeSociety={activeSociety} profile={profile} />
+      case "historique":        return <HistoriqueModule      activeSociety={activeSociety} profile={profile} />
+      case "contrats":          return <ContratsModule        activeSociety={activeSociety} profile={profile} />
+      case "facturesdevis":     return <FacturesDevisModule   activeSociety={activeSociety} profile={profile} />
+      case "pharmacies":        return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
+      case "commandes":         return <CommandesModule       activeSociety={activeSociety} profile={profile} />
+      case "playlists":         return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
+      case "publications":      return <PublicationModule     activeSociety={activeSociety} profile={profile} />
+      case "social_prospects":  return <SocialProspectsModule activeSociety={activeSociety} profile={profile} />
+      case "tournees":          return <TourneesModule        activeSociety={activeSociety} profile={profile}
           onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
-      case "prospects":    return <ProspectsModule       activeSociety={activeSociety} profile={profile}
+      case "prospects":         return <ProspectsModule       activeSociety={activeSociety} profile={profile}
           onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => setActiveTab("map")} onSwitchToTournees={() => setActiveTab("tournees")} />
-      case "map":          return <MapModule             activeSociety={activeSociety} profile={profile}
+      case "map":               return <MapModule             activeSociety={activeSociety} profile={profile}
           focusProspect={focusProspect} activeTournee={activeTournee}
           onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => setActiveTab("prospects")} />
-      case "messages":     return <MessagesModule        activeSociety={activeSociety} profile={profile} />
-      case "parametres":   return <ParametresModule      activeSociety={activeSociety} profile={profile} />
-      case "agenda":       return <AgendaModule          activeSociety={activeSociety} profile={profile} />
-      case "admin":        return <AdminGate             activeSociety={activeSociety} profile={profile} />
-      case "ia":           return <IAModule              activeSociety={activeSociety} profile={profile} />
+      case "messages":          return <MessagesModule        activeSociety={activeSociety} profile={profile} />
+      case "parametres":        return <ParametresModule      activeSociety={activeSociety} profile={profile} />
+      case "agenda":            return <AgendaModule          activeSociety={activeSociety} profile={profile} />
+      case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
+      case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
@@ -567,7 +570,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     </>
   )
 
-  /* ── Rendu d'un onglet sidebar ── */
+  /* ── Rendu item nav ── */
   const renderNavItem = (tab: any) => {
     const isActive = activeTab === tab.id
     return (
@@ -582,21 +585,15 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLElement
-          if (!isActive) {
-            el.style.backgroundColor = tab.restricted ? "#ef444410" : ACCENT + "0e"
-            el.style.color = tab.restricted ? "#ef4444" : ACCENT
-          }
+          if (!isActive) { el.style.backgroundColor = ACCENT + "0e"; el.style.color = tab.restricted ? "#ef4444" : ACCENT }
         }}
         onMouseLeave={e => {
           const el = e.currentTarget as HTMLElement
-          if (!isActive) {
-            el.style.backgroundColor = "transparent"
-            el.style.color = tab.restricted ? "#4a1515" : "#52525b"
-          }
+          if (!isActive) { el.style.backgroundColor = "transparent"; el.style.color = tab.restricted ? "#4a1515" : "#52525b" }
         }}>
         {isActive && (
           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-            style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT, boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}` }} />
+            style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT }} />
         )}
         <span className="text-sm">{tab.icon}</span>
         <span className="flex-1 truncate">{tab.label}</span>
@@ -616,10 +613,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* ── SIDEBAR DESKTOP ── */}
-      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 transition-colors duration-300 h-screen overflow-hidden"
+      <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 h-screen overflow-hidden"
         style={{ backgroundColor: SIDEBAR_BG }}>
 
-        {/* Logo + société + recherche */}
         <div className="px-4 pt-3 pb-3 border-b border-zinc-900 shrink-0">
           <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
           {activeSociety && (
@@ -660,37 +656,26 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         </div>
 
-        {/* ── NAV avec sections repliables ── */}
+        {/* NAV repliable */}
         <nav className="flex-1 overflow-y-auto py-2 px-2">
           {visibleNav.map(({ section, items }) => {
             const isCollapsed = collapsedSections.has(section)
             const hasActive   = items.some(t => t.id === activeTab)
             return (
               <div key={section} className="mb-1">
-                {/* En-tête de section cliquable */}
-                <button
-                  onClick={() => toggleSection(section)}
+                <button onClick={() => toggleSection(section)}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
                   <div className="flex items-center gap-1.5">
-                    {/* Pastille active */}
-                    {hasActive && !isCollapsed === false && (
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }}/>
-                    )}
                     <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-400" : "text-zinc-700 group-hover:text-zinc-500"}`}>
                       {section}
                     </p>
-                    {/* Pastille si section fermée avec onglet actif */}
                     {isCollapsed && hasActive && (
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT }}/>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>
                     )}
                   </div>
                   <span className={`text-zinc-600 group-hover:text-zinc-400 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
-                    style={{ display: "inline-block" }}>
-                    ▶
-                  </span>
+                    style={{ display: "inline-block" }}>▶</span>
                 </button>
-
-                {/* Items — visibles si non replié */}
                 {!isCollapsed && (
                   <div className="space-y-0.5 pl-0.5">
                     {items.map(tab => renderNavItem(tab))}
@@ -701,7 +686,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           })}
         </nav>
 
-        {/* Équipe en ligne */}
         {onlineUsers.length > 0 && (
           <div className="border-t border-zinc-900 px-2 pt-2 pb-1 shrink-0">
             <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
@@ -724,7 +708,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         )}
 
-        {/* Profil / statut */}
         <div className="border-t border-zinc-900 p-2 shrink-0">
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
@@ -768,10 +751,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           <button onClick={() => setSidebarOpen(false)}
             className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">✕</button>
           <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
-            <div className="flex items-center gap-2.5">
-              <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
-              {activeSociety && <p className="text-zinc-500 text-[10px] mt-0.5">{activeSociety.name}</p>}
-            </div>
+            <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
           </div>
           <nav className="flex-1 overflow-y-auto py-2 px-2">
             {visibleNav.map(({ section, items }) => {
@@ -779,45 +759,17 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               const hasActive   = items.some(t => t.id === activeTab)
               return (
                 <div key={section} className="mb-1">
-                  <button
-                    onClick={() => toggleSection(section)}
+                  <button onClick={() => toggleSection(section)}
                     className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-400" : "text-zinc-700 group-hover:text-zinc-500"}`}>
-                        {section}
-                      </p>
-                      {isCollapsed && hasActive && (
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>
-                      )}
+                      <p className={`text-[9px] font-bold uppercase tracking-widest ${hasActive ? "text-zinc-400" : "text-zinc-700"}`}>{section}</p>
+                      {isCollapsed && hasActive && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>}
                     </div>
                     <span className={`text-zinc-600 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`} style={{ display: "inline-block" }}>▶</span>
                   </button>
                   {!isCollapsed && (
                     <div className="space-y-0.5">
-                      {items.map(tab => {
-                        const isActive = activeTab === tab.id
-                        return (
-                          <button key={tab.id}
-                            onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-                            className="w-full flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium relative transition-all duration-150"
-                            style={{
-                              backgroundColor: isActive ? ACCENT + "12" : "transparent",
-                              color: isActive ? ACCENT : "#52525b",
-                              border: isActive ? `1px solid ${ACCENT}50` : "1px solid transparent",
-                            }}>
-                            {isActive && (
-                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-                                style={{ backgroundColor: ACCENT }} />
-                            )}
-                            <span className="text-base">{tab.icon}</span>
-                            <span className="flex-1 truncate">{tab.label}</span>
-                            {tab.id === "messages" && unreadMessages > 0 && (
-                              <span className="text-black text-[10px] font-black min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
-                            )}
-                          </button>
-                        )
-                      })}
+                      {items.map(tab => renderNavItem(tab))}
                     </div>
                   )}
                 </div>
@@ -826,9 +778,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </nav>
           <div className="border-t border-zinc-900 p-3 shrink-0">
             <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
-              <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+              <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
               <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{profile?.nom || profile?.username}</p>
+                <p className="text-white text-xs font-semibold truncate">{profile?.nom}</p>
                 <p className="text-zinc-500 text-[10px]">En ligne</p>
               </div>
             </div>
@@ -1015,7 +967,7 @@ function Theme2Layout({
       </main>
       {showConvPopup && activeConvention && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border" style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40", boxShadow: `0 0 40px ${NEON}20` }}>
+          <div className="rounded-2xl w-full max-w-sm shadow-2xl p-6 border" style={{ backgroundColor: "#0d0d18", borderColor: NEON + "40" }}>
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl">🎪</span>
               <div>
