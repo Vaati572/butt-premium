@@ -57,6 +57,7 @@ const ALL_NAV = [
   { section: "Principal", items: [
     { id: "accueil",     label: "Accueil",           icon: "🏠" },
     { id: "vente",       label: "Vente",             icon: "🛒" },
+    { id: "social_prospects", label: "Instagram & Autres", icon: "📱" },
     { id: "conventions", label: "Conventions",       icon: "🎪" },
     { id: "clients",     label: "Clients",           icon: "👤" },
     { id: "suivi",       label: "Suivi",             icon: "📋" },
@@ -82,7 +83,6 @@ const ALL_NAV = [
   ]},
   { section: "Démarchage", items: [
     { id: "prospects",        label: "Prospects",          icon: "🎯" },
-    { id: "social_prospects", label: "Instagram & Autres", icon: "📱" },
     { id: "tournees",         label: "Tournées",           icon: "🛣️" },
     { id: "map",              label: "Map & Tournées",     icon: "🗺️" },
     { id: "ia",               label: "IA",                 icon: "🤖" },
