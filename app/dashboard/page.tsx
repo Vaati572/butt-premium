@@ -36,10 +36,8 @@ const ADMIN_PIN = "18072209"
 type PresenceStatus = "online" | "busy" | "away" | "meeting" | "offline"
 
 interface OnlineUser {
-  id: string; nom: string; avatar_url?: string; color?: string
-  status: PresenceStatus
+  id: string; nom: string; avatar_url?: string; color?: string; status: PresenceStatus
 }
-
 interface UnreadNotif {
   sender_nom: string; content: string; file_name?: string | null
   conv_name: string; conv_id: string; count: number
@@ -53,46 +51,51 @@ const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: stri
   offline: { label: "Hors ligne", color: "text-zinc-500",   dot: "bg-zinc-600"   },
 }
 
+/* ══════════════════════════════════════════════
+   NAV — réorganisée et épurée
+══════════════════════════════════════════════ */
 const ALL_NAV = [
-  { section: "Principal", items: [
-    { id: "accueil",     label: "Accueil",           icon: "🏠" },
-    { id: "vente",       label: "Vente",             icon: "🛒" },
+  { section: "Activité", items: [
+    { id: "vente",            label: "Vente",              icon: "🛒" },
+    { id: "clients",          label: "Clients",            icon: "👤" },
     { id: "social_prospects", label: "Instagram & Autres", icon: "📱" },
-    { id: "conventions", label: "Conventions",       icon: "🎪" },
-    { id: "clients",     label: "Clients",           icon: "👤" },
-    { id: "suivi",       label: "Suivi",             icon: "📋" },
-    { id: "playlists",   label: "Playlists clients", icon: "🎵" },
-    { id: "stocks",      label: "Stock",             icon: "📦" },
+    { id: "suivi",            label: "Suivi clients",      icon: "📋" },
+    { id: "conventions",      label: "Conventions",        icon: "🎪" },
+    { id: "stocks",           label: "Stock",              icon: "📦" },
   ]},
-  { section: "Gestion", items: [
-    { id: "commandes",     label: "Fournisseurs",       icon: "🏭" },
-    { id: "depenses",      label: "Dépenses & Offerts", icon: "💸" },
-    { id: "contrats",      label: "Contrats",           icon: "📑" },
-    { id: "facturesdevis", label: "Factures & Devis",   icon: "📄" },
-    { id: "pharmacies",    label: "Pharmacies",         icon: "🏥" },
+  { section: "Finances", items: [
+    { id: "stats",         label: "Statistiques",    icon: "📊" },
+    { id: "historique",    label: "Historique",      icon: "🕓" },
+    { id: "depenses",      label: "Dépenses",        icon: "💸" },
+    { id: "facturesdevis", label: "Factures & Devis",icon: "📄" },
+    { id: "contrats",      label: "Contrats",        icon: "📑" },
   ]},
-  { section: "Analyse", items: [
-    { id: "stats",      label: "Statistiques", icon: "📊" },
-    { id: "historique", label: "Historique",   icon: "🕓" },
-  ]},
-  { section: "Outils", items: [
+  { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
+    { id: "publications", label: "Publications", icon: "📣" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
-    { id: "publications", label: "Publications", icon: "📣" },
   ]},
   { section: "Démarchage", items: [
-    { id: "prospects",        label: "Prospects",          icon: "🎯" },
-    { id: "tournees",         label: "Tournées",           icon: "🛣️" },
-    { id: "map",              label: "Map & Tournées",     icon: "🗺️" },
-    { id: "ia",               label: "IA",                 icon: "🤖" },
+    { id: "prospects", label: "Prospects",      icon: "🎯" },
+    { id: "tournees",  label: "Tournées",       icon: "🛣️" },
+    { id: "map",       label: "Map",            icon: "🗺️" },
+    { id: "ia",        label: "IA",             icon: "🤖" },
+  ]},
+  { section: "Gestion", items: [
+    { id: "commandes",  label: "Fournisseurs",       icon: "🏭" },
+    { id: "pharmacies", label: "Pharmacies",         icon: "🏥" },
+    { id: "playlists",  label: "Playlists clients",  icon: "🎵" },
   ]},
   { section: "Système", items: [
-    { id: "agenda",     label: "Agenda & Tâches", icon: "📅" },
-    { id: "admin",      label: "Admin",           icon: "🔒" },
-    { id: "parametres", label: "Paramètres",      icon: "⚙️" },
+    { id: "accueil",    label: "Accueil",        icon: "🏠" },
+    { id: "agenda",     label: "Agenda",         icon: "📅" },
+    { id: "admin",      label: "Admin",          icon: "🔒" },
+    { id: "parametres", label: "Paramètres",     icon: "⚙️" },
   ]},
 ]
+
+const ALL_TABS_FLAT = ALL_NAV.flatMap(s => s.items)
 
 /* ── ADMIN GATE ── */
 function AdminGate({ activeSociety, profile }: { activeSociety: any; profile: any }) {
@@ -159,7 +162,7 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
   return (
     <div className="fixed bottom-6 right-6 z-[100] w-80">
       <div className="bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden"
-        style={{ boxShadow: `0 8px 40px ${ACCENT}20, 0 0 0 1px ${ACCENT}15` }}>
+        style={{ boxShadow: `0 8px 40px ${ACCENT}20` }}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80"
           style={{ background: `linear-gradient(135deg, ${ACCENT}15, transparent)` }}>
           <div className="flex items-center gap-2.5">
@@ -170,28 +173,25 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
                 style={{ backgroundColor: ACCENT }}>{total > 9 ? "9+" : total}</span>
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-tight">Messages non lus</p>
-              <p className="text-zinc-400 text-[11px]">{total} message{total > 1 ? "s" : ""} pendant votre absence</p>
+              <p className="text-white font-bold text-sm">Messages non lus</p>
+              <p className="text-zinc-400 text-[11px]">{total} message{total > 1 ? "s" : ""}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white shrink-0">✕</button>
         </div>
-        <div className="max-h-56 overflow-y-auto divide-y divide-zinc-800/50">
-          {notifs.slice(0, 5).map((n, i) => (
-            <div key={i} className="px-4 py-2.5 hover:bg-zinc-800/30 cursor-default">
+        <div className="max-h-48 overflow-y-auto divide-y divide-zinc-800/50">
+          {notifs.slice(0, 4).map((n, i) => (
+            <div key={i} className="px-4 py-2.5">
               <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold text-[11px] shrink-0 mt-0.5"
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-black font-bold text-[11px] shrink-0"
                   style={{ backgroundColor: ACCENT }}>{n.sender_nom?.charAt(0)?.toUpperCase() || "?"}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <p className="text-white text-xs font-semibold truncate">{n.sender_nom}</p>
-                    {n.count > 1 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT + "20", color: ACCENT }}>{n.count} msg</span>}
-                  </div>
-                  {n.conv_name !== n.sender_nom && <p className="text-zinc-600 text-[10px] truncate">dans {n.conv_name}</p>}
+                  <p className="text-white text-xs font-semibold truncate">{n.sender_nom}</p>
                   <p className="text-zinc-400 text-[11px] truncate mt-0.5">
-                    {n.content ? `"${n.content.slice(0, 50)}${n.content.length > 50 ? "…" : ""}"` : n.file_name ? `📎 ${n.file_name}` : "Nouveau message"}
+                    {n.content ? `"${n.content.slice(0, 45)}…"` : `📎 ${n.file_name}`}
                   </p>
                 </div>
+                {n.count > 1 && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT + "20", color: ACCENT }}>{n.count}</span>}
               </div>
             </div>
           ))}
@@ -200,40 +200,38 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: {
           <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-black font-bold text-xs" style={{ backgroundColor: ACCENT }}>Voir les messages →</button>
           <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full transition-all duration-50" style={{ width: `${progress}%`, backgroundColor: ACCENT }} /></div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: ACCENT }} /></div>
       </div>
     </div>
   )
 }
 
-function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGoToStock: ()=>void; onClose: ()=>void }) {
+function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGoToStock: () => void; onClose: () => void }) {
   const [progress, setProgress] = useState(100)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - 0.5 })
-    }, 50)
+    const timer = setInterval(() => setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - 0.5 }), 50)
     return () => clearInterval(timer)
   }, [])
-  const neg = alerts.filter((a:any)=>a.quantite<0).length
-  const low = alerts.filter((a:any)=>a.quantite>=0).length
+  const neg = alerts.filter((a: any) => a.quantite < 0).length
+  const low = alerts.filter((a: any) => a.quantite >= 0).length
   return (
     <div className="fixed bottom-6 left-6 z-[100] w-72">
-      <div className="bg-[#18181b] border border-red-500/30 rounded-2xl shadow-2xl overflow-hidden" style={{ boxShadow: "0 8px 40px #ef444420" }}>
+      <div className="bg-[#18181b] border border-red-500/30 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80" style={{ background: "linear-gradient(135deg, #ef444415, transparent)" }}>
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-lg">⚠️</div>
             <div>
               <p className="text-white font-bold text-sm">Stocks critiques</p>
-              <p className="text-zinc-400 text-[11px]">{neg > 0 && `${neg} négatif${neg>1?"s":""}`}{neg>0&&low>0&&" · "}{low>0&&`${low} en alerte`}</p>
+              <p className="text-zinc-400 text-[11px]">{neg > 0 && `${neg} négatif${neg > 1 ? "s" : ""}`}{neg > 0 && low > 0 && " · "}{low > 0 && `${low} en alerte`}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white text-sm">✕</button>
         </div>
-        <div className="px-4 py-2.5 max-h-36 overflow-y-auto space-y-1">
-          {alerts.slice(0,5).map((a:any,i:number) => (
+        <div className="px-4 py-2.5 max-h-32 overflow-y-auto space-y-1">
+          {alerts.slice(0, 5).map((a: any, i: number) => (
             <div key={i} className="flex items-center justify-between">
               <span className="text-zinc-300 text-xs truncate">{a.produit_nom}</span>
-              <span className={`text-xs font-bold ml-2 shrink-0 ${a.quantite<0?"text-red-500":"text-orange-400"}`}>{a.quantite} {a.unite||"u."}</span>
+              <span className={`text-xs font-bold ml-2 shrink-0 ${a.quantite < 0 ? "text-red-500" : "text-orange-400"}`}>{a.quantite} {a.unite || "u."}</span>
             </div>
           ))}
         </div>
@@ -241,7 +239,7 @@ function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGo
           <button onClick={onGoToStock} className="flex-1 py-2 rounded-xl text-black font-bold text-xs bg-red-500 hover:bg-red-400">Voir le stock →</button>
           <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${progress}%` }}/></div>
+        <div className="h-0.5 bg-zinc-800"><div className="h-full rounded-full bg-red-500" style={{ width: `${progress}%` }} /></div>
       </div>
     </div>
   )
@@ -251,10 +249,9 @@ function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
       <div className="text-center p-8 max-w-sm">
-        <div className="w-24 h-24 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-6"><span className="text-5xl">🚫</span></div>
+        <div className="w-20 h-20 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center mx-auto mb-5"><span className="text-4xl">🚫</span></div>
         <h2 className="text-white text-xl font-bold mb-2">Accès non autorisé</h2>
-        <p className="text-zinc-500 text-sm mb-4">Tu n&apos;as pas la permission d&apos;accéder à l&apos;onglet <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.</p>
-        <p className="text-zinc-700 text-xs">Contacte un administrateur pour obtenir l&apos;accès.</p>
+        <p className="text-zinc-500 text-sm">Tu n&apos;as pas accès à <span className="text-red-400 font-semibold">&quot;{tabLabel}&quot;</span>.</p>
       </div>
     </div>
   )
@@ -265,7 +262,25 @@ function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
 ══════════════════════════════════════════════ */
 function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociety: any }) {
   const { settings } = useUserSettings()
-  const [activeTab, setActiveTab]           = useState(settings.start_page || "vente")
+
+  // ── Système d'onglets ouverts ──
+  const [openTabs, setOpenTabs]   = useState<string[]>([settings.start_page || "vente"])
+  const [activeTab, setActiveTab] = useState<string>(settings.start_page || "vente")
+
+  const openTab = (id: string) => {
+    setOpenTabs(prev => prev.includes(id) ? prev : [...prev, id])
+    setActiveTab(id)
+  }
+  const closeTab = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setOpenTabs(prev => {
+      const next = prev.filter(t => t !== id)
+      if (next.length === 0) { setActiveTab("vente"); return ["vente"] }
+      if (activeTab === id) setActiveTab(next[next.length - 1])
+      return next
+    })
+  }
+
   const [myStatus, setMyStatus]             = useState<PresenceStatus>("online")
   const [onlineUsers, setOnlineUsers]       = useState<OnlineUser[]>([])
   const [showStatusMenu, setShowStatusMenu] = useState(false)
@@ -284,7 +299,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [globalResults, setGlobalResults]   = useState<any[]>([])
   const [searchLoading, setSearchLoading]   = useState(false)
 
-  // ── Sections repliables — toutes fermées par défaut ──
+  // Sections repliables — toutes fermées par défaut
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(ALL_NAV.map(s => s.section))
   )
@@ -302,22 +317,18 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   const ACCENT      = settings.accent_color || "#eab308"
   const BG          = settings.background   || "#0a0a0a"
-  const SIDEBAR_BG  = settings.sidebar_accent ? ACCENT + "15" : "#0d0d0d"
+  const SIDEBAR_BG  = settings.sidebar_accent ? ACCENT + "12" : "#0d0d0d"
   const APP_THEME   = (settings as any).app_theme  || "1"
   const BG_GRADIENT = (settings as any).bg_gradient || ""
 
-  useEffect(() => { if (settings.start_page) setActiveTab(settings.start_page) }, [settings.start_page])
-
-  // Auto-ouvre la section de l'onglet actif
   useEffect(() => {
-    const activeSection = ALL_NAV.find(s => s.items.some(t => t.id === activeTab))?.section
-    if (activeSection) {
-      setCollapsedSections(prev => {
-        const next = new Set(prev)
-        next.delete(activeSection)
-        return next
-      })
-    }
+    if (settings.start_page) { openTab(settings.start_page) }
+  }, [settings.start_page])
+
+  // Auto-ouvre section de l'onglet actif
+  useEffect(() => {
+    const sec = ALL_NAV.find(s => s.items.some(t => t.id === activeTab))?.section
+    if (sec) setCollapsedSections(prev => { const n = new Set(prev); n.delete(sec); return n })
   }, [activeTab])
 
   useEffect(() => {
@@ -329,7 +340,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
     supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite").eq("society_id", activeSociety.id)
       .then(({ data }) => {
-        const alerts = (data||[]).filter((s:any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+        const alerts = (data || []).filter((s: any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
         if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
       })
   }, [activeSociety])
@@ -337,7 +348,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   useEffect(() => {
     if (!profile || !activeSociety) return
     const check = async () => {
-      const { data: convs } = await supabase.from("conversations").select("id, name, type, member_ids").eq("society_id", activeSociety.id).contains("member_ids", [profile.id])
+      const { data: convs } = await supabase.from("conversations").select("id, name, type, member_ids")
+        .eq("society_id", activeSociety.id).contains("member_ids", [profile.id])
       if (!convs || convs.length === 0) return
       const allMemberIds = [...new Set(convs.flatMap((c: any) => c.member_ids || []))]
       const { data: memberProfiles } = await supabase.from("profiles").select("id, nom").in("id", allMemberIds)
@@ -345,9 +357,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       ;(memberProfiles || []).forEach((p: any) => { profileMap[p.id] = p.nom })
       const notifs: UnreadNotif[] = []
       await Promise.all(convs.map(async (conv: any) => {
-        const { data: unreadMsgs } = await supabase.from("messages").select("id, sender_nom, sender_id, content, file_name")
-          .eq("conversation_id", conv.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
-          .order("created_at", { ascending: false }).limit(20)
+        const { data: unreadMsgs } = await supabase.from("messages")
+          .select("id, sender_nom, sender_id, content, file_name")
+          .eq("conversation_id", conv.id).not("read_by", "cs", `{${profile.id}}`)
+          .neq("sender_id", profile.id).order("created_at", { ascending: false }).limit(20)
         if (!unreadMsgs || unreadMsgs.length === 0) return
         let convName = conv.name
         if (conv.type === "direct" && !conv.name) {
@@ -371,14 +384,16 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   useEffect(() => {
     if (!profile || !activeSociety) return
     let channel: ReturnType<typeof supabase.channel> | null = null
-    supabase.from("user_presence").upsert({ user_id: profile.id, society_id: activeSociety.id, status: "online", last_seen: new Date().toISOString() }, { onConflict: "user_id" })
-      .then(() => { setMyStatus("online"); loadUsers() })
+    supabase.from("user_presence").upsert(
+      { user_id: profile.id, society_id: activeSociety.id, status: "online", last_seen: new Date().toISOString() },
+      { onConflict: "user_id" }
+    ).then(() => { setMyStatus("online"); loadUsers() })
     heartbeatRef.current = setInterval(() => {
       supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
     }, 30000)
     channel = supabase.channel(`presence_${activeSociety.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers).subscribe()
-    const bye = () => { supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id) }
+    const bye = () => supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id)
     window.addEventListener("beforeunload", bye)
     return () => {
       if (channel) supabase.removeChannel(channel)
@@ -423,7 +438,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         [settings.shortcut_parametres]: "parametres",
       }
       const target = map[e.key]
-      if (target) { e.preventDefault(); setActiveTab(target) }
+      if (target) { e.preventDefault(); openTab(target) }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
@@ -454,19 +469,16 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   const runGlobalSearch = async (q: string) => {
     if (!q.trim() || q.length < 2) { setGlobalResults([]); return }
-    if (!activeSociety?.id) return
     setSearchLoading(true)
-    const [{ data: clients }, { data: pharmacies }, { data: prospects }, { data: ventes }] = await Promise.all([
-      supabase.from("clients").select("id,nom,telephone,email").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
-      supabase.from("pharmacies").select("id,nom,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
-      supabase.from("prospects").select("id,nom,entreprise,ville").eq("society_id",activeSociety.id).ilike("nom",`%${q}%`).limit(5),
-      supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id",activeSociety.id).ilike("client_nom",`%${q}%`).order("created_at",{ascending:false}).limit(5),
+    const [{ data: clients }, { data: prospects }, { data: ventes }] = await Promise.all([
+      supabase.from("clients").select("id,nom,telephone,email").eq("society_id", activeSociety.id).ilike("nom", `%${q}%`).limit(5),
+      supabase.from("prospects").select("id,nom,entreprise,ville").eq("society_id", activeSociety.id).ilike("nom", `%${q}%`).limit(5),
+      supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id", activeSociety.id).ilike("client_nom", `%${q}%`).order("created_at", { ascending: false }).limit(5),
     ])
     const results: any[] = [
-      ...(clients||[]).map((c:any) => ({ type:"client",    icon:"👤", label:c.nom,                   sub:c.telephone||c.email||"", tab:"clients",    id:c.id })),
-      ...(pharmacies||[]).map((p:any) => ({ type:"pharmacie", icon:"🏥", label:p.nom,               sub:p.ville||"",              tab:"pharmacies", id:p.id })),
-      ...(prospects||[]).map((p:any) => ({ type:"prospect",  icon:"🎯", label:p.entreprise||p.nom,  sub:p.ville||"",              tab:"prospects",  id:p.id })),
-      ...(ventes||[]).map((v:any) => ({ type:"vente",       icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€ · "+new Date(v.created_at).toLocaleDateString("fr-FR"), tab:"historique", id:v.id })),
+      ...(clients||[]).map((c:any) => ({ type:"client",   icon:"👤", label:c.nom,                  sub:c.telephone||c.email||"", tab:"clients"    })),
+      ...(prospects||[]).map((p:any) => ({ type:"prospect", icon:"🎯", label:p.entreprise||p.nom, sub:p.ville||"",              tab:"prospects"  })),
+      ...(ventes||[]).map((v:any) => ({ type:"vente",     icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€", tab:"historique" })),
     ]
     setGlobalResults(results)
     setSearchLoading(false)
@@ -484,20 +496,20 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       ...tab,
       restricted: (settings as any).hidden_tabs?.includes(tab.id) || false,
     }))
-  })).filter(section => section.items.length > 0)
+  }))
 
   const myCfg       = PRESENCE[myStatus]
   const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
-  const allTabsFlat = ALL_NAV.flatMap(s => s.items)
-  const activeTabMeta = allTabsFlat.find(t => t.id === activeTab)
-  const isActiveTabRestricted = (settings as any).hidden_tabs?.includes(activeTab) || false
+  const activeTabMeta = ALL_TABS_FLAT.find(t => t.id === activeTab)
+  const isRestricted  = (settings as any).hidden_tabs?.includes(activeTab) || false
 
   const renderContent = () => {
-    if (isActiveTabRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
+    if (isRestricted) return <AccessDeniedPanel tabLabel={activeTabMeta?.label || activeTab} />
     switch (activeTab) {
       case "accueil":           return <AccueilModule         activeSociety={activeSociety} profile={profile} />
       case "clients":           return <ClientsModule         activeSociety={activeSociety} profile={profile} />
       case "suivi":             return <SuiviModule           activeSociety={activeSociety} profile={profile} />
+      case "social_prospects":  return <SocialProspectsModule activeSociety={activeSociety} profile={profile} />
       case "conventions":       return <ConventionModule      activeSociety={activeSociety} profile={profile} />
       case "stocks":            return <StocksModule          activeSociety={activeSociety} profile={profile} />
       case "vente":             return <VenteModule           activeSociety={activeSociety} profile={profile} />
@@ -512,14 +524,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "commandes":         return <CommandesModule       activeSociety={activeSociety} profile={profile} />
       case "playlists":         return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
       case "publications":      return <PublicationModule     activeSociety={activeSociety} profile={profile} />
-      case "social_prospects":  return <SocialProspectsModule activeSociety={activeSociety} profile={profile} />
       case "tournees":          return <TourneesModule        activeSociety={activeSociety} profile={profile}
-          onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => setActiveTab("map")} />
+          onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => openTab("map")} />
       case "prospects":         return <ProspectsModule       activeSociety={activeSociety} profile={profile}
-          onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => setActiveTab("map")} onSwitchToTournees={() => setActiveTab("tournees")} />
+          onShowOnMap={(p: any) => setFocusProspect(p)} onSwitchToMap={() => openTab("map")} onSwitchToTournees={() => openTab("tournees")} />
       case "map":               return <MapModule             activeSociety={activeSociety} profile={profile}
           focusProspect={focusProspect} activeTournee={activeTournee}
-          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => setActiveTab("prospects")} />
+          onClearFocus={() => { setFocusProspect(null); setActiveTournee(null) }} onSwitchToProspects={() => openTab("prospects")} />
       case "messages":          return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres":        return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "agenda":            return <AgendaModule          activeSociety={activeSociety} profile={profile} />
@@ -529,7 +540,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-5xl mb-4">🚧</p>
-            <p className="text-white text-xl font-bold">{ALL_NAV.flatMap(s => s.items).find(t => t.id === activeTab)?.label}</p>
+            <p className="text-white text-xl font-bold">{activeTabMeta?.label}</p>
             <p className="text-zinc-500 text-sm mt-2">Module en cours de construction</p>
           </div>
         </div>
@@ -543,18 +554,19 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const cardRadius   = radiusMap[settings.card_style as keyof typeof radiusMap] || "12px"
 
   const stockAlertPopup = stockAlerts.length > 0 && showStockAlert && (
-    <StockAlertPopup alerts={stockAlerts} onGoToStock={() => { setActiveTab("stocks"); setShowStockAlert(false) }} onClose={() => setShowStockAlert(false)} />
+    <StockAlertPopup alerts={stockAlerts} onGoToStock={() => { openTab("stocks"); setShowStockAlert(false) }} onClose={() => setShowStockAlert(false)} />
   )
   const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
     <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
-      onGoToMessages={() => { setActiveTab("messages"); setShowUnreadPopup(false) }} onClose={() => setShowUnreadPopup(false)} />
+      onGoToMessages={() => { openTab("messages"); setShowUnreadPopup(false) }} onClose={() => setShowUnreadPopup(false)} />
   )
 
   if (APP_THEME === "2") return (
     <>
       <Theme2Layout
         activeSociety={activeSociety} profile={profile}
-        activeTab={activeTab} setActiveTab={setActiveTab}
+        activeTab={activeTab} openTab={openTab}
+        openTabs={openTabs} closeTab={closeTab}
         visibleNav={visibleNav} renderContent={renderContent}
         ACCENT={ACCENT} BG={BG} BG_GRADIENT={BG_GRADIENT}
         baseFontSize={baseFontSize} cardRadius={cardRadius}
@@ -570,36 +582,55 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     </>
   )
 
-  /* ── Rendu item nav ── */
+  /* ── Rendu bouton nav ── */
   const renderNavItem = (tab: any) => {
     const isActive = activeTab === tab.id
+    const isOpen   = openTabs.includes(tab.id)
     return (
       <button key={tab.id}
-        onClick={() => { setActiveTab(tab.id); setSidebarOpen(false) }}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-150 relative"
+        onClick={() => openTab(tab.id)}
+        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 relative group/btn"
         style={{
-          backgroundColor: isActive ? (tab.restricted ? "#ef444415" : ACCENT + "12") : "transparent",
-          color: tab.restricted ? (isActive ? "#ef4444" : "#4a1515") : (isActive ? ACCENT : "#52525b"),
-          border: isActive ? `1px solid ${tab.restricted ? "#ef444445" : ACCENT + "55"}` : "1px solid transparent",
-          boxShadow: isActive ? `0 0 14px ${tab.restricted ? "#ef444418" : ACCENT + "18"}` : "none",
+          backgroundColor: isActive
+            ? (tab.restricted ? "#ef444420" : ACCENT + "18")
+            : "rgba(39,39,42,0.55)",
+          color: tab.restricted
+            ? (isActive ? "#ef4444" : "#7f3333")
+            : (isActive ? ACCENT : "#a1a1aa"),
+          border: isActive
+            ? `1px solid ${tab.restricted ? "#ef444455" : ACCENT + "60"}`
+            : "1px solid rgba(63,63,70,0.5)",
+          boxShadow: isActive ? `0 0 16px ${ACCENT}15` : "none",
         }}
         onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement
-          if (!isActive) { el.style.backgroundColor = ACCENT + "0e"; el.style.color = tab.restricted ? "#ef4444" : ACCENT }
+          if (!isActive) {
+            const el = e.currentTarget as HTMLElement
+            el.style.backgroundColor = ACCENT + "12"
+            el.style.color = tab.restricted ? "#ef4444" : ACCENT
+            el.style.borderColor = ACCENT + "35"
+          }
         }}
         onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement
-          if (!isActive) { el.style.backgroundColor = "transparent"; el.style.color = tab.restricted ? "#4a1515" : "#52525b" }
+          if (!isActive) {
+            const el = e.currentTarget as HTMLElement
+            el.style.backgroundColor = "rgba(39,39,42,0.55)"
+            el.style.color = tab.restricted ? "#7f3333" : "#a1a1aa"
+            el.style.borderColor = "rgba(63,63,70,0.5)"
+          }
         }}>
         {isActive && (
-          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
-            style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT }} />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+            style={{ backgroundColor: tab.restricted ? "#ef4444" : ACCENT, boxShadow: `0 0 6px ${tab.restricted ? "#ef4444" : ACCENT}` }} />
         )}
-        <span className="text-sm">{tab.icon}</span>
-        <span className="flex-1 truncate">{tab.label}</span>
-        {tab.restricted && <span className="text-[9px] text-red-500/70">🔒</span>}
+        <span className="text-sm shrink-0">{tab.icon}</span>
+        <span className="flex-1 truncate text-left">{tab.label}</span>
+        {/* Pastille onglet ouvert */}
+        {isOpen && !isActive && (
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: ACCENT + "80" }}/>
+        )}
+        {tab.restricted && <span className="text-[9px] text-red-500/70 shrink-0">🔒</span>}
         {tab.id === "messages" && unreadMessages > 0 && (
-          <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center"
+          <span className="text-black text-[9px] font-black min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center shrink-0"
             style={{ backgroundColor: ACCENT }}>{unreadMessages > 9 ? "9+" : unreadMessages}</span>
         )}
       </button>
@@ -612,72 +643,75 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
       {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* ── SIDEBAR DESKTOP ── */}
+      {/* ══ SIDEBAR DESKTOP ══ */}
       <aside className="hidden md:flex w-56 border-r border-zinc-900 flex-col shrink-0 h-screen overflow-hidden"
         style={{ backgroundColor: SIDEBAR_BG }}>
 
-        <div className="px-4 pt-3 pb-3 border-b border-zinc-900 shrink-0">
-          <img src="/logo.png" alt="Butt Premium" className="h-10 w-auto" />
-          {activeSociety && (
-            <div className="flex items-center gap-1 mt-1.5">
-              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
-              <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
-            </div>
-          )}
-          <div className="relative mt-2">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">🔍</span>
-            <input type="text" placeholder="Recherche globale..." value={globalSearch}
+        {/* Logo + recherche */}
+        <div className="px-3 pt-3 pb-3 border-b border-zinc-800/60 shrink-0">
+          <div className="flex items-center gap-2 mb-2.5">
+            <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
+            {activeSociety && (
+              <div className="flex items-center gap-1 min-w-0">
+                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: activeSociety.color || ACCENT }} />
+                <p className="text-zinc-500 text-[10px] truncate">{activeSociety.name}</p>
+              </div>
+            )}
+          </div>
+          {/* Recherche */}
+          <div className="relative" data-global-search>
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">🔍</span>
+            <input type="text" placeholder="Recherche..." value={globalSearch}
               onChange={e => { setGlobalSearch(e.target.value); runGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
               onFocus={() => setShowGlobalSearch(true)}
-              className="w-full bg-zinc-800/70 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/40"/>
+              className="w-full bg-zinc-800/60 border border-zinc-700/50 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/50"/>
             {showGlobalSearch && globalSearch.length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-72 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a1a] border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-64 overflow-y-auto">
                 {searchLoading ? (
                   <p className="text-zinc-500 text-xs px-3 py-3 text-center">Recherche...</p>
                 ) : globalResults.length === 0 ? (
                   <p className="text-zinc-600 text-xs px-3 py-3 text-center">Aucun résultat</p>
-                ) : (
-                  <div className="py-1">
-                    {globalResults.map((r,i) => (
-                      <button key={i} onClick={() => { setActiveTab(r.tab); setShowGlobalSearch(false); setGlobalSearch("") }}
-                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-800 transition-colors text-left">
-                        <span className="text-sm shrink-0">{r.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-xs font-medium truncate">{r.label}</p>
-                          {r.sub && <p className="text-zinc-500 text-[10px] truncate">{r.sub}</p>}
-                        </div>
-                        <span className="text-zinc-600 text-[9px] uppercase shrink-0">{r.type}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                ) : globalResults.map((r, i) => (
+                  <button key={i} onClick={() => { openTab(r.tab); setShowGlobalSearch(false); setGlobalSearch("") }}
+                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-zinc-800 transition-colors text-left">
+                    <span className="text-sm shrink-0">{r.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{r.label}</p>
+                      {r.sub && <p className="text-zinc-500 text-[10px] truncate">{r.sub}</p>}
+                    </div>
+                    <span className="text-zinc-600 text-[9px] uppercase shrink-0">{r.type}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
         </div>
 
         {/* NAV repliable */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2">
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
           {visibleNav.map(({ section, items }) => {
             const isCollapsed = collapsedSections.has(section)
             const hasActive   = items.some(t => t.id === activeTab)
+            const hasOpen     = items.some(t => openTabs.includes(t.id))
             return (
-              <div key={section} className="mb-1">
+              <div key={section} className="mb-0.5">
+                {/* Header section */}
                 <button onClick={() => toggleSection(section)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors group mb-0.5">
                   <div className="flex items-center gap-1.5">
-                    <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-400" : "text-zinc-700 group-hover:text-zinc-500"}`}>
+                    <p className={`text-[9px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-300" : "text-zinc-600 group-hover:text-zinc-400"}`}>
                       {section}
                     </p>
-                    {isCollapsed && hasActive && (
+                    {isCollapsed && (hasActive || hasOpen) && (
                       <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>
                     )}
                   </div>
-                  <span className={`text-zinc-600 group-hover:text-zinc-400 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
+                  <span className={`text-zinc-600 group-hover:text-zinc-400 text-[8px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
                     style={{ display: "inline-block" }}>▶</span>
                 </button>
+
                 {!isCollapsed && (
-                  <div className="space-y-0.5 pl-0.5">
+                  <div className="space-y-0.5 px-0.5">
                     {items.map(tab => renderNavItem(tab))}
                   </div>
                 )}
@@ -686,45 +720,48 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           })}
         </nav>
 
+        {/* Équipe en ligne */}
         {onlineUsers.length > 0 && (
-          <div className="border-t border-zinc-900 px-2 pt-2 pb-1 shrink-0">
-            <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-2 mb-1.5">
+          <div className="border-t border-zinc-800/60 px-2 pt-2 pb-1 shrink-0">
+            <p className="text-[9px] font-bold text-zinc-700 uppercase tracking-widest px-1 mb-1">
               Équipe · <span className={onlineCount > 0 ? "text-green-500" : "text-zinc-600"}>
                 {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
               </span>
             </p>
-            <div className="space-y-0.5 max-h-20 overflow-y-auto">
-              {onlineUsers.slice(0, 5).map(u => (
-                <button key={u.id} onClick={() => setActiveTab("messages")}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group text-left">
+            <div className="space-y-0.5 max-h-16 overflow-y-auto">
+              {onlineUsers.slice(0, 4).map(u => (
+                <button key={u.id} onClick={() => openTab("messages")}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-zinc-800/50 transition-colors">
                   <div className="relative shrink-0">
-                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={22} />
+                    <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={20} />
                     <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ${PRESENCE[u.status].dot} ring-1 ring-[#0d0d0d]`} />
                   </div>
-                  <p className="text-zinc-500 text-[11px] font-medium truncate group-hover:text-zinc-300">{u.nom}</p>
+                  <p className="text-zinc-500 text-[10px] truncate">{u.nom}</p>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <div className="border-t border-zinc-900 p-2 shrink-0">
+        {/* Profil */}
+        <div className="border-t border-zinc-800/60 p-2 shrink-0">
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 transition-colors">
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-zinc-800/60 transition-colors"
+              style={{ backgroundColor: "rgba(39,39,42,0.5)", border: "1px solid rgba(63,63,70,0.5)" }}>
               <div className="relative shrink-0">
-                <UserAvatar nom={profile?.nom || profile?.username || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+                <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={26} />
                 <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ${myCfg.dot} ring-1 ring-[#0d0d0d]`} />
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-white text-[11px] font-semibold truncate">{profile?.nom || profile?.username}</p>
                 <p className={`text-[9px] font-medium ${myCfg.color}`}>{myCfg.label}</p>
               </div>
-              <span className="text-zinc-700 text-[10px]">▾</span>
+              <span className="text-zinc-600 text-[10px]">▾</span>
             </button>
             {showStatusMenu && (
               <div className="absolute bottom-full left-0 right-0 mb-1 bg-[#1a1a1a] border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-50">
-                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider px-3 pt-2 pb-1">Mon statut</p>
+                <p className="text-[9px] text-zinc-600 font-bold uppercase tracking-wider px-3 pt-2 pb-1">Statut</p>
                 {(Object.entries(PRESENCE) as [PresenceStatus, typeof PRESENCE[PresenceStatus]][]).map(([s, cfg]) => (
                   <button key={s} onClick={() => updateStatus(s)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-zinc-800 transition-colors ${myStatus === s ? "bg-zinc-800/60" : ""}`}>
@@ -744,28 +781,28 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </div>
       </aside>
 
-      {/* ── SIDEBAR MOBILE ── */}
+      {/* ══ SIDEBAR MOBILE ══ */}
       {sidebarOpen && (
-        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-900 md:hidden overflow-y-auto"
-          style={{ backgroundColor: SIDEBAR_BG }}>
+        <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-800/60 md:hidden overflow-y-auto"
+          style={{ backgroundColor: "#0d0d0d" }}>
           <button onClick={() => setSidebarOpen(false)}
-            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white text-lg">✕</button>
-          <div className="px-4 pt-4 pb-3.5 border-b border-zinc-900">
+            className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">✕</button>
+          <div className="px-4 pt-4 pb-3 border-b border-zinc-800/60">
             <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
           </div>
-          <nav className="flex-1 overflow-y-auto py-2 px-2">
+          <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
             {visibleNav.map(({ section, items }) => {
               const isCollapsed = collapsedSections.has(section)
               const hasActive   = items.some(t => t.id === activeTab)
               return (
-                <div key={section} className="mb-1">
+                <div key={section} className="mb-0.5">
                   <button onClick={() => toggleSection(section)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors group mb-0.5">
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors group mb-0.5">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-[9px] font-bold uppercase tracking-widest ${hasActive ? "text-zinc-400" : "text-zinc-700"}`}>{section}</p>
+                      <p className={`text-[9px] font-bold uppercase tracking-widest ${hasActive ? "text-zinc-300" : "text-zinc-600"}`}>{section}</p>
                       {isCollapsed && hasActive && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>}
                     </div>
-                    <span className={`text-zinc-600 text-[9px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`} style={{ display: "inline-block" }}>▶</span>
+                    <span className={`text-zinc-600 text-[8px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`} style={{ display:"inline-block" }}>▶</span>
                   </button>
                   {!isCollapsed && (
                     <div className="space-y-0.5">
@@ -776,9 +813,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               )
             })}
           </nav>
-          <div className="border-t border-zinc-900 p-3 shrink-0">
-            <div className="flex items-center gap-2 px-2 py-2 rounded-xl bg-zinc-900/80">
-              <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
+          <div className="border-t border-zinc-800/60 p-3 shrink-0">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-xl" style={{ backgroundColor: "rgba(39,39,42,0.5)", border: "1px solid rgba(63,63,70,0.5)" }}>
+              <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={26} />
               <div className="flex-1 min-w-0">
                 <p className="text-white text-xs font-semibold truncate">{profile?.nom}</p>
                 <p className="text-zinc-500 text-[10px]">En ligne</p>
@@ -788,49 +825,85 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </aside>
       )}
 
-      {/* ── MAIN ── */}
-      <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+      {/* ══ ZONE PRINCIPALE ══ */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+
+        {/* Bouton menu mobile */}
         <button onClick={() => setSidebarOpen(true)}
-          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700"
-          style={{ backgroundColor: SIDEBAR_BG }}>
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex flex-col items-center justify-center gap-1.5 rounded-xl shadow-xl border border-zinc-700 bg-zinc-900">
           <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
           <span className="w-5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
           <span className="w-3.5 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
         </button>
-        {renderContent()}
 
-        {showConvPopup && activeConvention && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
-              <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
-                <div className="text-5xl mb-3">🎪</div>
-                <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  <span className="text-green-400 text-xs font-bold">Convention en cours</span>
-                </div>
-                <h2 className="text-white font-bold text-xl">{activeConvention.nom}</h2>
-                {activeConvention.lieu && <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>}
-              </div>
-              <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
-                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
-                  <span className="text-zinc-500 text-sm">Début</span>
-                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
-                </div>
-                <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
-                  <span className="text-zinc-500 text-sm">Fin</span>
-                  <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
-                </div>
-              </div>
-              <div className="px-6 pb-6 space-y-2">
-                <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
-                  className="w-full py-3 rounded-xl text-black font-bold text-sm" style={{ backgroundColor: ACCENT }}>📋 Aller à la convention</button>
-                <button onClick={() => setShowConvPopup(false)}
-                  className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800">Continuer vers l'accueil</button>
-              </div>
+        {/* ── BARRE D'ONGLETS OUVERTS ── */}
+        {openTabs.length > 0 && (
+          <div className="shrink-0 border-b border-zinc-800/60 flex items-center overflow-x-auto"
+            style={{ backgroundColor: SIDEBAR_BG, minHeight: "40px" }}>
+            <div className="flex items-center px-2 gap-1">
+              {openTabs.map(tabId => {
+                const meta    = ALL_TABS_FLAT.find(t => t.id === tabId)
+                const isActive = activeTab === tabId
+                if (!meta) return null
+                return (
+                  <div key={tabId}
+                    onClick={() => setActiveTab(tabId)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer shrink-0 transition-all duration-150 group/tab"
+                    style={{
+                      backgroundColor: isActive ? ACCENT + "18" : "rgba(39,39,42,0.4)",
+                      border: isActive ? `1px solid ${ACCENT}50` : "1px solid rgba(63,63,70,0.4)",
+                      color: isActive ? ACCENT : "#71717a",
+                    }}>
+                    <span className="text-xs">{meta.icon}</span>
+                    <span className="text-[12px] font-medium whitespace-nowrap">{meta.label}</span>
+                    <button
+                      onClick={(e) => closeTab(tabId, e)}
+                      className="ml-0.5 w-4 h-4 rounded flex items-center justify-center text-[10px] opacity-40 hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
+                    >✕</button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
-      </main>
+
+        {/* Contenu */}
+        <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
+          {renderContent()}
+
+          {showConvPopup && activeConvention && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-[#111111] border border-zinc-800 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+                <div className="px-6 pt-6 pb-4 text-center" style={{ background: "linear-gradient(135deg, #eab30815, #eab30805)" }}>
+                  <div className="text-5xl mb-3">🎪</div>
+                  <div className="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/30 rounded-full px-3 py-1 mb-3">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                    <span className="text-green-400 text-xs font-bold">Convention en cours</span>
+                  </div>
+                  <h2 className="text-white font-bold text-xl">{activeConvention.nom}</h2>
+                  {activeConvention.lieu && <p className="text-zinc-500 text-sm mt-1">📍 {activeConvention.lieu}</p>}
+                </div>
+                <div className="px-6 py-4 space-y-3 border-t border-zinc-800">
+                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                    <span className="text-zinc-500 text-sm">Début</span>
+                    <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_debut + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+                  </div>
+                  <div className="flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3">
+                    <span className="text-zinc-500 text-sm">Fin</span>
+                    <span className="text-white text-sm font-semibold">{new Date(activeConvention.date_fin + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</span>
+                  </div>
+                </div>
+                <div className="px-6 pb-6 space-y-2">
+                  <button onClick={() => { setShowConvPopup(false); openTab("conventions") }}
+                    className="w-full py-3 rounded-xl text-black font-bold text-sm" style={{ backgroundColor: ACCENT }}>📋 Aller à la convention</button>
+                  <button onClick={() => setShowConvPopup(false)}
+                    className="w-full py-3 rounded-xl text-zinc-400 font-medium text-sm bg-zinc-900 hover:bg-zinc-800">Continuer</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
 
       {unreadPopup}{stockAlertPopup}
     </div>
@@ -853,7 +926,7 @@ export default function DashboardPage() {
         if (!session) { router.push("/"); return }
         let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
         if (!prof) {
-          const nom = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "Utilisateur"
+          const nom = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Utilisateur"
           const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
           await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
           const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
@@ -862,11 +935,8 @@ export default function DashboardPage() {
         if (prof) setProfile({ ...prof, email: session.user.email })
         const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
         if (socs?.length) setActiveSociety(socs[0])
-      } catch (err) {
-        console.error("init error:", err)
-      } finally {
-        setLoading(false)
-      }
+      } catch (err) { console.error("init error:", err) }
+      finally { setLoading(false) }
     }
     init()
   }, [router])
@@ -880,7 +950,6 @@ export default function DashboardPage() {
   if (!profile) return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center gap-4">
       <p className="text-white font-bold text-lg">Problème de chargement</p>
-      <p className="text-zinc-500 text-sm">Votre profil n'a pas pu être chargé.</p>
       <button onClick={() => window.location.reload()} className="bg-yellow-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-yellow-400">Réessayer</button>
       <button onClick={async () => { await supabase.auth.signOut(); router.push("/") }} className="text-zinc-500 text-sm hover:text-white">Se déconnecter</button>
     </div>
@@ -897,7 +966,7 @@ export default function DashboardPage() {
    THEME 2 — NEON
 ══════════════════════════════════════════════ */
 function Theme2Layout({
-  activeSociety, profile, activeTab, setActiveTab, visibleNav,
+  activeSociety, profile, activeTab, openTab, openTabs, closeTab, visibleNav,
   renderContent, ACCENT, BG, BG_GRADIENT, baseFontSize, cardRadius,
   unreadMessages, sidebarOpen, setSidebarOpen,
   onlineUsers, onlineCount, myStatus, showStatusMenu,
@@ -947,7 +1016,7 @@ function Theme2Layout({
           {allTabs.map((tab: any) => {
             const isActive = activeTab === tab.id
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => openTab(tab.id)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 relative"
                 style={isActive ? { backgroundColor: NEON + "20", color: NEON, border: `1px solid ${NEON}50` } : { color: "#52525b", border: "1px solid transparent" }}>
                 {isActive && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full" style={{ backgroundColor: NEON }} />}
@@ -977,7 +1046,7 @@ function Theme2Layout({
             </div>
             {activeConvention.lieu && <p className="text-zinc-400 text-sm mb-4">📍 {activeConvention.lieu}</p>}
             <div className="flex gap-2">
-              <button onClick={() => { setShowConvPopup(false); setActiveTab("conventions") }}
+              <button onClick={() => { setShowConvPopup(false); openTab("conventions") }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black" style={{ backgroundColor: NEON }}>📋 Aller à la convention</button>
               <button onClick={() => setShowConvPopup(false)} className="px-4 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300">Plus tard</button>
             </div>
