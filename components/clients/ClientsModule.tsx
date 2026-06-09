@@ -374,8 +374,8 @@ function ClientPanel({ client, societyId, onClose, onEdit, onTarifs, onDelete }:
           style={accentHex ? { borderBottom: `1px solid ${accentHex}40`, background: `linear-gradient(135deg, ${accentHex}10, transparent)` } : { borderBottom: "1px solid #27272a" }}>
           <div className="flex items-start justify-between px-5 pt-5 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-base shrink-0 ring-2"
-                style={{ backgroundColor: getAvatarColor(client.nom), ringColor: accentHex || "#27272a" }}>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-base shrink-0"
+                style={{ backgroundColor: getAvatarColor(client.nom), border: `2px solid ${accentHex || "#3f3f46"}` }}>
                 {client.avatar_url
                   ? <img src={client.avatar_url} className="w-full h-full object-cover rounded-2xl" alt={client.nom}/>
                   : initials(client.nom)
