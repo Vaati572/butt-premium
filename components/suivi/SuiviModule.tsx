@@ -355,7 +355,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
           )}
           {commande && (
             <button onClick={deleteCmd}
-              className="w-full py-2.5 rounded-xl bg-red-500/8 border border-red-500/15 text-red-400/70 hover:bg-red-500/15 font-semibold text-sm flex items-center justify-center gap-2">
+              className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400/70 hover:bg-red-500/15 font-semibold text-sm flex items-center justify-center gap-2">
               <Trash2 size={12}/> Supprimer
             </button>
           )}
@@ -481,7 +481,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     if (panel) {
       const { data } = await supabase.from("suivi_commandes").select("*")
         .eq("society_id", activeSociety.id).eq("client_id", panel.client.client_id)
-        .eq("annee", year).eq("mois", panel.mois).maybeSingle()
+        .eq("annee", year).eq("mois", panel.mois).limit(1).then(r => ({ data: r.data?.[0] || null }))
       setPanel(p => p ? { ...p, commande: data || null } : null)
     }
   }
