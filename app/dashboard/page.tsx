@@ -27,7 +27,6 @@ import MapModule from "@/components/map/MapModule"
 import ParametresModule from "@/components/parametres/ParametresModule"
 import IAModule from "@/components/IAModule"
 import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
-import PublicationModule from "@/components/publications/PublicationModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 
@@ -72,7 +71,6 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
-    { id: "publications", label: "Publications", icon: "📣" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
