@@ -18,8 +18,8 @@ interface SuiviClient {
 interface Commande {
   id: string; client_id: string; annee: number; mois: number
   montant: number; detail?: string; date_commande?: string; notes?: string
-  statut_paiement?: string   // 'attente' | 'valide' | 'relance'
-  statut_colis?: string      // 'a_preparer' | 'en_livraison' | 'recu'
+  statut_paiement?: string
+  statut_colis?: string
   date_expedition?: string
   date_validation_paiement?: string
 }
@@ -31,15 +31,15 @@ const NOW_YEAR   = new Date().getFullYear()
 const TODAY      = new Date()
 
 const PAIEMENT = {
-  attente: { label: "En attente",    color: "#eab308", bg: "rgba(234,179,8,0.12)",  border: "rgba(234,179,8,0.4)",  dot: "bg-yellow-400" },
-  valide:  { label: "Validé",        color: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.4)",  dot: "bg-green-400"  },
-  relance: { label: "Relancé",       color: "#3b82f6", bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.4)", dot: "bg-blue-400"   },
+  attente: { label: "En attente", color: "#eab308", bg: "rgba(234,179,8,0.12)",  border: "rgba(234,179,8,0.4)",  dot: "bg-yellow-400" },
+  valide:  { label: "Validé",     color: "#22c55e", bg: "rgba(34,197,94,0.12)",  border: "rgba(34,197,94,0.4)",  dot: "bg-green-400"  },
+  relance: { label: "Relancé",    color: "#3b82f6", bg: "rgba(59,130,246,0.12)", border: "rgba(59,130,246,0.4)", dot: "bg-blue-400"   },
 }
 
 const COLIS = {
-  a_preparer:   { label: "À préparer",   Icon: Package,     color: "#71717a" },
-  en_livraison: { label: "En livraison", Icon: Truck,       color: "#f97316" },
-  recu:         { label: "Reçu ✓",       Icon: CheckCircle2,color: "#22c55e" },
+  a_preparer:   { label: "À préparer",   Icon: Package,      color: "#71717a" },
+  en_livraison: { label: "En livraison", Icon: Truck,        color: "#f97316" },
+  recu:         { label: "Reçu ✓",       Icon: CheckCircle2, color: "#22c55e" },
 }
 
 const CONTRAT_COLORS: Record<string, string> = {
@@ -90,19 +90,16 @@ function LivraisonPopup({ commandes, clients, societyId, onClose, onDone }: {
         <div className="p-4 space-y-2 max-h-72 overflow-y-auto">
           {pending.map(cmd => {
             const jours = daysDiff(cmd.date_expedition!)
-            const isValidating = validating.has(cmd.id)
+            const isV = validating.has(cmd.id)
             return (
               <div key={cmd.id} className="flex items-center justify-between gap-3 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
                 <div>
                   <p className="text-white text-sm font-semibold">{getClientName(cmd.client_id)}</p>
                   <p className="text-zinc-500 text-xs">{MOIS_FULL[cmd.mois - 1]} · Expédié il y a {jours}j · {Number(cmd.montant).toFixed(0)}€</p>
                 </div>
-                <button onClick={() => validate(cmd)} disabled={isValidating}
+                <button onClick={() => validate(cmd)} disabled={isV}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40 text-black font-bold text-xs shrink-0">
-                  {isValidating
-                    ? <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"/>
-                    : <><Check size={12}/> Reçu</>
-                  }
+                  {isV ? <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={12}/> Reçu</>}
                 </button>
               </div>
             )
@@ -116,21 +113,21 @@ function LivraisonPopup({ commandes, clients, societyId, onClose, onDone }: {
   )
 }
 
-/* ── Panel commande (remplace les 2 anciens modals) ── */
+/* ── Panel commande ── */
 function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDone }: {
   client: SuiviClient; mois: number; annee: number
   commande: Commande | null; societyId: string
   onClose: () => void; onDone: () => void
 }) {
-  const [editMode, setEditMode]   = useState(!commande)
-  const [montant, setMontant]     = useState(commande?.montant?.toString() || "")
-  const [detail, setDetail]       = useState(commande?.detail || "")
-  const [date, setDate]           = useState(commande?.date_commande || `${annee}-${String(mois).padStart(2,"0")}-01`)
-  const [notes, setNotes]         = useState(commande?.notes || "")
-  const [paiement, setPaiement]   = useState(commande?.statut_paiement || "attente")
-  const [colis, setColis]         = useState(commande?.statut_colis || "a_preparer")
-  const [dateExp, setDateExp]     = useState(commande?.date_expedition || "")
-  const [saving, setSaving]       = useState(false)
+  const [editMode, setEditMode] = useState(!commande)
+  const [montant, setMontant]   = useState(commande?.montant?.toString() || "")
+  const [detail, setDetail]     = useState(commande?.detail || "")
+  const [date, setDate]         = useState(commande?.date_commande || `${annee}-${String(mois).padStart(2,"0")}-01`)
+  const [notes, setNotes]       = useState(commande?.notes || "")
+  const [paiement, setPaiement] = useState(commande?.statut_paiement || "attente")
+  const [colis, setColis]       = useState(commande?.statut_colis || "a_preparer")
+  const [dateExp, setDateExp]   = useState(commande?.date_expedition || "")
+  const [saving, setSaving]     = useState(false)
   const montantRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (!commande) setTimeout(() => montantRef.current?.focus(), 100) }, [])
@@ -144,7 +141,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
       montant: parseFloat(montant), detail: detail || null,
       date_commande: date || null, notes: notes || null,
       statut_paiement: paiement, statut_colis: colis,
-      date_expedition: (colis === "en_livraison" && dateExp) ? dateExp : (colis === "en_livraison" ? now : null),
+      date_expedition: colis === "en_livraison" ? (dateExp || now) : null,
     }
     if (paiement === "valide" && (!commande?.date_validation_paiement || commande.statut_paiement !== "valide")) {
       payload.date_validation_paiement = now
@@ -165,12 +162,10 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   const quickUpdate = async (field: string, value: string) => {
     if (!commande?.id) return
     const extra: any = {}
-    if (field === "statut_paiement" && value === "valide" && commande.statut_paiement !== "valide") {
+    if (field === "statut_paiement" && value === "valide" && commande.statut_paiement !== "valide")
       extra.date_validation_paiement = new Date().toISOString().slice(0, 10)
-    }
-    if (field === "statut_colis" && value === "en_livraison" && !commande.date_expedition) {
+    if (field === "statut_colis" && value === "en_livraison" && !commande.date_expedition)
       extra.date_expedition = new Date().toISOString().slice(0, 10)
-    }
     await supabase.from("suivi_commandes").update({ [field]: value, ...extra }).eq("id", commande.id)
     if (field === "statut_paiement") setPaiement(value)
     if (field === "statut_colis")    setColis(value)
@@ -179,24 +174,17 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
 
   const contratColor = CONTRAT_COLORS[client.client_contrat || ""] || ""
   const clientName   = client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom
-
-  // 25-day relance countdown
   const relanceAlert = commande?.date_validation_paiement && paiement === "valide"
-    ? daysDiff(commande.date_validation_paiement)
-    : null
+    ? daysDiff(commande.date_validation_paiement) : null
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
-
-        {/* Header */}
         <div className="px-5 py-4 border-b border-zinc-800 shrink-0"
           style={contratColor ? { background: `linear-gradient(135deg, ${contratColor}12, transparent)` } : {}}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider mb-0.5">
-                {MOIS_FULL[mois - 1]} {annee}
-              </p>
+              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider mb-0.5">{MOIS_FULL[mois - 1]} {annee}</p>
               <h2 className="text-white font-bold text-base">{clientName}</h2>
               {client.client_nom_shop && <p className="text-zinc-400 text-xs mt-0.5">🏪 {client.client_nom_shop}</p>}
             </div>
@@ -205,8 +193,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-          {/* Alerte relance 25 jours */}
+          {/* Alerte relance */}
           {relanceAlert !== null && relanceAlert >= 25 && (
             <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3">
               <Bell size={16} className="text-blue-400 shrink-0 animate-pulse"/>
@@ -222,8 +209,6 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               )}
             </div>
           )}
-
-          {/* Alerte countdown (entre 20 et 24 jours) */}
           {relanceAlert !== null && relanceAlert >= 20 && relanceAlert < 25 && (
             <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-4 py-3">
               <Clock size={14} className="text-yellow-400 shrink-0"/>
@@ -231,18 +216,16 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
             </div>
           )}
 
-          {/* Section COMMANDE */}
+          {/* Commande */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Commande</p>
               {commande && !editMode && (
-                <button onClick={() => setEditMode(true)}
-                  className="text-zinc-600 hover:text-white flex items-center gap-1 text-[10px]">
+                <button onClick={() => setEditMode(true)} className="text-zinc-600 hover:text-white flex items-center gap-1 text-[10px]">
                   <Pencil size={10}/> Modifier
                 </button>
               )}
             </div>
-
             {!editMode && commande ? (
               <div className="space-y-2">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-center">
@@ -278,21 +261,24 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                 <input type="date" value={date} onChange={e => setDate(e.target.value)}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
                 <textarea value={detail} onChange={e => setDetail(e.target.value)} rows={2}
-                  placeholder="Détail de la commande..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
+                  placeholder="Détail de la commande..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
                 <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Notes..." className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  placeholder="Notes..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
               </div>
             )}
           </div>
 
-          {/* Section PAIEMENT */}
+          {/* Paiement */}
           <div>
             <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">💳 Paiement</p>
             <div className="grid grid-cols-3 gap-1.5">
               {(Object.entries(PAIEMENT) as [string, typeof PAIEMENT.attente][]).map(([key, cfg]) => {
                 const isActive = paiement === key
                 return (
-                  <button key={key} onClick={() => commande?.id ? quickUpdate("statut_paiement", key) : setPaiement(key)}
+                  <button key={key}
+                    onClick={() => commande?.id ? quickUpdate("statut_paiement", key) : setPaiement(key)}
                     className="flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-bold transition-all"
                     style={{
                       backgroundColor: isActive ? cfg.bg : "rgba(39,39,42,0.5)",
@@ -308,12 +294,12 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
             {paiement === "valide" && commande?.date_validation_paiement && (
               <p className="text-green-600 text-[10px] mt-1.5 flex items-center gap-1">
                 <Check size={10}/> Validé le {new Date(commande.date_validation_paiement + "T00:00:00").toLocaleDateString("fr-FR")}
-                {relanceAlert !== null && <span className="text-zinc-600">· relance J+{relanceAlert}</span>}
+                {relanceAlert !== null && <span className="text-zinc-600 ml-1">· J+{relanceAlert}/25</span>}
               </p>
             )}
           </div>
 
-          {/* Section LIVRAISON */}
+          {/* Livraison */}
           <div>
             <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">📦 Livraison</p>
             <div className="grid grid-cols-3 gap-1.5">
@@ -321,7 +307,8 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                 const isActive = colis === key
                 const { Icon } = cfg
                 return (
-                  <button key={key} onClick={() => commande?.id ? quickUpdate("statut_colis", key) : setColis(key)}
+                  <button key={key}
+                    onClick={() => commande?.id ? quickUpdate("statut_colis", key) : setColis(key)}
                     className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all"
                     style={{
                       backgroundColor: isActive ? cfg.color + "18" : "rgba(39,39,42,0.5)",
@@ -334,8 +321,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                 )
               })}
             </div>
-
-            {(colis === "en_livraison" || commande?.date_expedition) && (
+            {(colis === "en_livraison" || commande?.statut_colis === "en_livraison") && (
               <div className="mt-2">
                 <label className="block text-[10px] text-zinc-600 mb-1">Date d&apos;expédition</label>
                 <input type="date" value={dateExp || commande?.date_expedition || ""}
@@ -343,10 +329,10 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none"/>
               </div>
             )}
-
             {commande?.date_expedition && colis === "en_livraison" && (
               <p className="text-orange-400 text-[10px] mt-1.5 flex items-center gap-1">
-                <Truck size={10}/> Expédié le {new Date(commande.date_expedition + "T00:00:00").toLocaleDateString("fr-FR")}
+                <Truck size={10}/>
+                Expédié le {new Date(commande.date_expedition + "T00:00:00").toLocaleDateString("fr-FR")}
                 {daysDiff(commande.date_expedition) >= 4 && <span className="text-orange-300 font-bold"> · Confirmer réception ?</span>}
               </p>
             )}
@@ -393,11 +379,12 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
       .then(({ data }) => setClients(data || []))
   }, [societyId])
 
-  const filtered = clients.filter(c => !existingClientIds.includes(c.id)).filter(c => {
-    const s = search.toLowerCase()
-    return !s || c.nom?.toLowerCase().includes(s) || c.prenom?.toLowerCase().includes(s) || c.nom_shop?.toLowerCase().includes(s)
-  })
+  const filtered = clients
+    .filter(c => !existingClientIds.includes(c.id))
+    .filter(c => { const s = search.toLowerCase(); return !s || c.nom?.toLowerCase().includes(s) || c.prenom?.toLowerCase().includes(s) || c.nom_shop?.toLowerCase().includes(s) })
+
   const toggle = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
   const save = async () => {
     if (!selected.size) return
     setSaving(true)
@@ -421,7 +408,9 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
         </div>
         <div className="flex-1 overflow-y-auto py-2">
           {filtered.length === 0 ? (
-            <p className="text-zinc-600 text-sm text-center py-8">{clients.filter(c => !existingClientIds.includes(c.id)).length === 0 ? "Tous les clients sont dans le suivi" : "Aucun résultat"}</p>
+            <p className="text-zinc-600 text-sm text-center py-8">
+              {clients.filter(c => !existingClientIds.includes(c.id)).length === 0 ? "Tous les clients sont dans le suivi" : "Aucun résultat"}
+            </p>
           ) : filtered.map(c => {
             const isSel = selected.has(c.id); const cc = CONTRAT_COLORS[c.contrat || ""]
             return (
@@ -455,13 +444,13 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
    MAIN MODULE
 ══════════════════════════════════════════════ */
 export default function SuiviModule({ activeSociety, profile }: Props) {
-  const [suiviClients, setSuiviClients] = useState<SuiviClient[]>([])
-  const [commandes, setCommandes]       = useState<Commande[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [year, setYear]                 = useState(NOW_YEAR)
-  const [search, setSearch]             = useState("")
+  const [suiviClients, setSuiviClients]   = useState<SuiviClient[]>([])
+  const [commandes, setCommandes]         = useState<Commande[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [year, setYear]                   = useState(NOW_YEAR)
+  const [search, setSearch]               = useState("")
   const [showAddClient, setShowAddClient] = useState(false)
-  const [panel, setPanel]               = useState<{ client: SuiviClient; mois: number; commande: Commande | null } | null>(null)
+  const [panel, setPanel]                 = useState<{ client: SuiviClient; mois: number; commande: Commande | null } | null>(null)
   const [livraisonPopup, setLivraisonPopup] = useState(false)
 
   const load = useCallback(async () => {
@@ -479,11 +468,10 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     })))
     setCommandes(cmd || [])
     setLoading(false)
-    // Vérifier livraisons en attente de validation
-    const pendingDeliveries = (cmd || []).filter(c =>
+    const pending = (cmd || []).filter((c: any) =>
       c.statut_colis === "en_livraison" && c.date_expedition && daysDiff(c.date_expedition) >= 4
     )
-    if (pendingDeliveries.length > 0) setTimeout(() => setLivraisonPopup(true), 1500)
+    if (pending.length > 0) setTimeout(() => setLivraisonPopup(true), 1500)
   }, [activeSociety?.id, year])
 
   useEffect(() => { load() }, [load])
@@ -513,18 +501,16 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     return sc.client_nom?.toLowerCase().includes(s) || sc.client_prenom?.toLowerCase().includes(s) || sc.client_nom_shop?.toLowerCase().includes(s)
   })
 
-  const totalAnnee     = commandes.reduce((s, c) => s + Number(c.montant || 0), 0)
-  const cellsVertes    = commandes.length
-  const cellsTotal     = suiviClients.length * 12
-  const tauxCouverture = cellsTotal > 0 ? Math.round((cellsVertes / cellsTotal) * 100) : 0
-  const relanceDue     = commandes.filter(c => c.statut_paiement === "valide" && c.date_validation_paiement && daysDiff(c.date_validation_paiement) >= 25).length
+  const totalAnnee      = commandes.reduce((s, c) => s + Number(c.montant || 0), 0)
+  const cellsVertes     = commandes.length
+  const cellsTotal      = suiviClients.length * 12
+  const tauxCouverture  = cellsTotal > 0 ? Math.round((cellsVertes / cellsTotal) * 100) : 0
+  const relanceDue      = commandes.filter(c => c.statut_paiement === "valide" && c.date_validation_paiement && daysDiff(c.date_validation_paiement) >= 25).length
   const livraisonsEnCours = commandes.filter(c => c.statut_colis === "en_livraison").length
-  const totalParMois = MOIS_SHORT.map((_, i) => commandes.filter(c => c.mois === i + 1).reduce((s, c) => s + Number(c.montant || 0), 0))
+  const totalParMois    = MOIS_SHORT.map((_, i) => commandes.filter(c => c.mois === i + 1).reduce((s, c) => s + Number(c.montant || 0), 0))
 
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] flex flex-col">
-
-      {/* HEADER */}
       <div className="border-b border-zinc-900 px-4 pt-4 pb-3 shrink-0 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
@@ -556,14 +542,13 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[
             { label: "CA annuel",  value: totalAnnee.toFixed(0)+"€", color: "text-yellow-400" },
-            { label: "Couverture", value: tauxCouverture+"%",        color: tauxCouverture > 60 ? "text-green-400" : "text-yellow-400" },
-            { label: "Validés",    value: String(commandes.filter(c=>c.statut_paiement==="valide").length),  color: "text-green-400" },
-            { label: "En attente", value: String(commandes.filter(c=>c.statut_paiement==="attente").length), color: "text-yellow-400" },
-            { label: "À préparer", value: String(commandes.filter(c=>c.statut_colis==="a_preparer").length), color: "text-zinc-400" },
+            { label: "Couverture", value: tauxCouverture+"%",         color: tauxCouverture > 60 ? "text-green-400" : "text-yellow-400" },
+            { label: "Validés",    value: String(commandes.filter(c => c.statut_paiement === "valide").length),  color: "text-green-400"  },
+            { label: "En attente", value: String(commandes.filter(c => c.statut_paiement === "attente").length), color: "text-yellow-400" },
+            { label: "À préparer", value: String(commandes.filter(c => c.statut_colis === "a_preparer").length), color: "text-zinc-400"   },
           ].map(({ label, value, color }) => (
             <div key={label} className="shrink-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 flex items-center gap-2">
               <p className={`text-sm font-black ${color}`}>{value}</p>
@@ -572,14 +557,12 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           ))}
         </div>
 
-        {/* Barre progression */}
         {suiviClients.length > 0 && (
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
             <div className="h-full rounded-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-700" style={{ width: `${tauxCouverture}%` }}/>
           </div>
         )}
 
-        {/* Recherche */}
         {suiviClients.length > 3 && (
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
@@ -590,7 +573,6 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {/* TABLEAU */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/></div>
       ) : suiviClients.length === 0 ? (
@@ -619,10 +601,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                       <p className={`text-[10px] font-bold ${isCurrent ? "text-yellow-400" : isPast ? "text-zinc-600" : "text-zinc-300"}`}>
                         {m}{isCurrent && <span className="text-yellow-500 ml-0.5">●</span>}
                       </p>
-                      {total > 0
-                        ? <p className="text-[9px] text-zinc-500 font-semibold">{total.toFixed(0)}€</p>
-                        : <p className="text-[9px] text-zinc-800">—</p>
-                      }
+                      {total > 0 ? <p className="text-[9px] text-zinc-500 font-semibold">{total.toFixed(0)}€</p> : <p className="text-[9px] text-zinc-800">—</p>}
                     </th>
                   )
                 })}
@@ -633,13 +612,12 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
             </thead>
             <tbody>
               {filteredClients.map(sc => {
-                const clientCmds    = commandes.filter(c => c.client_id === sc.client_id)
-                const clientTotal   = clientCmds.reduce((s, c) => s + Number(c.montant || 0), 0)
+                const clientCmds   = commandes.filter(c => c.client_id === sc.client_id)
+                const clientTotal  = clientCmds.reduce((s, c) => s + Number(c.montant || 0), 0)
                 const clientCoverage = clientCmds.length
-                const contratColor  = CONTRAT_COLORS[sc.client_contrat || ""] || ""
+                const contratColor = CONTRAT_COLORS[sc.client_contrat || ""] || ""
                 return (
                   <tr key={sc.id} className="group">
-                    {/* Client sticky */}
                     <td className="sticky left-0 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/40 border-b border-r border-zinc-800/60 transition-colors"
                       style={contratColor ? { borderLeft: `2px solid ${contratColor}60` } : {}}>
                       <div className="flex items-center justify-between gap-1 px-3 py-2">
@@ -653,7 +631,6 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                             ? <p className="text-[10px] font-semibold" style={{ color: contratColor || "#71717a" }}>{sc.client_contrat}</p>
                             : null
                           }
-                          {/* Mini progression */}
                           <div className="flex gap-0.5 mt-1">
                             {Array.from({ length: 12 }).map((_, i) => {
                               const cmd = getCmd(sc.client_id, i + 1)
@@ -665,32 +642,22 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                         <button onClick={() => removeClient(sc.id)} className="opacity-0 group-hover:opacity-100 text-zinc-700 hover:text-red-400 transition-all shrink-0 p-1 rounded"><Trash2 size={10}/></button>
                       </div>
                     </td>
-
-                    {/* Cellules mois */}
                     {MOIS_SHORT.map((_, i) => {
                       const moisNum   = i + 1
                       const cmd       = getCmd(sc.client_id, moisNum)
                       const isCurrent = year === NOW_YEAR && moisNum === NOW_MONTH
                       const isPast    = year < NOW_YEAR || (year === NOW_YEAR && moisNum < NOW_MONTH)
                       const isActive  = panel?.client.client_id === sc.client_id && panel?.mois === moisNum
-
-                      // Couleur cellule selon statut paiement
                       let cellBg = "rgba(39,39,42,0.2)"; let cellBorder = "rgba(63,63,70,0.3)"
                       if (cmd) {
-                        const p = cmd.statut_paiement || "attente"
-                        cellBg     = PAIEMENT[p as keyof typeof PAIEMENT]?.bg || cellBg
-                        cellBorder = PAIEMENT[p as keyof typeof PAIEMENT]?.border || cellBorder
-                      } else if (isPast) {
-                        cellBg = "rgba(239,68,68,0.04)"; cellBorder = "rgba(239,68,68,0.1)"
-                      }
-
+                        const p = (cmd.statut_paiement || "attente") as keyof typeof PAIEMENT
+                        cellBg = PAIEMENT[p]?.bg || cellBg; cellBorder = PAIEMENT[p]?.border || cellBorder
+                      } else if (isPast) { cellBg = "rgba(239,68,68,0.04)"; cellBorder = "rgba(239,68,68,0.1)" }
                       const relance25 = cmd?.date_validation_paiement && cmd.statut_paiement === "valide" && daysDiff(cmd.date_validation_paiement) >= 25
-                      const ColisIcon = cmd ? (COLIS[cmd.statut_colis as keyof typeof COLIS] || COLIS.a_preparer).Icon : null
-                      const colisColor = cmd ? (COLIS[cmd.statut_colis as keyof typeof COLIS] || COLIS.a_preparer).color : ""
-
+                      const ColisIconComp = cmd ? (COLIS[(cmd.statut_colis || "a_preparer") as keyof typeof COLIS] || COLIS.a_preparer).Icon : null
+                      const colisColor = cmd ? (COLIS[(cmd.statut_colis || "a_preparer") as keyof typeof COLIS] || COLIS.a_preparer).color : ""
                       return (
-                        <td key={moisNum} className="border-b border-r border-zinc-800/40 p-0.5"
-                          style={isCurrent ? { backgroundColor: "#eab3080a" } : {}}>
+                        <td key={moisNum} className="border-b border-r border-zinc-800/40 p-0.5" style={isCurrent ? { backgroundColor: "#eab3080a" } : {}}>
                           <button onClick={() => setPanel({ client: sc, mois: moisNum, commande: cmd })}
                             className="w-full h-[64px] rounded-lg text-center transition-all duration-150 flex flex-col items-center justify-center gap-0.5 border group/cell relative"
                             style={{ backgroundColor: cellBg, borderColor: isActive ? "#eab308" : cellBorder, boxShadow: isActive ? "0 0 0 1px #eab30850" : "none" }}>
@@ -702,17 +669,18 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                             {cmd ? (
                               <>
                                 <p className="text-[12px] font-black leading-none"
-                                  style={{ color: PAIEMENT[cmd.statut_paiement as keyof typeof PAIEMENT]?.color || "#eab308" }}>
+                                  style={{ color: PAIEMENT[(cmd.statut_paiement || "attente") as keyof typeof PAIEMENT]?.color || "#eab308" }}>
                                   {Number(cmd.montant).toFixed(0)}€
                                 </p>
                                 {cmd.date_commande && (
-                                  <p className="text-[9px] leading-none" style={{ color: PAIEMENT[cmd.statut_paiement as keyof typeof PAIEMENT]?.color + "99" || "#71717a" }}>
+                                  <p className="text-[9px] leading-none opacity-70"
+                                    style={{ color: PAIEMENT[(cmd.statut_paiement || "attente") as keyof typeof PAIEMENT]?.color || "#eab308" }}>
                                     {new Date(cmd.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short" })}
                                   </p>
                                 )}
                                 <div className="flex items-center gap-1 mt-0.5">
-                                  {ColisIcon && <ColisIcon size={9} color={colisColor}/>}
-                                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PAIEMENT[cmd.statut_paiement as keyof typeof PAIEMENT]?.color || "#eab308" }}/>
+                                  {ColisIconComp && <ColisIconComp size={9} color={colisColor}/>}
+                                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PAIEMENT[(cmd.statut_paiement || "attente") as keyof typeof PAIEMENT]?.color || "#eab308" }}/>
                                 </div>
                               </>
                             ) : isPast ? (
@@ -724,21 +692,14 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                         </td>
                       )
                     })}
-
-                    {/* Total */}
                     <td className="border-b border-zinc-800/40 px-2 py-2 text-center">
                       {clientTotal > 0 ? (
-                        <div>
-                          <p className="text-yellow-400 text-xs font-black">{clientTotal.toFixed(0)}€</p>
-                          <p className="text-zinc-700 text-[9px]">{clientCoverage}×</p>
-                        </div>
+                        <div><p className="text-yellow-400 text-xs font-black">{clientTotal.toFixed(0)}€</p><p className="text-zinc-700 text-[9px]">{clientCoverage}×</p></div>
                       ) : <p className="text-zinc-800 text-xs">—</p>}
                     </td>
                   </tr>
                 )
               })}
-
-              {/* Ligne totaux */}
               <tr>
                 <td className="sticky left-0 z-10 bg-zinc-900/60 border-t-2 border-r border-zinc-700 px-3 py-2.5">
                   <p className="text-zinc-400 text-[10px] font-black uppercase tracking-wider">Total</p>
@@ -758,27 +719,15 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
             </tbody>
           </table>
 
-          {/* Légende */}
           <div className="flex items-center gap-4 px-4 py-2.5 border-t border-zinc-900/60 flex-wrap">
-            {[
-              { color: "#eab308", label: "Paiement en attente" },
-              { color: "#22c55e", label: "Paiement validé" },
-              { color: "#3b82f6", label: "Relance effectuée" },
-            ].map(({ color, label }) => (
+            {[{ color: "#eab308", label: "En attente" }, { color: "#22c55e", label: "Validé" }, { color: "#3b82f6", label: "Relancé" }].map(({ color, label }) => (
               <div key={label} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}/>
-                <span className="text-zinc-600 text-[10px]">{label}</span>
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}/><span className="text-zinc-600 text-[10px]">{label}</span>
               </div>
             ))}
-            <div className="flex items-center gap-1.5">
-              <Package size={10} className="text-zinc-600"/><span className="text-zinc-600 text-[10px]">À préparer</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Truck size={10} className="text-orange-600"/><span className="text-zinc-600 text-[10px]">En livraison</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 size={10} className="text-green-600"/><span className="text-zinc-600 text-[10px]">Reçu</span>
-            </div>
+            <div className="flex items-center gap-1.5"><Package size={10} className="text-zinc-600"/><span className="text-zinc-600 text-[10px]">À préparer</span></div>
+            <div className="flex items-center gap-1.5"><Truck size={10} className="text-orange-600"/><span className="text-zinc-600 text-[10px]">En livraison</span></div>
+            <div className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-green-600"/><span className="text-zinc-600 text-[10px]">Reçu</span></div>
           </div>
         </div>
       )}
