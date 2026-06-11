@@ -5,8 +5,7 @@ import { supabase } from "@/lib/supabase"
 import {
   ShoppingCart, Plus, X, Search, User, Receipt,
   ChevronDown, Minus, Check, Package, AlertTriangle,
-  Pencil, Save, RotateCcw, Trash2, Zap, TrendingUp,
-  ChevronRight,
+  Pencil, Save, RotateCcw, Trash2, Zap,
 } from "lucide-react"
 
 interface Product { id: string; name: string; gamme: string; pv: number; cf: number; avatar_url?: string; composition?: any }
@@ -34,12 +33,16 @@ const GAMMES = [
   { val: "Convention",     emoji: "🎪", color: "#f97316", bg: "rgba(249,115,22,0.12)", border: "rgba(249,115,22,0.5)" },
 ]
 
-const createFacture = async (societyId: string, venteId: string, clientNom: string, montant: number, notes: string) => {
+const createFacture = async (societyId: string, venteId: string, clientNom: string, montant: number, notesText: string) => {
   try {
     const d = new Date()
     const num = `FAC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*9000)+1000}`
-    await supabase.from("factures").insert({ society_id: societyId, numero: num, client_nom: clientNom, montant, statut: "en_attente", source: "vente", vente_id: venteId, date_emission: new Date().toISOString().slice(0,10), notes })
-  } catch {}
+    await supabase.from("factures").insert({
+      society_id: societyId, numero: num, client_nom: clientNom,
+      montant, statut: "en_attente", source: "vente", vente_id: venteId,
+      date_emission: new Date().toISOString().slice(0,10), notes: notesText,
+    })
+  } catch { /* silencieux si table absente */ }
 }
 
 /* ── HISTORIQUE ── */
@@ -47,13 +50,13 @@ function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: (
   const [ventes, setVentes]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState("")
-  const [editVente, setEditVente] = useState<any>(null)
+  const [editVente, setEditVente]   = useState<any>(null)
   const [editFields, setEditFields] = useState({ clientNom: "", paiement: "", notes: "" })
 
   const load = () => {
     setLoading(true)
-    supabase.from("ventes").select("*, vente_items(*)").eq("society_id", societyId)
-      .order("created_at", { ascending: false }).limit(200)
+    supabase.from("ventes").select("*, vente_items(*)")
+      .eq("society_id", societyId).order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => { setVentes(data||[]); setLoading(false) })
   }
   useEffect(() => { load() }, [])
@@ -65,11 +68,15 @@ function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: (
     setVentes(p => p.filter(v => v.id !== id))
   }
   const saveEdit = async () => {
-    await supabase.from("ventes").update({ client_nom: editFields.clientNom, paiement: editFields.paiement, notes: editFields.notes }).eq("id", editVente.id)
+    await supabase.from("ventes").update({
+      client_nom: editFields.clientNom, paiement: editFields.paiement, notes: editFields.notes,
+    }).eq("id", editVente.id)
     setEditVente(null); load()
   }
 
-  const filtered = ventes.filter(v => !search || (v.client_nom||"").toLowerCase().includes(search.toLowerCase()) || (v.notes||"").toLowerCase().includes(search.toLowerCase()))
+  const filtered = ventes.filter(v => !search
+    || (v.client_nom||"").toLowerCase().includes(search.toLowerCase())
+    || (v.notes||"").toLowerCase().includes(search.toLowerCase()))
   const totalCA = filtered.reduce((s,v) => s + Number(v.total_ttc), 0)
 
   return (
@@ -98,16 +105,16 @@ function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: (
                 <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 group">
                   {editVente?.id === v.id ? (
                     <div className="space-y-2">
-                      <input value={editFields.clientNom} onChange={e => setEditFields(p=>({...p,clientNom:e.target.value}))} placeholder="Client"
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
+                      <input value={editFields.clientNom} onChange={e => setEditFields(p=>({...p,clientNom:e.target.value}))}
+                        placeholder="Client" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
                       <div className="flex gap-1.5 flex-wrap">
                         {["Espèces","CB","Virement","Chèque","En attente"].map(p => (
                           <button key={p} onClick={() => setEditFields(prev=>({...prev,paiement:p}))}
                             className={`px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${editFields.paiement===p?"bg-yellow-500 text-black border-yellow-500":"bg-zinc-700 text-zinc-400 border-zinc-600"}`}>{p}</button>
                         ))}
                       </div>
-                      <input value={editFields.notes} onChange={e => setEditFields(p=>({...p,notes:e.target.value}))} placeholder="Notes"
-                        className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
+                      <input value={editFields.notes} onChange={e => setEditFields(p=>({...p,notes:e.target.value}))}
+                        placeholder="Notes" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"/>
                       <div className="flex gap-2">
                         <button onClick={saveEdit} className="flex-1 py-1.5 bg-yellow-500 text-black font-bold rounded-lg text-xs">Sauvegarder</button>
                         <button onClick={() => setEditVente(null)} className="px-3 py-1.5 bg-zinc-700 text-zinc-300 rounded-lg text-xs">Annuler</button>
@@ -156,29 +163,38 @@ function HistoriquePanel({ societyId, onClose }: { societyId: string; onClose: (
 function VenteManuellePanel({ societyId, profile, clients, onClose, onDone }: {
   societyId: string; profile: any; clients: Client[]; onClose: () => void; onDone: () => void
 }) {
-  const [items, setItems] = useState([{ nom: "", quantite: 1, pv: 0 }])
-  const [clientSearch, setClientSearch] = useState("")
+  const [items, setItems]       = useState([{ nom: "", quantite: 1, pv: 0 }])
+  const [clientSearch, setClientSearch]     = useState("")
   const [selectedClient, setSelectedClient] = useState<Client|null>(null)
-  const [showClients, setShowClients] = useState(false)
+  const [showClients, setShowClients]       = useState(false)
   const [paiement, setPaiement] = useState("Espèces")
-  const [notes, setNotes] = useState("")
-  const [saving, setSaving] = useState(false)
+  const [notes, setNotes]       = useState("")
+  const [saving, setSaving]     = useState(false)
   const total = items.reduce((s,i) => s + i.quantite * i.pv, 0)
-  const filtered = clients.filter(c => { const s = clientSearch.toLowerCase(); return c.nom?.toLowerCase().includes(s)||c.prenom?.toLowerCase().includes(s)||c.nom_shop?.toLowerCase().includes(s) })
+
+  const filtered = clients.filter(c => {
+    const s = clientSearch.toLowerCase()
+    return c.nom?.toLowerCase().includes(s) || c.prenom?.toLowerCase().includes(s) || c.nom_shop?.toLowerCase().includes(s)
+  })
 
   const save = async () => {
-    const valid = items.filter(i => i.nom.trim() && i.pv > 0); if (!valid.length) return
+    const valid = items.filter(i => i.nom.trim() && i.pv > 0)
+    if (!valid.length) return
     setSaving(true)
     try {
-      const { data: vente } = await supabase.from("ventes").insert({
-        society_id: societyId, user_id: profile.id, client_id: selectedClient?.id||null,
-        client_nom: selectedClient?.nom||"Client de passage", total_ht: total, port: 0, remise: 0, total_ttc: total, paiement, notes,
+      const { data: vente, error } = await supabase.from("ventes").insert({
+        society_id: societyId, user_id: profile.id,
+        client_id: selectedClient?.id || null,
+        client_nom: selectedClient?.nom || "Client de passage",
+        total_ht: total, port: 0, remise: 0, total_ttc: total, paiement, notes,
       }).select().single()
+      if (error) { alert("Erreur : " + error.message); return }
       if (vente) {
         await supabase.from("vente_items").insert(valid.map(i => ({
-          vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite, pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
+          vente_id: vente.id, produit_nom: i.nom, quantite: i.quantite,
+          pv_unitaire: i.pv, cf_unitaire: 0, total: i.quantite * i.pv,
         })))
-        await createFacture(societyId, vente.id, selectedClient?.nom||"Client de passage", total, "Vente manuelle")
+        await createFacture(societyId, vente.id, selectedClient?.nom || "Client de passage", total, "Vente manuelle")
       }
     } finally { setSaving(false); onDone(); onClose() }
   }
@@ -191,17 +207,20 @@ function VenteManuellePanel({ societyId, profile, clients, onClose, onDone }: {
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Client */}
           <div className="relative">
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Client</label>
-            <button onClick={() => setShowClients(!showClients)} className="w-full flex items-center gap-3 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 hover:border-yellow-500/40">
+            <button onClick={() => setShowClients(!showClients)}
+              className="w-full flex items-center gap-3 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 hover:border-yellow-500/40">
               <User size={14} className="text-yellow-500 shrink-0"/>
               <span className="text-white text-sm flex-1 text-left">{selectedClient?.nom || "Client de passage"}</span>
               <ChevronDown size={14} className="text-zinc-500"/>
             </button>
             {showClients && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
-                <div className="p-2"><input type="text" placeholder="Rechercher..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} autoFocus className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"/></div>
+                <div className="p-2">
+                  <input type="text" placeholder="Rechercher..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} autoFocus
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"/>
+                </div>
                 <div className="max-h-40 overflow-y-auto">
                   <button onClick={() => { setSelectedClient(null); setShowClients(false) }} className="w-full text-left px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800">Client de passage</button>
                   {filtered.map(c => (
@@ -214,31 +233,36 @@ function VenteManuellePanel({ societyId, profile, clients, onClose, onDone }: {
               </div>
             )}
           </div>
-          {/* Articles */}
           <div>
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Articles</label>
             <div className="space-y-2">
               {items.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <input type="text" placeholder="Article" value={item.nom} onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,nom:e.target.value}:i))}
+                  <input type="text" placeholder="Article" value={item.nom}
+                    onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,nom:e.target.value}:i))}
                     className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-yellow-500/60"/>
-                  <input type="number" placeholder="Qté" value={item.quantite} min={1} onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,quantite:parseInt(e.target.value)||1}:i))}
+                  <input type="number" placeholder="Qté" value={item.quantite} min={1}
+                    onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,quantite:parseInt(e.target.value)||1}:i))}
                     className="w-14 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
-                  <input type="number" placeholder="€" value={item.pv} min={0} step={0.01} onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,pv:parseFloat(e.target.value)||0}:i))}
+                  <input type="number" placeholder="€" value={item.pv} min={0} step={0.01}
+                    onChange={e => setItems(p => p.map((i,j) => j===idx?{...i,pv:parseFloat(e.target.value)||0}:i))}
                     className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-sm text-white text-center focus:outline-none"/>
                   <button onClick={() => setItems(p => p.filter((_,j) => j!==idx))} className="text-zinc-600 hover:text-red-400"><X size={14}/></button>
                 </div>
               ))}
-              <button onClick={() => setItems(p => [...p, { nom: "", quantite: 1, pv: 0 }])} className="flex items-center gap-2 text-[11px] font-semibold text-yellow-500 hover:text-yellow-400">
+              <button onClick={() => setItems(p => [...p, { nom: "", quantite: 1, pv: 0 }])}
+                className="flex items-center gap-2 text-[11px] font-semibold text-yellow-500 hover:text-yellow-400">
                 <Plus size={12}/> Ajouter un article
               </button>
             </div>
           </div>
-          {/* Paiement */}
           <div>
             <label className="block text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Paiement</label>
             <div className="flex gap-1.5 flex-wrap">
-              {PAIEMENTS.map(p => <button key={p} onClick={() => setPaiement(p)} className={`flex-1 py-2 rounded-lg text-[11px] font-semibold border transition-colors min-w-[60px] ${paiement===p?"bg-yellow-500 text-black border-yellow-500":"bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500"}`}>{p}</button>)}
+              {PAIEMENTS.map(p => (
+                <button key={p} onClick={() => setPaiement(p)}
+                  className={`flex-1 py-2 rounded-lg text-[11px] font-semibold border transition-colors min-w-[60px] ${paiement===p?"bg-yellow-500 text-black border-yellow-500":"bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-zinc-500"}`}>{p}</button>
+              ))}
             </div>
           </div>
           <div>
@@ -252,7 +276,8 @@ function VenteManuellePanel({ societyId, profile, clients, onClose, onDone }: {
           </div>
         </div>
         <div className="p-5 border-t border-zinc-800 flex gap-3">
-          <button onClick={save} disabled={saving} className="flex-1 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
+          <button onClick={save} disabled={saving}
+            className="flex-1 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black font-bold py-3 rounded-xl text-sm flex items-center justify-center gap-2">
             <Check size={16}/> Valider la vente
           </button>
           <button onClick={onClose} className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl text-sm">Annuler</button>
@@ -263,7 +288,7 @@ function VenteManuellePanel({ societyId, profile, clients, onClose, onDone }: {
 }
 
 /* ══════════════════════════════════════════════
-   MAIN — Redesign
+   MAIN
 ══════════════════════════════════════════════ */
 export default function VenteModule({ activeSociety, profile }: Props) {
   const [products, setProducts]     = useState<Product[]>([])
@@ -273,7 +298,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const [urssafRate, setUrssafRate] = useState(DEFAULT_URSSAF)
   const [cart, setCart]             = useState<CartItem[]>([])
   const [search, setSearch]         = useState("")
-  const [searchClient, setSearchClient] = useState("")
+  const [searchClient, setSearchClient]     = useState("")
   const [selectedClient, setSelectedClient] = useState<Client|null>(null)
   const [clientPrixMap, setClientPrixMap]   = useState<Record<string,number>>({})
   const [venteDate, setVenteDate]   = useState(new Date().toISOString().split("T")[0])
@@ -292,7 +317,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const [success, setSuccess]       = useState(false)
   const [stockAlerts, setStockAlerts] = useState<string[]>([])
   const [mobileTab, setMobileTab]   = useState<"catalogue"|"panier">("catalogue")
-  const [showCart, setShowCart]     = useState(false)
 
   useEffect(() => { if (activeSociety) loadData() }, [activeSociety])
 
@@ -312,25 +336,30 @@ export default function VenteModule({ activeSociety, profile }: Props) {
       setPharmacies(pharmas || [])
       if (cfgData?.value != null) setUrssafRate(Number(cfgData.value))
       const alerts = (stockData||[])
-        .filter((s:any) => s.quantite <= 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
-        .map((s:any) => s.quantite <= 0 ? `Rupture: ${s.produit_nom}` : `Faible: ${s.produit_nom}`)
+        .filter((s: any) => s.quantite <= 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+        .map((s: any) => s.quantite <= 0 ? `Rupture: ${s.produit_nom}` : `Faible: ${s.produit_nom}`)
       setStockAlerts(alerts)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
+  /* FIX STOCK : cherche par product_id d'abord, puis fallback par nom */
   const findStockItem = (productId: string, productName: string) =>
-    allStock.find((s:any) => s.product_id && s.product_id === productId) ||
-    allStock.find((s:any) => s.produit_nom?.toLowerCase().trim() === productName.toLowerCase().trim())
+    allStock.find((s: any) => s.product_id && s.product_id === productId) ||
+    allStock.find((s: any) => s.produit_nom?.toLowerCase().trim() === productName.toLowerCase().trim())
 
   const filteredProducts = activeGamme
     ? products.filter(p => p.gamme === activeGamme && p.name.toLowerCase().includes(search.toLowerCase()))
     : []
 
   const filteredClients = typeVente === "Pharmacie"
-    ? pharmacies.filter((p:any) => p.nom.toLowerCase().includes(searchClient.toLowerCase()))
-        .map((p:any) => ({ id: p.id, nom: p.nom, contrat: p.ville||"Pharmacie", telephone: p.telephone }))
-    : clients.filter(c => { const s = searchClient.toLowerCase(); return c.nom?.toLowerCase().includes(s)||c.prenom?.toLowerCase().includes(s)||c.nom_shop?.toLowerCase().includes(s) })
+    ? pharmacies
+        .filter((p: any) => p.nom.toLowerCase().includes(searchClient.toLowerCase()))
+        .map((p: any) => ({ id: p.id, nom: p.nom, prenom: undefined as string|undefined, nom_shop: undefined as string|undefined, contrat: p.ville || "Pharmacie", telephone: p.telephone }))
+    : clients.filter(c => {
+        const s = searchClient.toLowerCase()
+        return c.nom?.toLowerCase().includes(s) || c.prenom?.toLowerCase().includes(s) || c.nom_shop?.toLowerCase().includes(s)
+      })
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -350,7 +379,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   const resultat      = totalTTC - urssaf - cfTotal - fraisColisVal
   const cartCount     = cart.reduce((s,i) => s + i.quantite, 0)
 
-  /* ══ VALIDATION VENTE + FIX STOCK ══ */
+  /* ════════════ VALIDATION VENTE ════════════ */
   const handleVente = async () => {
     if (!cart.length) return
     setSaving(true)
@@ -358,100 +387,140 @@ export default function VenteModule({ activeSociety, profile }: Props) {
       (typeVente === "Shopify" ? "Commande Shopify" : typeVente === "Pharmacie" ? "Pharmacie" : typeVente === "Convention" ? "Convention" : "Client de passage")
     try {
       const { data: vente, error } = await supabase.from("ventes").insert({
-        society_id: activeSociety.id, user_id: profile.id,
-        client_id: selectedClient?.id || null, client_nom: clientNom,
+        society_id: activeSociety.id,
+        user_id: profile.id,
+        client_id: selectedClient?.id || null,
+        client_nom: clientNom,
         created_at: new Date(venteDate + "T12:00:00").toISOString(),
-        total_ht: totalHT, port: portVal, remise: 0, total_ttc: totalTTC, paiement, notes,
-        lignes: cart.map(i => ({ product_id: i.product_id, produit_nom: i.nom, quantite: i.quantite, prix_unitaire: i.pv })),
+        total_ht: totalHT,
+        port: portVal,
+        remise: 0,
+        total_ttc: totalTTC,
+        paiement,
+        notes,
       }).select().single()
 
-      if (!error && vente) {
-        // Vente items
+      if (error) {
+        console.error("Erreur insert vente:", error)
+        alert("Erreur lors de la vente : " + error.message)
+        setSaving(false)
+        return
+      }
+
+      if (vente) {
+        /* 1. Vente items */
         await supabase.from("vente_items").insert(cart.map(item => ({
-          vente_id: vente.id, product_id: item.product_id, produit_nom: item.nom,
-          gamme: item.gamme, quantite: item.quantite, pv_unitaire: item.pv, cf_unitaire: item.cf,
+          vente_id: vente.id,
+          product_id: item.product_id,
+          produit_nom: item.nom,
+          gamme: item.gamme,
+          quantite: item.quantite,
+          pv_unitaire: item.pv,
+          cf_unitaire: item.cf,
           total: item.pv * item.quantite,
         })))
 
-        // Facture
+        /* 2. Facture */
         await createFacture(activeSociety.id, vente.id, clientNom, totalTTC, `Vente — ${paiement}`)
 
-        // ── STOCK SYNC (avec fallback par nom) ──
+        /* 3. Stock sync */
         const freshStock = [...allStock]
         for (const item of cart) {
           const prod = products.find(p => p.id === item.product_id)
           let composition: Record<string, number> = {}
           if (prod?.composition) {
-            composition = typeof prod.composition === "string" ? JSON.parse(prod.composition) : prod.composition
+            composition = typeof prod.composition === "string"
+              ? JSON.parse(prod.composition)
+              : prod.composition
           }
           const entries = Object.entries(composition)
 
           if (entries.length > 0) {
-            // Produit avec composition → décrémenter les ingrédients
+            /* Produit avec composition → décrémenter chaque ingrédient */
             for (const [compNom, qtyParUnite] of entries) {
               const totalADeduire = item.quantite * Number(qtyParUnite)
-              const stockItem = freshStock.find((s:any) => s.produit_nom?.toLowerCase().trim() === compNom.toLowerCase().trim())
+              const stockItem = freshStock.find((s: any) =>
+                s.produit_nom?.toLowerCase().trim() === compNom.toLowerCase().trim()
+              )
               if (stockItem) {
                 const newQty = stockItem.quantite - totalADeduire
-                await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-                try { await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: stockItem.product_id, produit_nom: stockItem.produit_nom, user_id: profile.id, action: "Sortie", quantite: totalADeduire, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente "${item.nom}" ×${item.quantite} (composition) — ${clientNom}` }) } catch {}
+                await supabase.from("stock")
+                  .update({ quantite: newQty, updated_at: new Date().toISOString() })
+                  .eq("id", stockItem.id)
+                try {
+                  await supabase.from("stock_history").insert({
+                    society_id: activeSociety.id, product_id: stockItem.product_id,
+                    produit_nom: stockItem.produit_nom, user_id: profile.id,
+                    action: "Sortie", quantite: totalADeduire,
+                    quantite_avant: stockItem.quantite, quantite_apres: newQty,
+                    notes: `Vente "${item.nom}" ×${item.quantite} (compo) — ${clientNom}`,
+                  })
+                } catch {}
                 stockItem.quantite = newQty
               }
             }
           } else {
-            // Produit simple → décrémenter directement
-            // FIX: essai par product_id d'abord, puis fallback par nom
+            /* Produit simple → cherche par ID puis par nom */
             const stockItem = findStockItem(item.product_id, item.nom)
             if (stockItem) {
               const newQty = stockItem.quantite - item.quantite
-              await supabase.from("stock").update({ quantite: newQty, updated_at: new Date().toISOString() }).eq("id", stockItem.id)
-              try { await supabase.from("stock_history").insert({ society_id: activeSociety.id, product_id: item.product_id, produit_nom: item.nom, user_id: profile.id, action: "Sortie", quantite: item.quantite, quantite_avant: stockItem.quantite, quantite_apres: newQty, notes: `Vente — ${clientNom}` }) } catch {}
+              await supabase.from("stock")
+                .update({ quantite: newQty, updated_at: new Date().toISOString() })
+                .eq("id", stockItem.id)
+              try {
+                await supabase.from("stock_history").insert({
+                  society_id: activeSociety.id, product_id: item.product_id,
+                  produit_nom: item.nom, user_id: profile.id,
+                  action: "Sortie", quantite: item.quantite,
+                  quantite_avant: stockItem.quantite, quantite_apres: newQty,
+                  notes: `Vente — ${clientNom}`,
+                })
+              } catch {}
               stockItem.quantite = newQty
             }
           }
         }
 
-        // Reset
+        /* 4. Reset */
         setCart([]); setSelectedClient(null); setNotes("")
         setClientPrixMap({}); setPaiement("Espèces"); setPort(PORT_OPTIONS[0])
         setPortPerso(""); setFraisColis("")
-        setSuccess(true); setMobileTab("catalogue"); setShowCart(false)
+        setSuccess(true); setMobileTab("catalogue")
         setTimeout(() => { setSuccess(false); loadData() }, 2500)
       }
-    } catch (e) { console.error("handleVente error:", e) }
-    finally { setSaving(false) }
+    } catch (e) {
+      console.error("handleVente error:", e)
+      alert("Erreur inattendue — voir la console")
+    } finally {
+      setSaving(false)
+    }
   }
 
   const activeGammeCfg = GAMMES.find(g => g.val === activeGamme)
 
   /* ════════════════════════════════════
-     RENDU CATALOGUE
+     VUE CATALOGUE
   ════════════════════════════════════ */
   const CatalogueView = (
     <div className="flex-1 flex flex-col overflow-hidden">
-
-      {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-zinc-900 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             🛒 Vente
-            {cartCount > 0 && (
-              <span className="text-sm font-black text-black bg-yellow-500 px-2 py-0.5 rounded-full">{cartCount}</span>
-            )}
+            {cartCount > 0 && <span className="text-sm font-black text-black bg-yellow-500 px-2 py-0.5 rounded-full">{cartCount}</span>}
           </h1>
           <div className="flex gap-2">
             <button onClick={() => setShowManuelle(true)}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">
+              className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600">
               <Pencil size={12}/> Manuelle
             </button>
             <button onClick={() => setShowHistorique(true)}
-              className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600 transition-colors">
+              className="flex items-center gap-1.5 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-xl hover:border-zinc-600">
               <Receipt size={12}/> Historique
             </button>
           </div>
         </div>
 
-        {/* Alertes stock */}
         {stockAlerts.length > 0 && (
           <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">
             <AlertTriangle size={12} className="text-red-400 shrink-0"/>
@@ -482,8 +551,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               className="flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all font-bold text-[11px]"
               style={activeGamme === g.val
                 ? { backgroundColor: g.bg, borderColor: g.border, color: g.color }
-                : { backgroundColor: "rgba(24,24,27,0.8)", borderColor: "rgba(63,63,70,0.5)", color: "#71717a" }
-              }>
+                : { backgroundColor: "rgba(24,24,27,0.8)", borderColor: "rgba(63,63,70,0.5)", color: "#71717a" }}>
               <span className="text-xl">{g.emoji}</span>
               <span>{g.val}</span>
               <span className="text-[9px] opacity-60">{products.filter(p=>p.gamme===g.val).length} art.</span>
@@ -491,7 +559,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           ))}
         </div>
 
-        {/* Recherche produit */}
         {activeGamme && (
           <div className="relative">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"/>
@@ -501,7 +568,6 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {/* Liste produits */}
       <div className="flex-1 overflow-y-auto p-3">
         {loading ? (
           <div className="flex items-center justify-center py-16"><div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/></div>
@@ -519,19 +585,21 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         ) : (
           <div className="space-y-1.5">
             {filteredProducts.map(product => {
-              const inCart = cart.find(i => i.product_id === product.id)
+              const inCart    = cart.find(i => i.product_id === product.id)
               const stockItem = findStockItem(product.id, product.name)
               const stockQty  = stockItem?.quantite ?? null
-              const stockLow  = stockQty !== null && stockQty <= (stockItem?.seuil_alerte || 0) && stockItem?.seuil_alerte > 0
+              const stockLow  = stockQty !== null && stockItem?.seuil_alerte > 0 && stockQty <= stockItem.seuil_alerte && stockQty > 0
               const stockOut  = stockQty !== null && stockQty <= 0
-              const prix = clientPrixMap[product.id] ?? product.pv
+              const prix      = clientPrixMap[product.id] ?? product.pv
 
               return (
                 <button key={product.id} onClick={() => addToCart(product)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left group ${inCart ? "border-yellow-500/60 bg-yellow-500/8" : "border-zinc-800/60 bg-zinc-900/60 hover:border-zinc-600 hover:bg-zinc-800/60"}`}
-                  style={inCart && activeGammeCfg ? { borderColor: activeGammeCfg.border, backgroundColor: activeGammeCfg.bg } : {}}>
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left group"
+                  style={inCart && activeGammeCfg
+                    ? { borderColor: activeGammeCfg.border, backgroundColor: activeGammeCfg.bg }
+                    : { borderColor: "rgba(63,63,70,0.5)", backgroundColor: "rgba(24,24,27,0.7)" }}>
 
-                  {/* Avatar / image */}
+                  {/* Icône */}
                   <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
                     style={{ backgroundColor: activeGammeCfg ? activeGammeCfg.bg : "rgba(39,39,42,0.6)" }}>
                     {product.avatar_url
@@ -540,11 +608,11 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                     }
                   </div>
 
-                  {/* Infos produit */}
+                  {/* Infos */}
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-semibold truncate">{product.name}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-zinc-500 text-[11px]">CF: {product.cf.toFixed(2)}€</span>
+                      <span className="text-zinc-500 text-[11px]">CF: {Number(product.cf).toFixed(2)}€</span>
                       {stockQty !== null && (
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${stockOut ? "bg-red-500/15 text-red-400" : stockLow ? "bg-orange-500/15 text-orange-400" : "bg-green-500/10 text-green-500"}`}>
                           {stockOut ? "Rupture" : `Stock: ${stockQty}`}
@@ -553,13 +621,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                     </div>
                   </div>
 
-                  {/* Prix + badge panier */}
+                  {/* Prix + badge */}
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-base font-black" style={{ color: activeGammeCfg?.color || "#eab308" }}>
                       {prix.toFixed(2)}€
                     </span>
                     {inCart ? (
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-black text-xs font-black" style={{ backgroundColor: activeGammeCfg?.color || "#eab308" }}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-black text-xs font-black"
+                        style={{ backgroundColor: activeGammeCfg?.color || "#eab308" }}>
                         {inCart.quantite}
                       </div>
                     ) : (
@@ -578,7 +647,7 @@ export default function VenteModule({ activeSociety, profile }: Props) {
   )
 
   /* ════════════════════════════════════
-     RENDU PANIER
+     VUE PANIER
   ════════════════════════════════════ */
   const PanierView = (
     <div className="w-full md:w-96 bg-[#111111] flex flex-col overflow-hidden border-l border-zinc-900">
@@ -589,17 +658,24 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           <div className="relative">
             <button onClick={() => setShowClients(!showClients)}
               className="w-full flex items-center gap-2.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 hover:border-yellow-500/40 transition-colors">
-              <div className="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center shrink-0"><User size={13} className="text-yellow-500"/></div>
+              <div className="w-8 h-8 bg-yellow-500/10 rounded-lg flex items-center justify-center shrink-0">
+                <User size={13} className="text-yellow-500"/>
+              </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="text-white text-sm font-medium truncate">{selectedClient?.nom || "Sélectionner un client"}</p>
-                {selectedClient && <p className="text-zinc-500 text-[11px]">{selectedClient.nom_shop ? `🏪 ${selectedClient.nom_shop}` : selectedClient.contrat}</p>}
+                {selectedClient && (
+                  <p className="text-zinc-500 text-[11px]">
+                    {selectedClient.nom_shop ? `🏪 ${selectedClient.nom_shop}` : selectedClient.contrat}
+                  </p>
+                )}
               </div>
               <ChevronDown size={13} className="text-zinc-500 shrink-0"/>
             </button>
             {showClients && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-20 overflow-hidden">
                 <div className="p-2">
-                  <input type="text" placeholder="Nom, prénom, shop..." value={searchClient} onChange={e => setSearchClient(e.target.value)} autoFocus
+                  <input type="text" placeholder="Nom, prénom, shop..." value={searchClient}
+                    onChange={e => setSearchClient(e.target.value)} autoFocus
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"/>
                 </div>
                 <div className="max-h-48 overflow-y-auto">
@@ -607,11 +683,12 @@ export default function VenteModule({ activeSociety, profile }: Props) {
                     <button key={c.id} onClick={async () => {
                       setSelectedClient(c); setShowClients(false)
                       const { data } = await supabase.from("client_prix").select("*").eq("client_id", c.id)
-                      const map: Record<string,number> = {}; (data||[]).forEach((p:any) => { map[p.product_id] = p.prix })
+                      const map: Record<string,number> = {}
+                      ;(data||[]).forEach((p: any) => { map[p.product_id] = p.prix })
                       setClientPrixMap(map)
                     }} className="w-full text-left px-4 py-2.5 hover:bg-zinc-800">
-                      <p className="text-white text-sm">{(c as any).prenom ? `${(c as any).prenom} ${c.nom}` : c.nom}</p>
-                      <p className="text-zinc-500 text-[11px]">{(c as any).nom_shop ? `🏪 ${(c as any).nom_shop}` : c.contrat}</p>
+                      <p className="text-white text-sm">{c.prenom ? `${c.prenom} ${c.nom}` : c.nom}</p>
+                      <p className="text-zinc-500 text-[11px]">{c.nom_shop ? `🏪 ${c.nom_shop}` : c.contrat}</p>
                     </button>
                   ))}
                   {filteredClients.length === 0 && <p className="text-zinc-600 text-xs text-center py-4">Aucun client trouvé</p>}
@@ -622,12 +699,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         ) : (
           <div className="flex items-center gap-2.5 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
             <div className="w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center shrink-0"><User size={13} className="text-zinc-500"/></div>
-            <p className="text-zinc-400 text-sm">{typeVente === "Shopify" ? "🛍️ Commande Shopify" : typeVente === "Convention" ? "🎪 Convention" : "Client de passage"}</p>
+            <p className="text-zinc-400 text-sm">
+              {typeVente === "Shopify" ? "🛍️ Commande Shopify" : typeVente === "Convention" ? "🎪 Convention" : "Client de passage"}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Articles panier */}
+      {/* Articles */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-zinc-700 py-8">
@@ -641,15 +720,17 @@ export default function VenteModule({ activeSociety, profile }: Props) {
               <p className="text-white text-xs font-semibold truncate">{item.nom}</p>
               <p className="text-zinc-600 text-[10px]">{item.gamme}</p>
             </div>
-            {/* Qty control */}
+            {/* Quantité */}
             <div className="flex items-center gap-1 bg-zinc-800 rounded-lg">
-              <button onClick={() => { if (item.quantite <= 1) setCart(p => p.filter(i => i.product_id !== item.product_id)); else setCart(p => p.map(i => i.product_id === item.product_id ? {...i, quantite: i.quantite-1} : i)) }}
-                className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-white"><Minus size={10}/></button>
+              <button onClick={() => {
+                if (item.quantite <= 1) setCart(p => p.filter(i => i.product_id !== item.product_id))
+                else setCart(p => p.map(i => i.product_id === item.product_id ? {...i, quantite: i.quantite-1} : i))
+              }} className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-white"><Minus size={10}/></button>
               <span className="text-white text-xs font-bold w-5 text-center">{item.quantite}</span>
               <button onClick={() => setCart(p => p.map(i => i.product_id === item.product_id ? {...i, quantite: i.quantite+1} : i))}
                 className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-white"><Plus size={10}/></button>
             </div>
-            {/* Prix modifiable */}
+            {/* Prix */}
             <div className="relative w-16">
               <input type="number" step="0.01" value={item.pv}
                 onChange={e => setCart(p => p.map(i => i.product_id === item.product_id ? {...i, pv: parseFloat(e.target.value)||0} : i))}
@@ -662,42 +743,47 @@ export default function VenteModule({ activeSociety, profile }: Props) {
         ))}
       </div>
 
-      {/* Actions rapides sur le panier */}
+      {/* Actions rapides */}
       {cart.length > 0 && (
         <div className="px-3 py-1.5 border-t border-zinc-900 flex items-center gap-3">
           <button onClick={() => { try { localStorage.setItem("brouillon_"+activeSociety.id, JSON.stringify(cart)) } catch {}; alert("Brouillon sauvegardé") }}
-            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-yellow-500 transition-colors"><Save size={10}/> Sauvegarder</button>
-          <button onClick={() => { try { const d = localStorage.getItem("brouillon_"+activeSociety.id); if (d) setCart(JSON.parse(d)) } catch {} }}
-            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-yellow-500 transition-colors"><RotateCcw size={10}/> Reprendre</button>
+            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-yellow-500">
+            <Save size={10}/> Sauvegarder
+          </button>
+          <button onClick={() => { try { const d = localStorage.getItem("brouillon_"+activeSociety.id); if(d) setCart(JSON.parse(d)) } catch {} }}
+            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-yellow-500">
+            <RotateCcw size={10}/> Reprendre
+          </button>
           {selectedClient && (
             <button onClick={async () => {
               const { data } = await supabase.from("client_prix").select("*").eq("client_id", selectedClient.id)
               if (data?.length) {
-                const map: Record<string,number> = {}; data.forEach((p:any) => { map[p.product_id] = p.prix })
+                const map: Record<string,number> = {}; data.forEach((p: any) => { map[p.product_id] = p.prix })
                 setClientPrixMap(map); setCart(p => p.map(i => map[i.product_id]!=null ? {...i, pv: map[i.product_id]} : i))
               }
-            }} className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 transition-colors ml-auto">
+            }} className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 ml-auto">
               <Zap size={10}/> Tarif {selectedClient.nom.split(" ")[0]}
             </button>
           )}
         </div>
       )}
 
-      {/* Options + Total */}
+      {/* Options + résumé + validation */}
       {cart.length > 0 && (
         <div className="border-t border-zinc-800 p-3 space-y-2">
-          {/* Port + frais */}
+          {/* Port */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[9px] text-zinc-600 font-bold uppercase tracking-wider mb-1">Port</label>
-              <select value={port} onChange={e => setPort(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-white focus:outline-none">
+              <select value={port} onChange={e => setPort(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-[11px] text-white focus:outline-none">
                 {PORT_OPTIONS.map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[9px] text-zinc-600 font-bold uppercase tracking-wider mb-1">Port perso / Frais</label>
+              <label className="block text-[9px] text-zinc-600 font-bold uppercase tracking-wider mb-1">Port perso / Frais colis</label>
               <div className="flex gap-1">
-                <input type="text" placeholder="0.00" value={portPerso} onChange={e => setPortPerso(e.target.value)}
+                <input type="text" placeholder="port" value={portPerso} onChange={e => setPortPerso(e.target.value)}
                   className="flex-1 w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none"/>
                 <input type="text" placeholder="colis" value={fraisColis} onChange={e => setFraisColis(e.target.value)}
                   className="flex-1 w-0 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none"/>
@@ -722,11 +808,14 @@ export default function VenteModule({ activeSociety, profile }: Props) {
           {/* Date */}
           <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5">
             <span className="text-zinc-600 text-[10px]">📅</span>
-            <input type="date" value={venteDate} onChange={e => setVenteDate(e.target.value)} className="flex-1 bg-transparent text-xs text-white focus:outline-none"/>
-            {venteDate !== new Date().toISOString().split("T")[0] && <span className="text-orange-400 text-[9px] font-bold">≠ Auj.</span>}
+            <input type="date" value={venteDate} onChange={e => setVenteDate(e.target.value)}
+              className="flex-1 bg-transparent text-xs text-white focus:outline-none"/>
+            {venteDate !== new Date().toISOString().split("T")[0] && (
+              <span className="text-orange-400 text-[9px] font-bold">≠ Auj.</span>
+            )}
           </div>
 
-          {/* Récapitulatif financier */}
+          {/* Récapitulatif */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 space-y-0.5">
             <div className="flex justify-between text-[11px] text-zinc-500"><span>Sous-total HT</span><span>{totalHT.toFixed(2)}€</span></div>
             {portVal > 0 && <div className="flex justify-between text-[11px] text-zinc-500"><span>Port</span><span>+{portVal.toFixed(2)}€</span></div>}
@@ -744,10 +833,16 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
           {/* Bouton valider */}
           <button onClick={handleVente} disabled={saving || !cart.length}
-            className={`w-full font-black py-4 rounded-xl text-base transition-all flex items-center justify-center gap-2 shadow-lg ${success ? "bg-green-500 text-white shadow-green-500/20" : "bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black shadow-yellow-500/20"}`}>
-            {success ? <><Check size={18}/> Vente enregistrée !</>
-              : saving ? <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"/>
-              : <><ShoppingCart size={18}/> Valider · {totalTTC.toFixed(2)}€</>
+            className={`w-full font-black py-4 rounded-xl text-base transition-all flex items-center justify-center gap-2 shadow-lg ${
+              success
+                ? "bg-green-500 text-white shadow-green-500/20"
+                : "bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 text-black shadow-yellow-500/20"
+            }`}>
+            {success
+              ? <><Check size={18}/> Vente enregistrée !</>
+              : saving
+                ? <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"/>
+                : <><ShoppingCart size={18}/> Valider · {totalTTC.toFixed(2)}€</>
             }
           </button>
         </div>
@@ -757,18 +852,13 @@ export default function VenteModule({ activeSociety, profile }: Props) {
 
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] flex flex-col">
-      {/* Desktop : 2 colonnes */}
       <div className="hidden md:flex flex-1 overflow-hidden">
         {CatalogueView}
         {PanierView}
       </div>
-
-      {/* Mobile : tabs */}
       <div className="flex md:hidden flex-1 overflow-hidden">
         {mobileTab === "catalogue" ? CatalogueView : PanierView}
       </div>
-
-      {/* Tab bar mobile */}
       <div className="flex md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800 bg-[#111111]">
         <button onClick={() => setMobileTab("catalogue")}
           className={`flex-1 flex flex-col items-center justify-center py-3 gap-0.5 ${mobileTab==="catalogue" ? "text-yellow-500" : "text-zinc-500"}`}>
