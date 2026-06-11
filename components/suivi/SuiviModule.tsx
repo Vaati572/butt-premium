@@ -725,7 +725,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}/><span className="text-zinc-600 text-[10px]">{label}</span>
               </div>
             ))}
-            <div className="flex items-center gap-1.5"><Package size={10} className="text-zinc-600"/><span className="text-zinc-600 text-[10px]">À préparer</span></div>
+            <div className="flex items-center gap-1.5"><Package size={10} className="text-blue-600"/><span className="text-zinc-600 text-[10px]">À préparer</span></div>
             <div className="flex items-center gap-1.5"><Truck size={10} className="text-orange-600"/><span className="text-zinc-600 text-[10px]">En livraison</span></div>
             <div className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-green-600"/><span className="text-zinc-600 text-[10px]">Reçu</span></div>
           </div>
