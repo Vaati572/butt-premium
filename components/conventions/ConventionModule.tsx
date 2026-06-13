@@ -6,6 +6,7 @@ import {
   Plus, X, ShoppingCart, Check, Pencil, Trash2, Package,
   Wallet, Search, Minus, AlertTriangle, ChevronDown, User,
   Tag, FileText, CreditCard, Calendar, TrendingUp, Zap,
+  Receipt, ChevronLeft, ChevronRight,
 } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
@@ -610,6 +611,274 @@ function VenteConventionPanel({ societyId, profile, convention, onClose, onDone 
 }
 
 /* ══════════════════════════════════════════════
+   VENTES JOURNALIÈRES — PANEL DÉTAIL
+══════════════════════════════════════════════ */
+function VentesJourPanel({ societyId, convention, onClose }: {
+  societyId: string; convention: any; onClose: () => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [date, setDate]     = useState(today)
+  const [ventes, setVentes] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  // Génère les jours de la convention pour le sélecteur
+  const getDays = () => {
+    const days: string[] = []
+    if (!convention.date_debut || !convention.date_fin) return days
+    let cur = new Date(convention.date_debut + "T00:00:00")
+    const end = new Date(convention.date_fin + "T00:00:00")
+    while (cur <= end) {
+      days.push(cur.toISOString().slice(0, 10))
+      cur.setDate(cur.getDate() + 1)
+    }
+    return days
+  }
+  const days = getDays()
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      const { data } = await supabase
+        .from("ventes")
+        .select("*, vente_items(*)")
+        .eq("society_id", societyId)
+        .gte("created_at", `${date}T00:00:00`)
+        .lte("created_at", `${date}T23:59:59`)
+        .order("created_at", { ascending: false })
+      setVentes(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [date, societyId])
+
+  const toggle = (id: string) => setExpanded(prev => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
+  })
+
+  const prevDay = () => {
+    const idx = days.indexOf(date); if (idx > 0) setDate(days[idx - 1])
+  }
+  const nextDay = () => {
+    const idx = days.indexOf(date); if (idx < days.length - 1) setDate(days[idx + 1])
+  }
+
+  const totalJour    = ventes.reduce((s, v) => s + Number(v.total_ttc || 0), 0)
+  const totalRemises = ventes.reduce((s, v) => s + Number(v.remise || 0), 0)
+
+  // CA par mode de paiement
+  const byPaiement: Record<string, number> = {}
+  ventes.forEach(v => { byPaiement[v.paiement] = (byPaiement[v.paiement] || 0) + Number(v.total_ttc || 0) })
+
+  // Articles vendus agrégés
+  const articlesMap: Record<string, { nom: string; qty: number; total: number }> = {}
+  ventes.forEach(v => {
+    (v.vente_items || []).forEach((item: any) => {
+      if (!articlesMap[item.produit_nom]) articlesMap[item.produit_nom] = { nom: item.produit_nom, qty: 0, total: 0 }
+      articlesMap[item.produit_nom].qty   += Number(item.quantite || 0)
+      articlesMap[item.produit_nom].total += Number(item.total || 0)
+    })
+  })
+  const articles = Object.values(articlesMap).sort((a, b) => b.total - a.total)
+
+  const curIdx  = days.indexOf(date)
+  const dateLabel = date ? new Date(date + "T00:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) : date
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0"
+          style={{ background: "linear-gradient(135deg,rgba(249,115,22,0.1),transparent)" }}>
+          <div>
+            <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">🎪 {convention.nom}</p>
+            <h3 className="text-white font-bold text-base flex items-center gap-2"><Receipt size={16}/> Ventes du jour</h3>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+
+        {/* Sélecteur de jour */}
+        <div className="px-4 py-3 border-b border-zinc-800 shrink-0">
+          {days.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <button onClick={prevDay} disabled={curIdx <= 0}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 shrink-0">
+                <ChevronLeft size={15}/>
+              </button>
+              <div className="flex-1 text-center">
+                <p className="text-white font-semibold text-sm capitalize">{dateLabel}</p>
+                <p className="text-zinc-500 text-[10px]">Jour {curIdx + 1} / {days.length}</p>
+              </div>
+              <button onClick={nextDay} disabled={curIdx >= days.length - 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-30 shrink-0">
+                <ChevronRight size={15}/>
+              </button>
+            </div>
+          ) : (
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"/>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : ventes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-6">
+              <Receipt size={40} className="text-zinc-800 mb-4"/>
+              <p className="text-zinc-500 font-semibold">Aucune vente ce jour</p>
+              <p className="text-zinc-700 text-sm mt-1">Aucune vente enregistrée pour le {dateLabel}</p>
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+
+              {/* Stats du jour */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-orange-400 text-lg font-black">{totalJour.toFixed(2)}€</p>
+                  <p className="text-zinc-600 text-[10px]">CA total</p>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-white text-lg font-black">{ventes.length}</p>
+                  <p className="text-zinc-600 text-[10px]">Vente{ventes.length > 1 ? "s" : ""}</p>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-zinc-300 text-lg font-black">{ventes.length > 0 ? (totalJour / ventes.length).toFixed(0) : "0"}€</p>
+                  <p className="text-zinc-600 text-[10px]">Moy/vente</p>
+                </div>
+              </div>
+
+              {/* Répartition par paiement */}
+              {Object.keys(byPaiement).length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">💳 Par mode de paiement</p>
+                  <div className="space-y-1.5">
+                    {Object.entries(byPaiement).sort((a,b) => b[1]-a[1]).map(([mode, montant]) => {
+                      const pct = totalJour > 0 ? (montant / totalJour) * 100 : 0
+                      return (
+                        <div key={mode}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-zinc-300 text-xs">{mode}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-500 text-[10px]">{pct.toFixed(0)}%</span>
+                              <span className="text-orange-400 text-xs font-bold">{montant.toFixed(2)}€</span>
+                            </div>
+                          </div>
+                          <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500" style={{ width: `${pct}%` }}/>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {totalRemises > 0 && <p className="text-zinc-600 text-[10px] mt-2">Remises accordées : {totalRemises.toFixed(2)}€</p>}
+                </div>
+              )}
+
+              {/* Articles vendus agrégés */}
+              {articles.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">📦 Articles vendus</p>
+                  <div className="space-y-1.5">
+                    {articles.map(art => (
+                      <div key={art.nom} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-orange-400 text-[10px] font-black shrink-0 w-5 text-center">×{art.qty}</span>
+                          <span className="text-zinc-300 text-xs truncate">{art.nom}</span>
+                        </div>
+                        <span className="text-white text-xs font-bold shrink-0 ml-2">{art.total.toFixed(2)}€</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Liste des ventes individuelles */}
+              <div>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">🧾 Détail des ventes</p>
+                <div className="space-y-2">
+                  {ventes.map(v => (
+                    <div key={v.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                      {/* En-tête vente */}
+                      <button onClick={() => toggle(v.id)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
+                        <div className="text-left">
+                          <p className="text-white text-sm font-semibold">{v.client_nom || "Client de passage"}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-zinc-500 text-[11px]">
+                              {new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                            <span className="text-[10px] bg-zinc-800 border border-zinc-700 text-zinc-400 px-1.5 py-0.5 rounded-full">{v.paiement}</span>
+                            {v.remise > 0 && <span className="text-[10px] text-orange-400">−{Number(v.remise).toFixed(2)}€ remise</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="text-orange-400 font-black">{Number(v.total_ttc).toFixed(2)}€</p>
+                          <ChevronRight size={14} className={`text-zinc-600 transition-transform ${expanded.has(v.id) ? "rotate-90" : ""}`}/>
+                        </div>
+                      </button>
+
+                      {/* Détail articles si expanded */}
+                      {expanded.has(v.id) && (
+                        <div className="border-t border-zinc-800 bg-zinc-800/30">
+                          {v.notes && (
+                            <div className="px-4 py-2 border-b border-zinc-800/60">
+                              <p className="text-zinc-500 text-[10px]">📝 {v.notes}</p>
+                            </div>
+                          )}
+                          {(v.vente_items || []).length > 0 ? (
+                            <div className="px-4 py-2 space-y-1.5">
+                              {v.vente_items.map((item: any, i: number) => (
+                                <div key={i} className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-zinc-500 text-[10px] shrink-0">×{item.quantite}</span>
+                                    <span className="text-zinc-300 text-xs truncate">{item.produit_nom}</span>
+                                    {item.notes && <span className="text-zinc-600 text-[10px] italic truncate">"{item.notes}"</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                    <span className="text-zinc-500 text-[10px]">{Number(item.pv_unitaire).toFixed(2)}€/u</span>
+                                    <span className="text-white text-xs font-bold">{Number(item.total).toFixed(2)}€</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {v.remise > 0 && (
+                                <div className="flex justify-between pt-1 border-t border-zinc-800/60">
+                                  <span className="text-orange-400 text-[10px]">Remise globale</span>
+                                  <span className="text-orange-400 text-[10px] font-bold">−{Number(v.remise).toFixed(2)}€</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="px-4 py-2 text-zinc-700 text-xs">Aucun détail disponible</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer avec total */}
+        {!loading && ventes.length > 0 && (
+          <div className="border-t border-zinc-800 px-5 py-3 shrink-0 flex items-center justify-between bg-zinc-900/50">
+            <div>
+              <p className="text-zinc-500 text-xs">{ventes.length} vente{ventes.length > 1 ? "s" : ""} · {dateLabel}</p>
+              {totalRemises > 0 && <p className="text-zinc-600 text-[10px]">dont {totalRemises.toFixed(2)}€ de remises</p>}
+            </div>
+            <p className="text-orange-400 text-xl font-black">{totalJour.toFixed(2)}€</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
    FORM CONVENTION
 ══════════════════════════════════════════════ */
 function ConventionForm({ societyId, profile, convention, onClose, onDone }: {
@@ -686,6 +955,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const [editConv, setEditConv]       = useState<any>(null)
   const [venteConv, setVenteConv]     = useState<any>(null)
   const [caisseConv, setCaisseConv]   = useState<any>(null)
+  const [ventesConv, setVentesConv]   = useState<any>(null)
   const [filter, setFilter]           = useState<"all"|"active"|"upcoming"|"past">("all")
 
   const load = useCallback(async () => {
@@ -749,6 +1019,10 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
+                <button onClick={() => setVentesConv(activeNow)}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm border border-zinc-700">
+                  <Receipt size={15}/> Ventes du jour
+                </button>
                 <button onClick={() => setCaisseConv(activeNow)}
                   className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm border border-zinc-700">
                   <Wallet size={15}/> Caisse
@@ -800,9 +1074,13 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isActive && (
                         <>
+                          <button onClick={() => setVentesConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-300 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Receipt size={11}/> Ventes</button>
                           <button onClick={() => setCaisseConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-white bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Wallet size={11}/> Caisse</button>
                           <button onClick={() => setVenteConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-2 py-1.5 rounded-lg hover:bg-orange-400/20"><ShoppingCart size={11}/> Vendre</button>
                         </>
+                      )}
+                      {isPast && (
+                        <button onClick={() => setVentesConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Receipt size={11}/> Ventes</button>
                       )}
                       <button onClick={() => { setEditConv(c); setShowForm(true) }} className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
                       <button onClick={() => del(c.id)} className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10"><Trash2 size={13}/></button>
@@ -829,9 +1107,10 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {showForm   && <ConventionForm societyId={activeSociety.id} profile={profile} convention={editConv} onClose={() => { setShowForm(false); setEditConv(null) }} onDone={load}/>}
-      {venteConv  && <VenteConventionPanel societyId={activeSociety.id} profile={profile} convention={venteConv} onClose={() => setVenteConv(null)} onDone={load}/>}
-      {caisseConv && <CaissePanel societyId={activeSociety.id} convention={caisseConv} onClose={() => setCaisseConv(null)}/>}
+      {showForm    && <ConventionForm societyId={activeSociety.id} profile={profile} convention={editConv} onClose={() => { setShowForm(false); setEditConv(null) }} onDone={load}/>}
+      {venteConv   && <VenteConventionPanel societyId={activeSociety.id} profile={profile} convention={venteConv} onClose={() => setVenteConv(null)} onDone={load}/>}
+      {caisseConv  && <CaissePanel societyId={activeSociety.id} convention={caisseConv} onClose={() => setCaisseConv(null)}/>}
+      {ventesConv  && <VentesJourPanel societyId={activeSociety.id} convention={ventesConv} onClose={() => setVentesConv(null)}/>}
     </div>
   )
 }
