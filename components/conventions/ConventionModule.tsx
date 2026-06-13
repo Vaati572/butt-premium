@@ -611,6 +611,283 @@ function VenteConventionPanel({ societyId, profile, convention, onClose, onDone 
 }
 
 /* ══════════════════════════════════════════════
+   HISTORIQUE COMPLET CONVENTION
+══════════════════════════════════════════════ */
+function HistoriqueConventionPanel({ societyId, convention, onClose }: {
+  societyId: string; convention: any; onClose: () => void
+}) {
+  const [ventes, setVentes]   = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      const debut = convention.date_debut?.slice(0,10)
+      const fin   = convention.date_fin?.slice(0,10)
+      if (!debut || !fin) { setLoading(false); return }
+      const { data } = await supabase
+        .from("ventes")
+        .select("*, vente_items(*)")
+        .eq("society_id", societyId)
+        .gte("created_at", `${debut}T00:00:00`)
+        .lte("created_at", `${fin}T23:59:59`)
+        .order("created_at", { ascending: false })
+      setVentes(data || [])
+      // Ouvrir le premier jour par défaut
+      if (data && data.length > 0) {
+        const firstDay = data[0].created_at.slice(0,10)
+        setExpandedDays(new Set([firstDay]))
+      }
+      setLoading(false)
+    }
+    load()
+  }, [societyId, convention])
+
+  const toggleVente = (id: string) => setExpanded(prev => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
+  const toggleDay   = (d: string)  => setExpandedDays(prev => { const n = new Set(prev); n.has(d)?n.delete(d):n.add(d); return n })
+
+  // Grouper par jour
+  const byDay: Record<string, any[]> = {}
+  ventes.forEach(v => {
+    const d = v.created_at.slice(0,10)
+    if (!byDay[d]) byDay[d] = []
+    byDay[d].push(v)
+  })
+  const days = Object.keys(byDay).sort((a,b) => b.localeCompare(a))
+
+  const totalConv = ventes.reduce((s,v) => s + Number(v.total_ttc||0), 0)
+  const totalRemises = ventes.reduce((s,v) => s + Number(v.remise||0), 0)
+
+  // CA par paiement global
+  const byPaiement: Record<string,number> = {}
+  ventes.forEach(v => { byPaiement[v.paiement] = (byPaiement[v.paiement]||0) + Number(v.total_ttc||0) })
+
+  // Articles agrégés global
+  const articlesMap: Record<string,{nom:string;qty:number;total:number}> = {}
+  ventes.forEach(v => (v.vente_items||[]).forEach((item:any) => {
+    if (!articlesMap[item.produit_nom]) articlesMap[item.produit_nom]={nom:item.produit_nom,qty:0,total:0}
+    articlesMap[item.produit_nom].qty   += Number(item.quantite||0)
+    articlesMap[item.produit_nom].total += Number(item.total||0)
+  }))
+  const articles = Object.values(articlesMap).sort((a,b) => b.total - a.total)
+
+  const duration = convention.date_debut && convention.date_fin
+    ? Math.ceil((new Date(convention.date_fin+"T00:00:00").getTime()-new Date(convention.date_debut+"T00:00:00").getTime())/86400000)+1
+    : 0
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-end z-50">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-lg h-full flex flex-col shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 shrink-0"
+          style={{background:"linear-gradient(135deg,rgba(249,115,22,0.1),transparent)"}}>
+          <div>
+            <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wider mb-0.5">🎪 {convention.nom}</p>
+            <h3 className="text-white font-bold text-base flex items-center gap-2">
+              <Receipt size={16}/> Historique des ventes
+            </h3>
+            {convention.lieu && <p className="text-zinc-500 text-xs mt-0.5">📍 {convention.lieu} · {duration}j</p>}
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : ventes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-6">
+              <Receipt size={40} className="text-zinc-800 mb-4"/>
+              <p className="text-zinc-500 font-semibold">Aucune vente enregistrée</p>
+              <p className="text-zinc-700 text-sm mt-1">
+                {convention.date_debut && convention.date_fin
+                  ? `Du ${new Date(convention.date_debut+"T00:00:00").toLocaleDateString("fr-FR")} au ${new Date(convention.date_fin+"T00:00:00").toLocaleDateString("fr-FR")}`
+                  : "Période non définie"}
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+
+              {/* Stats globales */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-orange-400 text-lg font-black">{totalConv.toFixed(2)}€</p>
+                  <p className="text-zinc-600 text-[10px]">CA total</p>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-white text-lg font-black">{ventes.length}</p>
+                  <p className="text-zinc-600 text-[10px]">Vente{ventes.length>1?"s":""}</p>
+                </div>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-center">
+                  <p className="text-zinc-300 text-lg font-black">{days.length}j</p>
+                  <p className="text-zinc-600 text-[10px]">Jours actifs</p>
+                </div>
+              </div>
+
+              {/* CA par jour (mini chart) */}
+              {days.length > 1 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">📅 CA par jour</p>
+                  <div className="space-y-1.5">
+                    {[...days].reverse().map(d => {
+                      const ca = byDay[d].reduce((s,v) => s+Number(v.total_ttc||0), 0)
+                      const pct = totalConv > 0 ? (ca/totalConv)*100 : 0
+                      const label = new Date(d+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})
+                      return (
+                        <div key={d}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-zinc-400 text-xs capitalize">{label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-600 text-[10px]">{byDay[d].length} vente{byDay[d].length>1?"s":""}</span>
+                              <span className="text-orange-400 text-xs font-bold">{ca.toFixed(2)}€</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500" style={{width:`${pct}%`}}/>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Paiement global */}
+              {Object.keys(byPaiement).length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">💳 Par mode de paiement</p>
+                  <div className="space-y-1.5">
+                    {Object.entries(byPaiement).sort((a,b)=>b[1]-a[1]).map(([mode,montant]) => {
+                      const pct = totalConv > 0 ? (montant/totalConv)*100 : 0
+                      return (
+                        <div key={mode}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-zinc-300 text-xs">{mode}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-500 text-[10px]">{pct.toFixed(0)}%</span>
+                              <span className="text-orange-400 text-xs font-bold">{montant.toFixed(2)}€</span>
+                            </div>
+                          </div>
+                          <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500" style={{width:`${pct}%`}}/>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {totalRemises > 0 && <p className="text-zinc-600 text-[10px] mt-2">Remises totales : {totalRemises.toFixed(2)}€</p>}
+                </div>
+              )}
+
+              {/* Top articles */}
+              {articles.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">📦 Articles vendus</p>
+                  <div className="space-y-1.5">
+                    {articles.map(art => (
+                      <div key={art.nom} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-orange-400 text-[10px] font-black shrink-0 w-5 text-center">×{art.qty}</span>
+                          <span className="text-zinc-300 text-xs truncate">{art.nom}</span>
+                        </div>
+                        <span className="text-white text-xs font-bold shrink-0 ml-2">{art.total.toFixed(2)}€</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ventes groupées par jour */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">🧾 Détail par jour</p>
+                {days.map(d => {
+                  const ventesJour = byDay[d]
+                  const caJour = ventesJour.reduce((s,v)=>s+Number(v.total_ttc||0),0)
+                  const isOpen = expandedDays.has(d)
+                  const label  = new Date(d+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})
+                  return (
+                    <div key={d} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                      {/* En-tête jour */}
+                      <button onClick={() => toggleDay(d)} className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors">
+                        <div className="text-left">
+                          <p className="text-white text-sm font-bold capitalize">{label}</p>
+                          <p className="text-zinc-500 text-[11px]">{ventesJour.length} vente{ventesJour.length>1?"s":""}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <p className="text-orange-400 font-black">{caJour.toFixed(2)}€</p>
+                          <ChevronRight size={14} className={`text-zinc-600 transition-transform ${isOpen?"rotate-90":""}`}/>
+                        </div>
+                      </button>
+
+                      {/* Ventes du jour */}
+                      {isOpen && (
+                        <div className="border-t border-zinc-800 bg-zinc-800/20 divide-y divide-zinc-800/50">
+                          {ventesJour.map(v => (
+                            <div key={v.id}>
+                              <button onClick={() => toggleVente(v.id)} className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-zinc-800/50 transition-colors">
+                                <div className="text-left">
+                                  <p className="text-zinc-200 text-xs font-semibold">{v.client_nom||"Client de passage"}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-zinc-600 text-[10px]">{new Date(v.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
+                                    <span className="text-[9px] bg-zinc-800 border border-zinc-700 text-zinc-500 px-1.5 py-0.5 rounded-full">{v.paiement}</span>
+                                    {v.remise>0&&<span className="text-[9px] text-orange-400">−{Number(v.remise).toFixed(2)}€</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <p className="text-orange-400 font-bold text-xs">{Number(v.total_ttc).toFixed(2)}€</p>
+                                  <ChevronRight size={12} className={`text-zinc-700 transition-transform ${expanded.has(v.id)?"rotate-90":""}`}/>
+                                </div>
+                              </button>
+                              {expanded.has(v.id) && (
+                                <div className="px-5 pb-2.5 bg-zinc-800/30">
+                                  {v.notes && <p className="text-zinc-600 text-[10px] italic mb-1.5">"{v.notes}"</p>}
+                                  {(v.vente_items||[]).map((item:any,i:number) => (
+                                    <div key={i} className="flex items-center justify-between py-0.5">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-zinc-600 text-[10px] shrink-0">×{item.quantite}</span>
+                                        <span className="text-zinc-400 text-[11px] truncate">{item.produit_nom}</span>
+                                        {item.notes&&<span className="text-zinc-600 text-[9px] italic">"{item.notes}"</span>}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                        <span className="text-zinc-600 text-[9px]">{Number(item.pv_unitaire).toFixed(2)}€</span>
+                                        <span className="text-zinc-300 text-[11px] font-bold">{Number(item.total).toFixed(2)}€</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {!loading && ventes.length > 0 && (
+          <div className="border-t border-zinc-800 px-5 py-3 shrink-0 flex items-center justify-between bg-zinc-900/50">
+            <div>
+              <p className="text-zinc-500 text-xs">{ventes.length} ventes · {days.length} jour{days.length>1?"s":""}</p>
+              {totalRemises>0&&<p className="text-zinc-600 text-[10px]">Remises : {totalRemises.toFixed(2)}€</p>}
+            </div>
+            <p className="text-orange-400 text-xl font-black">{totalConv.toFixed(2)}€</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
    VENTES JOURNALIÈRES — PANEL DÉTAIL
 ══════════════════════════════════════════════ */
 function VentesJourPanel({ societyId, convention, onClose }: {
@@ -956,6 +1233,7 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
   const [venteConv, setVenteConv]     = useState<any>(null)
   const [caisseConv, setCaisseConv]   = useState<any>(null)
   const [ventesConv, setVentesConv]   = useState<any>(null)
+  const [historiqueConv, setHistoriqueConv] = useState<any>(null)
   const [filter, setFilter]           = useState<"all"|"active"|"upcoming"|"past">("all")
 
   const load = useCallback(async () => {
@@ -1018,10 +1296,14 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                   {new Date(activeNow.date_debut+"T00:00:00").toLocaleDateString("fr-FR")} → {new Date(activeNow.date_fin+"T00:00:00").toLocaleDateString("fr-FR")}
                 </p>
               </div>
-              <div className="flex gap-2 shrink-0">
+              <div className="flex gap-2 shrink-0 flex-wrap">
+                <button onClick={() => setHistoriqueConv(activeNow)}
+                  className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm border border-zinc-700">
+                  <Receipt size={15}/> Historique
+                </button>
                 <button onClick={() => setVentesConv(activeNow)}
                   className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm border border-zinc-700">
-                  <Receipt size={15}/> Ventes du jour
+                  <Calendar size={15}/> Ventes du jour
                 </button>
                 <button onClick={() => setCaisseConv(activeNow)}
                   className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm border border-zinc-700">
@@ -1071,16 +1353,14 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
                       </div>
                       {c.lieu && <p className="text-zinc-500 text-xs">📍 {c.lieu}</p>}
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      <button onClick={() => setHistoriqueConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Receipt size={11}/> Historique</button>
                       {isActive && (
                         <>
-                          <button onClick={() => setVentesConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-300 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Receipt size={11}/> Ventes</button>
+                          <button onClick={() => setVentesConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-300 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Calendar size={11}/> Du jour</button>
                           <button onClick={() => setCaisseConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-white bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Wallet size={11}/> Caisse</button>
                           <button onClick={() => setVenteConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-orange-400 bg-orange-400/10 border border-orange-400/20 px-2 py-1.5 rounded-lg hover:bg-orange-400/20"><ShoppingCart size={11}/> Vendre</button>
                         </>
-                      )}
-                      {isPast && (
-                        <button onClick={() => setVentesConv(c)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-1.5 rounded-lg hover:bg-zinc-700"><Receipt size={11}/> Ventes</button>
                       )}
                       <button onClick={() => { setEditConv(c); setShowForm(true) }} className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"><Pencil size={13}/></button>
                       <button onClick={() => del(c.id)} className="p-1.5 text-red-500 hover:text-red-400 rounded-lg hover:bg-red-500/10"><Trash2 size={13}/></button>
@@ -1107,10 +1387,11 @@ export default function ConventionModule({ activeSociety, profile }: Props) {
         )}
       </div>
 
-      {showForm    && <ConventionForm societyId={activeSociety.id} profile={profile} convention={editConv} onClose={() => { setShowForm(false); setEditConv(null) }} onDone={load}/>}
-      {venteConv   && <VenteConventionPanel societyId={activeSociety.id} profile={profile} convention={venteConv} onClose={() => setVenteConv(null)} onDone={load}/>}
-      {caisseConv  && <CaissePanel societyId={activeSociety.id} convention={caisseConv} onClose={() => setCaisseConv(null)}/>}
-      {ventesConv  && <VentesJourPanel societyId={activeSociety.id} convention={ventesConv} onClose={() => setVentesConv(null)}/>}
+      {showForm       && <ConventionForm societyId={activeSociety.id} profile={profile} convention={editConv} onClose={() => { setShowForm(false); setEditConv(null) }} onDone={load}/>}
+      {venteConv      && <VenteConventionPanel societyId={activeSociety.id} profile={profile} convention={venteConv} onClose={() => setVenteConv(null)} onDone={load}/>}
+      {caisseConv     && <CaissePanel societyId={activeSociety.id} convention={caisseConv} onClose={() => setCaisseConv(null)}/>}
+      {ventesConv     && <VentesJourPanel societyId={activeSociety.id} convention={ventesConv} onClose={() => setVentesConv(null)}/>}
+      {historiqueConv && <HistoriqueConventionPanel societyId={activeSociety.id} convention={historiqueConv} onClose={() => setHistoriqueConv(null)}/>}
     </div>
   )
 }
