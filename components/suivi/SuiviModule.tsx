@@ -440,26 +440,90 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
   )
 }
 
+/* ── Panel clients inactifs (−25j sans commande) ── */
+function InactifsPanel({ items, onClose, onSelectClient }: {
+  items: { client: SuiviClient; lastDate: string | null; jours: number | null }[]
+  onClose: () => void
+  onSelectClient: (client: SuiviClient) => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
+        <div className="px-5 py-4 border-b border-zinc-800 shrink-0"
+          style={{ background: "linear-gradient(135deg, rgba(239,68,68,0.12), transparent)" }}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-red-400 text-[10px] font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                <AlertTriangle size={11}/> Clients inactifs
+              </p>
+              <h2 className="text-white font-bold text-base">Sans commande depuis 25j+</h2>
+              <p className="text-zinc-500 text-xs mt-0.5">{items.length} client{items.length > 1 ? "s" : ""} concerné{items.length > 1 ? "s" : ""}</p>
+            </div>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16}/></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-6">
+              <span className="text-4xl mb-3">🎉</span>
+              <p className="text-zinc-400 text-sm font-semibold">Tous vos clients sont à jour !</p>
+              <p className="text-zinc-600 text-xs mt-1">Aucun client sans commande depuis plus de 25 jours</p>
+            </div>
+          ) : items.map(({ client, lastDate, jours }) => {
+            const contratColor = CONTRAT_COLORS[client.client_contrat || ""] || ""
+            const clientName = client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom
+            return (
+              <button key={client.id} onClick={() => onSelectClient(client)}
+                className="w-full flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-red-500/30 rounded-xl px-4 py-3 transition-colors text-left">
+                {contratColor && <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: contratColor }}/>}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold truncate">{clientName}</p>
+                  {client.client_nom_shop && <p className="text-zinc-500 text-[11px] truncate">🏪 {client.client_nom_shop}</p>}
+                  <p className="text-zinc-600 text-[11px] mt-0.5">
+                    {lastDate
+                      ? `Dernière commande : ${new Date(lastDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+                      : "Aucune commande enregistrée"}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  {jours !== null
+                    ? <p className="text-red-400 text-sm font-black">{jours}j</p>
+                    : <p className="text-red-500 text-[10px] font-bold">Jamais</p>}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════
    MAIN MODULE
 ══════════════════════════════════════════════ */
 export default function SuiviModule({ activeSociety, profile }: Props) {
   const [suiviClients, setSuiviClients]   = useState<SuiviClient[]>([])
   const [commandes, setCommandes]         = useState<Commande[]>([])
+  const [lastCommandeMap, setLastCommandeMap] = useState<Record<string, string | null>>({})
   const [loading, setLoading]             = useState(true)
   const [year, setYear]                   = useState(NOW_YEAR)
   const [search, setSearch]               = useState("")
   const [showAddClient, setShowAddClient] = useState(false)
   const [panel, setPanel]                 = useState<{ client: SuiviClient; mois: number; commande: Commande | null } | null>(null)
   const [livraisonPopup, setLivraisonPopup] = useState(false)
+  const [showInactifs, setShowInactifs]   = useState(false)
 
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
     setLoading(true)
-    const [{ data: sc }, { data: cmd }] = await Promise.all([
+    const [{ data: sc }, { data: cmd }, { data: allCmd }] = await Promise.all([
       supabase.from("suivi_clients").select("id, client_id, clients(nom, prenom, nom_shop, contrat)")
         .eq("society_id", activeSociety.id).order("created_at"),
       supabase.from("suivi_commandes").select("*").eq("society_id", activeSociety.id).eq("annee", year),
+      supabase.from("suivi_commandes").select("client_id, date_commande")
+        .eq("society_id", activeSociety.id).not("date_commande", "is", null)
+        .order("date_commande", { ascending: false }),
     ])
     setSuiviClients((sc || []).map((s: any) => ({
       id: s.id, client_id: s.client_id, client_nom: s.clients?.nom || "?",
@@ -467,6 +531,9 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
       client_contrat: s.clients?.contrat || "",
     })))
     setCommandes(cmd || [])
+    const lastMap: Record<string, string | null> = {}
+    ;(allCmd || []).forEach((c: any) => { if (!lastMap[c.client_id]) lastMap[c.client_id] = c.date_commande })
+    setLastCommandeMap(lastMap)
     setLoading(false)
     const pending = (cmd || []).filter((c: any) =>
       c.statut_colis === "en_livraison" && c.date_expedition && daysDiff(c.date_expedition) >= 4
@@ -509,6 +576,30 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
   const livraisonsEnCours = commandes.filter(c => c.statut_colis === "en_livraison").length
   const totalParMois    = MOIS_SHORT.map((_, i) => commandes.filter(c => c.mois === i + 1).reduce((s, c) => s + Number(c.montant || 0), 0))
 
+  /* ── Clients sans commande depuis 25j+ (ou jamais commandé) ── */
+  const inactifs = suiviClients
+    .map(sc => {
+      const lastDate = lastCommandeMap[sc.client_id] || null
+      const jours = lastDate ? daysDiff(lastDate) : null
+      return { client: sc, lastDate, jours }
+    })
+    .filter(x => x.jours === null || x.jours >= 25)
+    .sort((a, b) => {
+      if (a.jours === null && b.jours === null) return 0
+      if (a.jours === null) return -1
+      if (b.jours === null) return 1
+      return b.jours - a.jours
+    })
+
+  const handleSelectInactif = async (client: SuiviClient) => {
+    setShowInactifs(false)
+    if (year !== NOW_YEAR) setYear(NOW_YEAR)
+    const { data } = await supabase.from("suivi_commandes").select("*")
+      .eq("society_id", activeSociety.id).eq("client_id", client.client_id)
+      .eq("annee", NOW_YEAR).eq("mois", NOW_MONTH).limit(1)
+    setPanel({ client, mois: NOW_MONTH, commande: data?.[0] || null })
+  }
+
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] flex flex-col">
       <div className="border-b border-zinc-900 px-4 pt-4 pb-3 shrink-0 space-y-3">
@@ -518,6 +609,17 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
             <p className="text-zinc-500 text-xs mt-0.5">{suiviClients.length} clients · {year}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setShowInactifs(true)}
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 border transition-colors ${
+                inactifs.length > 0
+                  ? "bg-red-500/10 border-red-500/30 hover:bg-red-500/15"
+                  : "bg-zinc-900 border-zinc-800 hover:border-zinc-600"
+              }`}>
+              <AlertTriangle size={12} className={inactifs.length > 0 ? "text-red-400 animate-pulse" : "text-zinc-500"}/>
+              <span className={`text-xs font-bold ${inactifs.length > 0 ? "text-red-300" : "text-zinc-400"}`}>
+                {inactifs.length} −25j
+              </span>
+            </button>
             {relanceDue > 0 && (
               <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/30 rounded-xl px-3 py-2">
                 <Bell size={12} className="text-blue-400 animate-pulse"/>
@@ -743,6 +845,9 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
       {livraisonPopup && (
         <LivraisonPopup commandes={commandes} clients={suiviClients} societyId={activeSociety.id}
           onClose={() => setLivraisonPopup(false)} onDone={load}/>
+      )}
+      {showInactifs && (
+        <InactifsPanel items={inactifs} onClose={() => setShowInactifs(false)} onSelectClient={handleSelectInactif}/>
       )}
     </div>
   )
