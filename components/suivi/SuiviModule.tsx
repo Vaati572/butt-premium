@@ -23,7 +23,7 @@ interface Commande {
   statut_colis?: string
   date_expedition?: string
   date_validation_paiement?: string
-  type?: "commande" | "relance"
+  type?: "commande" | "relance" | "absence"
   vente_id?: string | null
 }
 
@@ -222,6 +222,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   const relanceAlert = commande?.date_validation_paiement && paiement === "valide" && type === "commande"
     ? daysDiff(commande.date_validation_paiement) : null
   const isRelanceEntry = commande?.type === "relance"
+  const isAbsenceEntry = commande?.type === "absence"
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
@@ -262,11 +263,11 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
             </div>
           )}
 
-          {/* Commande / Relance */}
+          {/* Commande / Relance / Sans suite */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
-                {showConvert ? "Lier à une vente" : isRelanceEntry ? "Relance" : "Commande"}
+                {showConvert ? "Lier à une vente" : isRelanceEntry ? "Relance" : isAbsenceEntry ? "Sans suite" : "Commande"}
               </p>
               {commande && !editMode && !showConvert && (
                 <button onClick={() => setEditMode(true)} className="text-zinc-600 hover:text-white flex items-center gap-1 text-[10px]">
@@ -326,6 +327,27 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                   💰 Transformer en commande
                 </button>
               </div>
+            ) : !editMode && commande && isAbsenceEntry ? (
+              <div className="space-y-2">
+                <div className="bg-zinc-800/60 border border-zinc-700/60 rounded-xl px-4 py-3 text-center">
+                  <p className="text-zinc-300 text-sm font-bold flex items-center justify-center gap-1.5"><X size={14}/> Ne commandera pas ce mois</p>
+                  {commande.date_commande && (
+                    <p className="text-zinc-500 text-xs mt-0.5">
+                      Noté le {new Date(commande.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"long" })}
+                    </p>
+                  )}
+                </div>
+                {commande.notes && (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+                    <p className="text-zinc-500 text-[10px] mb-0.5">📝 Raison</p>
+                    <p className="text-zinc-400 text-sm">{commande.notes}</p>
+                  </div>
+                )}
+                <button onClick={openConvert}
+                  className="w-full py-2.5 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-500/20">
+                  💰 Finalement, transformer en commande
+                </button>
+              </div>
             ) : !editMode && commande ? (
               <div className="space-y-2">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-center">
@@ -351,25 +373,34 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               </div>
             ) : (
               <div className="space-y-3">
-                {(!commande || isRelanceEntry) && (
-                  <div className="grid grid-cols-2 gap-1.5">
+                {(!commande || isRelanceEntry || isAbsenceEntry) && (
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button onClick={() => setType("relance")}
-                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all"
+                      className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-bold transition-all"
                       style={{
                         backgroundColor: type === "relance" ? "rgba(59,130,246,0.12)" : "rgba(39,39,42,0.5)",
                         borderColor: type === "relance" ? "rgba(59,130,246,0.4)" : "rgba(63,63,70,0.5)",
                         color: type === "relance" ? "#3b82f6" : "#52525b",
                       }}>
-                      <Bell size={12}/> Relance
+                      <Bell size={12}/> <span className="text-[10px]">Relance</span>
                     </button>
                     <button onClick={() => setType("commande")}
-                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all"
+                      className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-bold transition-all"
                       style={{
                         backgroundColor: type === "commande" ? "rgba(34,197,94,0.12)" : "rgba(39,39,42,0.5)",
                         borderColor: type === "commande" ? "rgba(34,197,94,0.4)" : "rgba(63,63,70,0.5)",
                         color: type === "commande" ? "#22c55e" : "#52525b",
                       }}>
-                      💰 Commande
+                      <span className="text-[10px]">💰 Commande</span>
+                    </button>
+                    <button onClick={() => setType("absence")}
+                      className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border text-xs font-bold transition-all"
+                      style={{
+                        backgroundColor: type === "absence" ? "rgba(113,113,122,0.18)" : "rgba(39,39,42,0.5)",
+                        borderColor: type === "absence" ? "rgba(113,113,122,0.5)" : "rgba(63,63,70,0.5)",
+                        color: type === "absence" ? "#d4d4d8" : "#52525b",
+                      }}>
+                      <X size={12}/> <span className="text-[10px]">Ne commandera pas</span>
                     </button>
                   </div>
                 )}
@@ -381,6 +412,15 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
                     <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && save()}
                       placeholder="Note de relance (optionnel)..."
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  </>
+                ) : type === "absence" ? (
+                  <>
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+                    <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && save()}
+                      placeholder="Raison (optionnel) : stock plein, pause, fermeture..."
                       className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
                   </>
                 ) : (
@@ -485,7 +525,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
             <div className="flex gap-2">
               <button onClick={save} disabled={saving || (type === "commande" && (!montant || parseFloat(montant) <= 0))}
                 className="flex-1 py-3 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40 text-black font-bold text-sm flex items-center justify-center gap-2">
-                {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={14}/> {commande ? "Mettre à jour" : type === "relance" ? "Valider la relance" : "Valider"}</>}
+                {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={14}/> {commande ? "Mettre à jour" : type === "relance" ? "Valider la relance" : type === "absence" ? "Enregistrer" : "Valider"}</>}
               </button>
               {commande && (
                 <button onClick={() => setEditMode(false)}
@@ -906,7 +946,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                           <div className="flex gap-0.5 mt-1">
                             {Array.from({ length: 12 }).map((_, i) => {
                               const cmd = getCmd(sc.client_id, i + 1)
-                              const pColor = cmd?.type === "relance" ? "#06b6d4" : cmd?.statut_paiement === "valide" ? "#22c55e" : cmd?.statut_paiement === "relance" ? "#3b82f6" : cmd ? "#eab308" : year === NOW_YEAR && i + 1 === NOW_MONTH ? "#eab30830" : "#27272a"
+                              const pColor = cmd?.type === "relance" ? "#06b6d4" : cmd?.type === "absence" ? "#71717a" : cmd?.statut_paiement === "valide" ? "#22c55e" : cmd?.statut_paiement === "relance" ? "#3b82f6" : cmd ? "#eab308" : year === NOW_YEAR && i + 1 === NOW_MONTH ? "#eab30830" : "#27272a"
                               return <div key={i} className="w-2 h-1 rounded-full" style={{ backgroundColor: pColor }}/>
                             })}
                           </div>
@@ -922,6 +962,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                       const isActive  = panel?.client.client_id === sc.client_id && panel?.mois === moisNum
                       let cellBg = "rgba(39,39,42,0.2)"; let cellBorder = "rgba(63,63,70,0.3)"
                       if (cmd?.type === "relance") { cellBg = "rgba(6,182,212,0.12)"; cellBorder = "rgba(6,182,212,0.4)" }
+                      else if (cmd?.type === "absence") { cellBg = "rgba(113,113,122,0.1)"; cellBorder = "rgba(113,113,122,0.35)" }
                       else if (cmd) {
                         const p = (cmd.statut_paiement || "attente") as keyof typeof PAIEMENT
                         cellBg = PAIEMENT[p]?.bg || cellBg; cellBorder = PAIEMENT[p]?.border || cellBorder
@@ -945,6 +986,16 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                                 <p className="text-[9px] font-bold leading-none text-cyan-400">Relancé</p>
                                 {cmd.date_commande && (
                                   <p className="text-[8px] leading-none opacity-70 text-cyan-400">
+                                    {new Date(cmd.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short" })}
+                                  </p>
+                                )}
+                              </>
+                            ) : cmd?.type === "absence" ? (
+                              <>
+                                <X size={14} className="text-zinc-400"/>
+                                <p className="text-[9px] font-bold leading-none text-zinc-400">Pas ce mois</p>
+                                {cmd.date_commande && (
+                                  <p className="text-[8px] leading-none opacity-70 text-zinc-400">
                                     {new Date(cmd.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short" })}
                                   </p>
                                 )}
@@ -1003,7 +1054,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           </table>
 
           <div className="flex items-center gap-4 px-4 py-2.5 border-t border-zinc-900/60 flex-wrap">
-            {[{ color: "#eab308", label: "En attente" }, { color: "#22c55e", label: "Validé" }, { color: "#3b82f6", label: "Paiement relancé" }, { color: "#06b6d4", label: "Relance commerciale" }].map(({ color, label }) => (
+            {[{ color: "#eab308", label: "En attente" }, { color: "#22c55e", label: "Validé" }, { color: "#3b82f6", label: "Paiement relancé" }, { color: "#06b6d4", label: "Relance commerciale" }, { color: "#71717a", label: "Ne commandera pas" }].map(({ color, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}/><span className="text-zinc-600 text-[10px]">{label}</span>
               </div>
