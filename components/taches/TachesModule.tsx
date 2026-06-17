@@ -3,20 +3,28 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import {
-  Plus, X, Search, Check, Trash2, Clock, CheckCircle2,
-  Circle, List, LayoutGrid, ChevronLeft, ChevronRight,
+  Plus, X, Search, Check, Trash2, Clock, CheckCircle2, Circle,
+  List, LayoutGrid, CalendarDays, ChevronLeft, ChevronRight,
+  Repeat, MessageSquare, ListChecks, Ban, Send, RotateCcw,
 } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
+
+interface SousTache { id: string; label: string; done: boolean }
 
 interface Tache {
   id: string
   titre: string
   description?: string | null
   priorite: "basse" | "normale" | "haute" | "urgente"
-  statut: "a_faire" | "en_cours" | "termine"
+  statut: "a_faire" | "en_cours" | "termine" | "annulee"
+  date_debut?: string | null
   echeance?: string | null
+  heure_echeance?: string | null
   categorie?: string | null
+  couleur?: string | null
+  recurrence?: "aucune" | "quotidienne" | "hebdomadaire" | "mensuelle" | null
+  sous_taches?: SousTache[] | null
   assigne_id?: string | null
   created_by?: string | null
   completed_at?: string | null
@@ -24,6 +32,7 @@ interface Tache {
 }
 
 interface Membre { id: string; nom: string; avatar_url?: string; color?: string }
+interface Commentaire { id: string; auteur_id: string; auteur_nom: string; contenu: string; created_at: string }
 
 const PRIORITE: Record<Tache["priorite"], { label: string; color: string; bg: string; border: string; order: number }> = {
   basse:   { label: "Basse",   color: "#71717a", bg: "rgba(113,113,122,0.12)", border: "rgba(113,113,122,0.35)", order: 0 },
@@ -36,8 +45,15 @@ const STATUTS: { key: Tache["statut"]; label: string; color: string }[] = [
   { key: "a_faire",  label: "À faire",  color: "#a1a1aa" },
   { key: "en_cours", label: "En cours", color: "#eab308" },
   { key: "termine",  label: "Terminé",  color: "#22c55e" },
+  { key: "annulee",  label: "Annulée",  color: "#52525b" },
 ]
 const STATUT_CYCLE: Tache["statut"][] = ["a_faire", "en_cours", "termine"]
+
+const RECURRENCE: Record<string, string> = {
+  aucune: "Ne se répète pas", quotidienne: "Tous les jours", hebdomadaire: "Toutes les semaines", mensuelle: "Tous les mois",
+}
+
+const COULEURS = ["#eab308", "#ef4444", "#3b82f6", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#06b6d4"]
 
 const TODAY = new Date()
 const todayStr = () => TODAY.toISOString().slice(0, 10)
@@ -45,7 +61,7 @@ const daysDiff = (dateStr: string) => Math.floor((TODAY.getTime() - new Date(dat
 
 const echeanceInfo = (echeance: string | null | undefined, statut: Tache["statut"]) => {
   if (!echeance) return null
-  if (statut === "termine") return { label: new Date(echeance + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), color: "#52525b" }
+  if (statut === "termine" || statut === "annulee") return { label: new Date(echeance + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), color: "#52525b" }
   const diff = daysDiff(echeance)
   if (diff > 0)  return { label: `Retard ${diff}j`, color: "#ef4444" }
   if (diff === 0) return { label: "Aujourd'hui", color: "#f97316" }
@@ -53,61 +69,141 @@ const echeanceInfo = (echeance: string | null | undefined, statut: Tache["statut
   return { label: new Date(echeance + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), color: "#71717a" }
 }
 
-const initials = (nom?: string) => nom?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"
+const nextEcheance = (dateStr: string, recurrence: string) => {
+  const d = new Date(dateStr + "T00:00:00")
+  if (recurrence === "quotidienne") d.setDate(d.getDate() + 1)
+  else if (recurrence === "hebdomadaire") d.setDate(d.getDate() + 7)
+  else if (recurrence === "mensuelle") d.setMonth(d.getMonth() + 1)
+  else return null
+  return d.toISOString().slice(0, 10)
+}
 
-/* ── Panel création / édition ── */
-function TachePanel({ tache, membres, societyId, createdBy, onClose, onSaved }: {
-  tache: Tache | null; membres: Membre[]; societyId: string; createdBy: string
+const initials = (nom?: string) => nom?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "?"
+const relTime = (iso: string) => {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (diff < 1) return "à l'instant"
+  if (diff < 60) return `il y a ${diff}min`
+  if (diff < 1440) return `il y a ${Math.floor(diff / 60)}h`
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+}
+
+/* ── Panel création / édition — complet ── */
+function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
+  tache: Tache | null; membres: Membre[]; societyId: string; profile: any
   onClose: () => void; onSaved: () => void
 }) {
   const [titre, setTitre]             = useState(tache?.titre || "")
   const [description, setDescription] = useState(tache?.description || "")
   const [priorite, setPriorite]       = useState<Tache["priorite"]>(tache?.priorite || "normale")
   const [statut, setStatut]           = useState<Tache["statut"]>(tache?.statut || "a_faire")
+  const [dateDebut, setDateDebut]     = useState(tache?.date_debut || "")
   const [echeance, setEcheance]       = useState(tache?.echeance || "")
+  const [heureEcheance, setHeureEcheance] = useState(tache?.heure_echeance || "")
   const [categorie, setCategorie]     = useState(tache?.categorie || "")
+  const [couleur, setCouleur]         = useState<string | null>(tache?.couleur || null)
+  const [recurrence, setRecurrence]   = useState(tache?.recurrence || "aucune")
   const [assigneId, setAssigneId]     = useState(tache?.assigne_id || "")
+  const [sousTaches, setSousTaches]   = useState<SousTache[]>(tache?.sous_taches || [])
+  const [nouvelleSousTache, setNouvelleSousTache] = useState("")
   const [saving, setSaving]           = useState(false)
+  const [comments, setComments]       = useState<Commentaire[]>([])
+  const [newComment, setNewComment]   = useState("")
+  const [postingComment, setPostingComment] = useState(false)
   const titreRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (!tache) setTimeout(() => titreRef.current?.focus(), 100) }, [])
+
+  useEffect(() => {
+    if (!tache?.id) return
+    supabase.from("taches_commentaires").select("*").eq("tache_id", tache.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => setComments(data || []))
+  }, [tache?.id])
+
+  const addSousTache = () => {
+    if (!nouvelleSousTache.trim()) return
+    setSousTaches(prev => [...prev, { id: Math.random().toString(36).slice(2), label: nouvelleSousTache.trim(), done: false }])
+    setNouvelleSousTache("")
+  }
+  const toggleSousTache = (id: string) => setSousTaches(prev => prev.map(s => s.id === id ? { ...s, done: !s.done } : s))
+  const removeSousTache = (id: string) => setSousTaches(prev => prev.filter(s => s.id !== id))
+
+  const postComment = async () => {
+    if (!newComment.trim() || !tache?.id) return
+    setPostingComment(true)
+    const payload = {
+      tache_id: tache.id, society_id: societyId, auteur_id: profile?.id || null,
+      auteur_nom: profile?.nom || "?", contenu: newComment.trim(),
+    }
+    const { data } = await supabase.from("taches_commentaires").insert(payload).select().single()
+    if (data) setComments(prev => [...prev, data])
+    setNewComment(""); setPostingComment(false)
+  }
 
   const save = async () => {
     if (!titre.trim()) return
     setSaving(true)
     const payload: any = {
       society_id: societyId, titre: titre.trim(), description: description || null,
-      priorite, statut, echeance: echeance || null, categorie: categorie || null,
-      assigne_id: assigneId || null,
+      priorite, statut, date_debut: dateDebut || null, echeance: echeance || null,
+      heure_echeance: heureEcheance || null, categorie: categorie || null,
+      couleur: couleur || null, recurrence, assigne_id: assigneId || null,
+      sous_taches: sousTaches,
     }
-    if (statut === "termine" && tache?.statut !== "termine") payload.completed_at = new Date().toISOString()
+    const wasTermine = tache?.statut === "termine"
+    if (statut === "termine" && !wasTermine) payload.completed_at = new Date().toISOString()
     if (statut !== "termine") payload.completed_at = null
+
     if (tache?.id) {
       await supabase.from("taches").update(payload).eq("id", tache.id)
     } else {
-      payload.created_by = createdBy
+      payload.created_by = profile?.id || null
       await supabase.from("taches").insert(payload)
+    }
+
+    // Récurrence : si on vient de terminer une tâche récurrente, on crée la prochaine occurrence
+    if (statut === "termine" && !wasTermine && recurrence !== "aucune" && echeance) {
+      const next = nextEcheance(echeance, recurrence)
+      if (next) {
+        await supabase.from("taches").insert({
+          society_id: societyId, titre: titre.trim(), description: description || null,
+          priorite, statut: "a_faire", date_debut: null, echeance: next,
+          heure_echeance: heureEcheance || null, categorie: categorie || null,
+          couleur: couleur || null, recurrence, assigne_id: assigneId || null,
+          sous_taches: sousTaches.map(s => ({ ...s, done: false })),
+          created_by: profile?.id || null,
+        })
+      }
     }
     setSaving(false); onSaved(); onClose()
   }
 
   const deleteTache = async () => {
-    if (!tache?.id || !confirm("Supprimer cette tâche ?")) return
+    if (!tache?.id || !confirm("Supprimer définitivement cette tâche ?")) return
+    await supabase.from("taches_commentaires").delete().eq("tache_id", tache.id)
     await supabase.from("taches").delete().eq("id", tache.id)
     onSaved(); onClose()
   }
 
+  const doneCount = sousTaches.filter(s => s.done).length
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
-      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
-        <div className="px-5 py-4 border-b border-zinc-800 shrink-0 flex items-start justify-between">
+      <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-md h-full flex flex-col shadow-2xl">
+        <div className="px-5 py-4 border-b border-zinc-800 shrink-0 flex items-start justify-between"
+          style={couleur ? { background: `linear-gradient(135deg, ${couleur}15, transparent)` } : {}}>
           <div>
             <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider mb-0.5">
               {tache ? "Modifier la tâche" : "Nouvelle tâche"}
             </p>
             <h2 className="text-white font-bold text-base">{tache ? "Détails" : "Créer une tâche"}</h2>
+            {tache?.created_by && (
+              <p className="text-zinc-600 text-[10px] mt-0.5">
+                Créée par {membres.find(m => m.id === tache.created_by)?.nom || "?"} · {new Date(tache.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+              </p>
+            )}
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16}/></button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white shrink-0"><X size={16}/></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -150,7 +246,7 @@ function TachePanel({ tache, membres, societyId, createdBy, onClose, onSaved }: 
           {tache && (
             <div>
               <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">Statut</label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
                 {STATUTS.map(s => {
                   const isActive = statut === s.key
                   return (
@@ -161,7 +257,8 @@ function TachePanel({ tache, membres, societyId, createdBy, onClose, onSaved }: 
                         borderColor: isActive ? s.color + "50" : "rgba(63,63,70,0.5)",
                         color: isActive ? s.color : "#52525b",
                       }}>
-                      <span className="text-[10px]">{s.label}</span>
+                      {s.key === "annulee" ? <Ban size={11}/> : <span className="text-[10px]">{s.label}</span>}
+                      {s.key === "annulee" && <span className="text-[9px]">{s.label}</span>}
                     </button>
                   )
                 })}
@@ -169,10 +266,32 @@ function TachePanel({ tache, membres, societyId, createdBy, onClose, onSaved }: 
             </div>
           )}
 
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5">Échéance</label>
-            <input type="date" value={echeance} onChange={e => setEcheance(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5">Début</label>
+              <input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"/>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5">Échéance</label>
+              <input type="date" value={echeance} onChange={e => setEcheance(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"/>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5">Heure (optionnel)</label>
+              <input type="time" value={heureEcheance} onChange={e => setHeureEcheance(e.target.value)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none"/>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Repeat size={10}/> Récurrence</label>
+              <select value={recurrence} onChange={e => setRecurrence(e.target.value as any)}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2.5 text-xs text-white focus:outline-none">
+                {Object.entries(RECURRENCE).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -190,6 +309,84 @@ function TachePanel({ tache, membres, societyId, createdBy, onClose, onSaved }: 
               placeholder="Ex: VaatiMod, CRM, Prospection..."
               className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
           </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5">Couleur (perso)</label>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button onClick={() => setCouleur(null)}
+                className="w-7 h-7 rounded-full border-2 flex items-center justify-center"
+                style={{ borderColor: !couleur ? "#fff" : "#3f3f46" }}>
+                <X size={11} className="text-zinc-500"/>
+              </button>
+              {COULEURS.map(c => (
+                <button key={c} onClick={() => setCouleur(c)}
+                  className="w-7 h-7 rounded-full border-2 transition-transform"
+                  style={{ backgroundColor: c, borderColor: couleur === c ? "#fff" : "transparent", transform: couleur === c ? "scale(1.1)" : "scale(1)" }}/>
+              ))}
+            </div>
+          </div>
+
+          {/* Sous-tâches */}
+          <div>
+            <label className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">
+              <ListChecks size={11}/> Sous-tâches {sousTaches.length > 0 && <span className="text-zinc-500">({doneCount}/{sousTaches.length})</span>}
+            </label>
+            {sousTaches.length > 0 && (
+              <div className="h-1 rounded-full bg-zinc-800 overflow-hidden mb-2">
+                <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${sousTaches.length ? (doneCount / sousTaches.length) * 100 : 0}%` }}/>
+              </div>
+            )}
+            <div className="space-y-1.5 mb-2">
+              {sousTaches.map(s => (
+                <div key={s.id} className="flex items-center gap-2 bg-zinc-800/60 rounded-lg px-2.5 py-2">
+                  <button onClick={() => toggleSousTache(s.id)} className="shrink-0">
+                    {s.done ? <CheckCircle2 size={15} className="text-green-500"/> : <Circle size={15} className="text-zinc-600"/>}
+                  </button>
+                  <span className={`flex-1 text-xs ${s.done ? "text-zinc-500 line-through" : "text-zinc-200"}`}>{s.label}</span>
+                  <button onClick={() => removeSousTache(s.id)} className="text-zinc-600 hover:text-red-400 shrink-0"><X size={12}/></button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              <input type="text" value={nouvelleSousTache} onChange={e => setNouvelleSousTache(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addSousTache()}
+                placeholder="Ajouter une sous-tâche..."
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none"/>
+              <button onClick={addSousTache} className="w-8 h-8 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center text-white shrink-0"><Plus size={14}/></button>
+            </div>
+          </div>
+
+          {/* Commentaires — visible seulement sur une tâche existante */}
+          {tache?.id && (
+            <div>
+              <label className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">
+                <MessageSquare size={11}/> Commentaires {comments.length > 0 && `(${comments.length})`}
+              </label>
+              <div className="space-y-2 mb-2 max-h-48 overflow-y-auto">
+                {comments.length === 0 ? (
+                  <p className="text-zinc-700 text-xs text-center py-3">Aucun commentaire pour l'instant</p>
+                ) : comments.map(c => (
+                  <div key={c.id} className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-zinc-300 text-xs font-bold">{c.auteur_nom}</span>
+                      <span className="text-zinc-600 text-[10px]">{relTime(c.created_at)}</span>
+                    </div>
+                    <p className="text-zinc-400 text-xs whitespace-pre-wrap">{c.contenu}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <input type="text" value={newComment} onChange={e => setNewComment(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && postComment()}
+                  placeholder="Ajouter un commentaire..."
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none"/>
+                <button onClick={postComment} disabled={postingComment || !newComment.trim()}
+                  className="w-8 h-8 rounded-lg bg-yellow-500 hover:bg-yellow-400 disabled:opacity-40 flex items-center justify-center text-black shrink-0">
+                  {postingComment ? <div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <Send size={13}/>}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-zinc-800 space-y-2 shrink-0">
@@ -216,21 +413,27 @@ function TacheRow({ tache, membre, onOpen, onCycleStatut }: {
   const ech = echeanceInfo(tache.echeance, tache.statut)
   const prio = PRIORITE[tache.priorite] || PRIORITE.normale
   const isDone = tache.statut === "termine"
+  const isCancelled = tache.statut === "annulee"
+  const sousTaches = tache.sous_taches || []
+  const doneCount = sousTaches.filter(s => s.done).length
   return (
     <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl px-3 py-3 transition-colors group"
-      style={{ opacity: isDone ? 0.55 : 1 }}>
-      <button onClick={onCycleStatut} className="shrink-0">
-        {tache.statut === "termine" ? <CheckCircle2 size={20} className="text-green-500"/> :
+      style={{ opacity: isDone || isCancelled ? 0.5 : 1, borderLeft: tache.couleur ? `3px solid ${tache.couleur}` : undefined }}>
+      <button onClick={onCycleStatut} className="shrink-0" disabled={isCancelled}>
+        {isCancelled ? <Ban size={20} className="text-zinc-600"/> :
+         tache.statut === "termine" ? <CheckCircle2 size={20} className="text-green-500"/> :
          tache.statut === "en_cours" ? <Clock size={20} className="text-yellow-500"/> :
          <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400"/>}
       </button>
       <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-        <p className={`text-white text-sm font-semibold truncate ${isDone ? "line-through text-zinc-500" : ""}`}>{tache.titre}</p>
+        <p className={`text-white text-sm font-semibold truncate ${isDone || isCancelled ? "line-through text-zinc-500" : ""}`}>{tache.titre}</p>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: prio.bg, color: prio.color }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: prio.color }}/>{prio.label}
           </span>
-          {ech && <span className="text-[10px] font-semibold" style={{ color: ech.color }}>📅 {ech.label}</span>}
+          {ech && <span className="text-[10px] font-semibold" style={{ color: ech.color }}>📅 {ech.label}{tache.heure_echeance ? ` à ${tache.heure_echeance.slice(0,5)}` : ""}</span>}
+          {tache.recurrence && tache.recurrence !== "aucune" && <Repeat size={10} className="text-zinc-500"/>}
+          {sousTaches.length > 0 && <span className="text-[10px] text-zinc-500">☑ {doneCount}/{sousTaches.length}</span>}
           {tache.categorie && <span className="text-[10px] text-zinc-500">🏷️ {tache.categorie}</span>}
         </div>
       </button>
@@ -251,13 +454,17 @@ function TacheCard({ tache, membre, onOpen, onMove }: {
   const ech = echeanceInfo(tache.echeance, tache.statut)
   const prio = PRIORITE[tache.priorite] || PRIORITE.normale
   const idx = Math.max(0, STATUT_CYCLE.indexOf(tache.statut))
+  const sousTaches = tache.sous_taches || []
+  const doneCount = sousTaches.filter(s => s.done).length
   return (
     <div className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-3 transition-colors group"
-      style={{ borderLeft: `3px solid ${prio.color}` }}>
+      style={{ borderLeft: `3px solid ${tache.couleur || prio.color}` }}>
       <button onClick={onOpen} className="w-full text-left">
         <p className="text-white text-sm font-semibold leading-snug mb-1.5">{tache.titre}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
           {ech && <span className="text-[10px] font-semibold" style={{ color: ech.color }}>📅 {ech.label}</span>}
+          {tache.recurrence && tache.recurrence !== "aucune" && <Repeat size={10} className="text-zinc-500"/>}
+          {sousTaches.length > 0 && <span className="text-[10px] text-zinc-500">☑ {doneCount}/{sousTaches.length}</span>}
           {tache.categorie && <span className="text-[10px] text-zinc-500">🏷️ {tache.categorie}</span>}
         </div>
       </button>
@@ -279,6 +486,29 @@ function TacheCard({ tache, membre, onOpen, onMove }: {
   )
 }
 
+/* ── Groupe vue Échéancier ── */
+function EcheancierGroup({ title, color, taches, membres, onOpen, onCycleStatut }: {
+  title: string; color: string; taches: Tache[]; membres: Membre[]
+  onOpen: (t: Tache) => void; onCycleStatut: (t: Tache) => void
+}) {
+  if (taches.length === 0) return null
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}/>
+        <p className="text-xs font-bold uppercase tracking-wider" style={{ color }}>{title}</p>
+        <span className="text-zinc-600 text-[10px] font-bold">{taches.length}</span>
+      </div>
+      <div className="space-y-2">
+        {taches.map(t => (
+          <TacheRow key={t.id} tache={t} membre={membres.find(m => m.id === t.assigne_id)}
+            onOpen={() => onOpen(t)} onCycleStatut={() => onCycleStatut(t)}/>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════
    MAIN MODULE
 ══════════════════════════════════════════════ */
@@ -286,11 +516,12 @@ export default function TachesModule({ activeSociety, profile }: Props) {
   const [taches, setTaches]   = useState<Tache[]>([])
   const [membres, setMembres] = useState<Membre[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView]       = useState<"liste" | "kanban">("liste")
+  const [view, setView]       = useState<"liste" | "kanban" | "echeancier">("echeancier")
   const [search, setSearch]   = useState("")
   const [filterStatut, setFilterStatut]   = useState<"toutes" | Tache["statut"]>("toutes")
   const [filterAssigne, setFilterAssigne] = useState<"tous" | "moi" | string>("tous")
   const [panelTache, setPanelTache] = useState<Tache | null | undefined>(undefined) // undefined = closed
+  const [showTerminees, setShowTerminees] = useState(false)
 
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
@@ -309,15 +540,30 @@ export default function TachesModule({ activeSociety, profile }: Props) {
   const getMembre = (id?: string | null) => membres.find(m => m.id === id)
 
   const cycleStatut = async (tache: Tache) => {
-    const idx = STATUT_CYCLE.indexOf(tache.statut)
+    if (tache.statut === "annulee") return
+    const idx = Math.max(0, STATUT_CYCLE.indexOf(tache.statut))
     const next = STATUT_CYCLE[(idx + 1) % STATUT_CYCLE.length]
     const payload: any = { statut: next, completed_at: next === "termine" ? new Date().toISOString() : null }
     await supabase.from("taches").update(payload).eq("id", tache.id)
     setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, ...payload } : t))
+    if (next === "termine" && tache.recurrence && tache.recurrence !== "aucune" && tache.echeance) {
+      const nextDate = nextEcheance(tache.echeance, tache.recurrence)
+      if (nextDate) {
+        await supabase.from("taches").insert({
+          society_id: activeSociety.id, titre: tache.titre, description: tache.description || null,
+          priorite: tache.priorite, statut: "a_faire", echeance: nextDate,
+          heure_echeance: tache.heure_echeance || null, categorie: tache.categorie || null,
+          couleur: tache.couleur || null, recurrence: tache.recurrence, assigne_id: tache.assigne_id || null,
+          sous_taches: (tache.sous_taches || []).map(s => ({ ...s, done: false })),
+          created_by: tache.created_by || null,
+        })
+        load()
+      }
+    }
   }
 
   const moveStatut = async (tache: Tache, dir: 1 | -1) => {
-    const idx = STATUT_CYCLE.indexOf(tache.statut)
+    const idx = Math.max(0, STATUT_CYCLE.indexOf(tache.statut))
     const nextIdx = idx + dir
     if (nextIdx < 0 || nextIdx >= STATUT_CYCLE.length) return
     const next = STATUT_CYCLE[nextIdx]
@@ -348,10 +594,23 @@ export default function TachesModule({ activeSociety, profile }: Props) {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
-  const actives     = taches.filter(t => t.statut !== "termine")
-  const urgentes    = actives.filter(t => t.priorite === "urgente").length
-  const enRetard    = actives.filter(t => t.echeance && t.echeance < todayStr()).length
+  const actives      = taches.filter(t => t.statut !== "termine" && t.statut !== "annulee")
+  const urgentes     = actives.filter(t => t.priorite === "urgente").length
+  const enRetard     = actives.filter(t => t.echeance && t.echeance < todayStr()).length
+  const aujourdhui   = actives.filter(t => t.echeance === todayStr()).length
   const termineesAuj = taches.filter(t => t.statut === "termine" && t.completed_at && t.completed_at.slice(0, 10) === todayStr()).length
+
+  // Groupes pour la vue Échéancier
+  const nonTerminees = sorted.filter(t => t.statut !== "termine" && t.statut !== "annulee")
+  const grpRetard     = nonTerminees.filter(t => t.echeance && t.echeance < todayStr())
+  const grpAujourdhui = nonTerminees.filter(t => t.echeance === todayStr())
+  const demainStr = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) })()
+  const grpDemain     = nonTerminees.filter(t => t.echeance === demainStr)
+  const semaineLimite = (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().slice(0, 10) })()
+  const grpSemaine    = nonTerminees.filter(t => t.echeance && t.echeance > demainStr && t.echeance <= semaineLimite)
+  const grpPlusTard   = nonTerminees.filter(t => t.echeance && t.echeance > semaineLimite)
+  const grpSansEcheance = nonTerminees.filter(t => !t.echeance)
+  const grpTermineesAnnulees = sorted.filter(t => t.statut === "termine" || t.statut === "annulee")
 
   return (
     <div className="flex-1 overflow-hidden bg-[#0a0a0a] flex flex-col">
@@ -359,16 +618,21 @@ export default function TachesModule({ activeSociety, profile }: Props) {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-white font-bold text-xl">✅ Liste des tâches</h1>
-            <p className="text-zinc-500 text-xs mt-0.5">{actives.length} active{actives.length > 1 ? "s" : ""} · {taches.length} au total</p>
+            <p className="text-zinc-500 text-xs mt-0.5">{actives.length} active{actives.length > 1 ? "s" : ""} · {taches.length} au total · partagée avec l'équipe</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-              <button onClick={() => setView("liste")}
+              <button onClick={() => setView("echeancier")} title="Échéancier"
+                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                style={{ backgroundColor: view === "echeancier" ? "#eab30820" : "transparent", color: view === "echeancier" ? "#eab308" : "#71717a" }}>
+                <CalendarDays size={15}/>
+              </button>
+              <button onClick={() => setView("liste")} title="Liste"
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
                 style={{ backgroundColor: view === "liste" ? "#eab30820" : "transparent", color: view === "liste" ? "#eab308" : "#71717a" }}>
                 <List size={15}/>
               </button>
-              <button onClick={() => setView("kanban")}
+              <button onClick={() => setView("kanban")} title="Kanban"
                 className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
                 style={{ backgroundColor: view === "kanban" ? "#eab30820" : "transparent", color: view === "kanban" ? "#eab308" : "#71717a" }}>
                 <LayoutGrid size={15}/>
@@ -383,10 +647,11 @@ export default function TachesModule({ activeSociety, profile }: Props) {
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[
-            { label: "Actives",   value: String(actives.length),       color: "text-zinc-300" },
-            { label: "Urgentes",  value: String(urgentes),             color: urgentes > 0 ? "text-red-400" : "text-zinc-500" },
-            { label: "En retard", value: String(enRetard),             color: enRetard > 0 ? "text-orange-400" : "text-zinc-500" },
-            { label: "Terminées aujourd'hui", value: String(termineesAuj), color: "text-green-400" },
+            { label: "Actives",             value: String(actives.length),       color: "text-zinc-300" },
+            { label: "Aujourd'hui",         value: String(aujourdhui),           color: aujourdhui > 0 ? "text-orange-400" : "text-zinc-500" },
+            { label: "Urgentes",            value: String(urgentes),             color: urgentes > 0 ? "text-red-400" : "text-zinc-500" },
+            { label: "En retard",           value: String(enRetard),             color: enRetard > 0 ? "text-red-400" : "text-zinc-500" },
+            { label: "Terminées aujourd'hui", value: String(termineesAuj),        color: "text-green-400" },
           ].map(({ label, value, color }) => (
             <div key={label} className="shrink-0 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 flex items-center gap-2">
               <p className={`text-sm font-black ${color}`}>{value}</p>
@@ -422,9 +687,32 @@ export default function TachesModule({ activeSociety, profile }: Props) {
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
           <div className="text-6xl mb-4">✅</div>
           <p className="text-white text-lg font-bold mb-2">{taches.length === 0 ? "Aucune tâche pour le moment" : "Aucun résultat"}</p>
-          <p className="text-zinc-500 text-sm mb-6">{taches.length === 0 ? "Crée ta première tâche pour t'organiser" : "Essaie d'autres filtres"}</p>
+          <p className="text-zinc-500 text-sm mb-6">{taches.length === 0 ? "Crée la première tâche pour toi et ton équipe" : "Essaie d'autres filtres"}</p>
           {taches.length === 0 && (
             <button onClick={() => setPanelTache(null)} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-5 py-3 rounded-xl text-sm"><Plus size={15}/> Nouvelle tâche</button>
+          )}
+        </div>
+      ) : view === "echeancier" ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <EcheancierGroup title="En retard" color="#ef4444" taches={grpRetard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="Aujourd'hui" color="#f97316" taches={grpAujourdhui} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="Demain" color="#eab308" taches={grpDemain} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="Cette semaine" color="#3b82f6" taches={grpSemaine} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="Plus tard" color="#71717a" taches={grpPlusTard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="Sans échéance" color="#52525b" taches={grpSansEcheance} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          {grpTermineesAnnulees.length > 0 && (
+            <div className="mt-2">
+              <button onClick={() => setShowTerminees(p => !p)} className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">
+                <RotateCcw size={11}/> {showTerminees ? "Masquer" : "Voir"} terminées / annulées ({grpTermineesAnnulees.length})
+              </button>
+              {showTerminees && (
+                <div className="space-y-2">
+                  {grpTermineesAnnulees.map(t => (
+                    <TacheRow key={t.id} tache={t} membre={getMembre(t.assigne_id)} onOpen={() => setPanelTache(t)} onCycleStatut={() => cycleStatut(t)}/>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       ) : view === "liste" ? (
@@ -437,7 +725,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
       ) : (
         <div className="flex-1 overflow-x-auto p-4">
           <div className="flex gap-4 h-full min-w-[700px]">
-            {STATUTS.map(s => {
+            {STATUTS.filter(s => s.key !== "annulee").map(s => {
               const colTaches = sorted.filter(t => t.statut === s.key)
               return (
                 <div key={s.key} className="flex-1 flex flex-col min-w-[220px]">
@@ -462,7 +750,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
       )}
 
       {panelTache !== undefined && (
-        <TachePanel tache={panelTache} membres={membres} societyId={activeSociety.id} createdBy={profile?.id || ""}
+        <TachePanel tache={panelTache} membres={membres} societyId={activeSociety.id} profile={profile}
           onClose={() => setPanelTache(undefined)} onSaved={load}/>
       )}
     </div>

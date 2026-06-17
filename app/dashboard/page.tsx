@@ -254,9 +254,12 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: { taches: any[]; on
     return () => clearInterval(timer)
   }, [])
   const todayStr = new Date().toISOString().slice(0, 10)
-  const urgentes = taches.filter((t: any) => t.priorite === "urgente").length
-  const enRetard = taches.filter((t: any) => t.echeance && t.echeance < todayStr).length
-  const isCritical = urgentes > 0
+  const urgentes   = taches.filter((t: any) => t.priorite === "urgente" && t.echeance !== todayStr).length
+  const aujourdhui = taches.filter((t: any) => t.echeance === todayStr).length
+  const enRetard   = taches.filter((t: any) => t.echeance && t.echeance < todayStr).length
+  const isCritical = urgentes > 0 || aujourdhui > 0
+  const badge = (t: any) => t.echeance === todayStr ? "Aujourd'hui" : t.priorite === "urgente" ? "Urgent" : "Retard"
+  const badgeColor = (t: any) => t.echeance === todayStr ? "bg-orange-500/20 text-orange-400" : t.priorite === "urgente" ? "bg-red-500/20 text-red-400" : "bg-zinc-700/40 text-zinc-400"
   return (
     <div className="fixed top-6 right-6 z-[100] w-80">
       <div className={`bg-[#18181b] border rounded-2xl shadow-2xl overflow-hidden ${isCritical ? "border-red-500/30" : "border-orange-500/30"}`}>
@@ -267,7 +270,9 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: { taches: any[]; on
             <div>
               <p className="text-white font-bold text-sm">Tâches à traiter</p>
               <p className="text-zinc-400 text-[11px]">
-                {urgentes > 0 && `${urgentes} urgente${urgentes > 1 ? "s" : ""}`}{urgentes > 0 && enRetard > 0 && " · "}{enRetard > 0 && `${enRetard} en retard`}
+                {aujourdhui > 0 && `${aujourdhui} aujourd'hui`}{aujourdhui > 0 && (urgentes > 0 || enRetard > 0) && " · "}
+                {urgentes > 0 && `${urgentes} urgente${urgentes > 1 ? "s" : ""}`}{urgentes > 0 && enRetard > 0 && " · "}
+                {enRetard > 0 && `${enRetard} en retard`}
               </p>
             </div>
           </div>
@@ -277,8 +282,8 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: { taches: any[]; on
           {taches.slice(0, 5).map((t: any, i: number) => (
             <div key={i} className="flex items-center justify-between gap-2">
               <span className="text-zinc-300 text-xs truncate flex-1">{t.titre}</span>
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${t.priorite === "urgente" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"}`}>
-                {t.priorite === "urgente" ? "Urgent" : "Retard"}
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${badgeColor(t)}`}>
+                {badge(t)}
               </span>
             </div>
           ))}
@@ -394,11 +399,11 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
       })
     supabase.from("taches").select("id,titre,priorite,statut,echeance,assigne_id").eq("society_id", activeSociety.id)
-      .neq("statut", "termine")
+      .not("statut", "in", "(termine,annulee)")
       .then(({ data }) => {
         const todayStr = new Date().toISOString().slice(0, 10)
         const relevant = (data || []).filter((t: any) =>
-          (t.priorite === "urgente" || (t.echeance && t.echeance < todayStr)) &&
+          (t.priorite === "urgente" || t.echeance === todayStr || (t.echeance && t.echeance < todayStr)) &&
           (!t.assigne_id || t.assigne_id === profile?.id)
         )
         if (relevant.length > 0) { setTachesAlerts(relevant); setTimeout(() => setShowTachesAlert(true), 4500) }
