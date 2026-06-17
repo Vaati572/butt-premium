@@ -30,6 +30,7 @@ import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
+import MailModule from "@/components/mail/MailModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -76,6 +77,7 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
+    { id: "mail",         label: "Boîte mail",   icon: "📧" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
@@ -324,6 +326,13 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     setOpenTabs(prev => prev.includes(id) ? prev : [...prev, id])
     setActiveTab(id)
   }
+
+  // Ouvre l'onglet indiqué dans l'URL au chargement (ex: retour du flux OAuth Gmail ?tab=mail)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get("tab")
+    if (tab) openTab(tab)
+  }, [])
   const closeTab = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation()
     setOpenTabs(prev => {
@@ -599,6 +608,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "parametres":        return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "agenda":            return <AgendaModule          activeSociety={activeSociety} profile={profile} />
       case "taches":            return <TachesModule          activeSociety={activeSociety} profile={profile} />
+      case "mail":              return <MailModule            activeSociety={activeSociety} profile={profile} />
       case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
