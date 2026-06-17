@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, type MouseEvent } from "react"
 import { supabase } from "@/lib/supabase"
 import {
   Plus, X, Search, Check, Trash2, ChevronLeft, ChevronRight,
@@ -13,6 +13,7 @@ interface Props { activeSociety: any; profile: any }
 interface SuiviClient {
   id: string; client_id: string; client_nom: string
   client_prenom?: string; client_nom_shop?: string; client_contrat?: string
+  derniere_relance?: string | null
 }
 
 interface Commande {
@@ -441,11 +442,21 @@ function AddClientModal({ societyId, existingClientIds, onClose, onDone }: {
 }
 
 /* ── Panel clients inactifs (−25j sans commande) ── */
-function InactifsPanel({ items, onClose, onSelectClient }: {
+function InactifsPanel({ items, onClose, onSelectClient, onRelance }: {
   items: { client: SuiviClient; lastDate: string | null; jours: number | null }[]
   onClose: () => void
   onSelectClient: (client: SuiviClient) => void
+  onRelance: (client: SuiviClient) => Promise<void>
 }) {
+  const [relancingId, setRelancingId] = useState<string | null>(null)
+
+  const handleRelance = async (e: MouseEvent, client: SuiviClient) => {
+    e.stopPropagation()
+    setRelancingId(client.id)
+    await onRelance(client)
+    setRelancingId(null)
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
       <div className="bg-[#111111] border-l border-zinc-800 w-full max-w-sm h-full flex flex-col shadow-2xl">
@@ -472,25 +483,34 @@ function InactifsPanel({ items, onClose, onSelectClient }: {
           ) : items.map(({ client, lastDate, jours }) => {
             const contratColor = CONTRAT_COLORS[client.client_contrat || ""] || ""
             const clientName = client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom
+            const isRelancing = relancingId === client.id
             return (
-              <button key={client.id} onClick={() => onSelectClient(client)}
-                className="w-full flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-red-500/30 rounded-xl px-4 py-3 transition-colors text-left">
-                {contratColor && <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: contratColor }}/>}
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">{clientName}</p>
-                  {client.client_nom_shop && <p className="text-zinc-500 text-[11px] truncate">🏪 {client.client_nom_shop}</p>}
-                  <p className="text-zinc-600 text-[11px] mt-0.5">
-                    {lastDate
-                      ? `Dernière commande : ${new Date(lastDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
-                      : "Aucune commande enregistrée"}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  {jours !== null
-                    ? <p className="text-red-400 text-sm font-black">{jours}j</p>
-                    : <p className="text-red-500 text-[10px] font-bold">Jamais</p>}
-                </div>
-              </button>
+              <div key={client.id}
+                className="w-full bg-zinc-900 border border-zinc-800 hover:border-red-500/30 rounded-xl px-4 py-3 transition-colors">
+                <button onClick={() => onSelectClient(client)} className="w-full flex items-center gap-3 text-left">
+                  {contratColor && <div className="w-1 h-10 rounded-full shrink-0" style={{ backgroundColor: contratColor }}/>}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-semibold truncate">{clientName}</p>
+                    {client.client_nom_shop && <p className="text-zinc-500 text-[11px] truncate">🏪 {client.client_nom_shop}</p>}
+                    <p className="text-zinc-600 text-[11px] mt-0.5">
+                      {lastDate
+                        ? `Dernière commande : ${new Date(lastDate + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`
+                        : "Aucune commande enregistrée"}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {jours !== null
+                      ? <p className="text-red-400 text-sm font-black">{jours}j</p>
+                      : <p className="text-red-500 text-[10px] font-bold">Jamais</p>}
+                  </div>
+                </button>
+                <button onClick={e => handleRelance(e, client)} disabled={isRelancing}
+                  className="w-full mt-2.5 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-500/10 border border-blue-500/25 hover:bg-blue-500/20 disabled:opacity-50 text-blue-300 text-xs font-bold transition-colors">
+                  {isRelancing
+                    ? <div className="w-3 h-3 border-2 border-blue-300 border-t-transparent rounded-full animate-spin"/>
+                    : <><Bell size={11}/> Relancé — ne plus signaler ce mois</>}
+                </button>
+              </div>
             )
           })}
         </div>
@@ -518,7 +538,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     if (!activeSociety?.id) return
     setLoading(true)
     const [{ data: sc }, { data: cmd }, { data: allCmd }] = await Promise.all([
-      supabase.from("suivi_clients").select("id, client_id, clients(nom, prenom, nom_shop, contrat)")
+      supabase.from("suivi_clients").select("id, client_id, derniere_relance, clients(nom, prenom, nom_shop, contrat)")
         .eq("society_id", activeSociety.id).order("created_at"),
       supabase.from("suivi_commandes").select("*").eq("society_id", activeSociety.id).eq("annee", year),
       supabase.from("suivi_commandes").select("client_id, date_commande")
@@ -528,7 +548,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
     setSuiviClients((sc || []).map((s: any) => ({
       id: s.id, client_id: s.client_id, client_nom: s.clients?.nom || "?",
       client_prenom: s.clients?.prenom || "", client_nom_shop: s.clients?.nom_shop || "",
-      client_contrat: s.clients?.contrat || "",
+      client_contrat: s.clients?.contrat || "", derniere_relance: s.derniere_relance || null,
     })))
     setCommandes(cmd || [])
     const lastMap: Record<string, string | null> = {}
@@ -576,20 +596,31 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
   const livraisonsEnCours = commandes.filter(c => c.statut_colis === "en_livraison").length
   const totalParMois    = MOIS_SHORT.map((_, i) => commandes.filter(c => c.mois === i + 1).reduce((s, c) => s + Number(c.montant || 0), 0))
 
-  /* ── Clients sans commande depuis 25j+ (ou jamais commandé) ── */
+  /* ── Clients sans commande depuis 25j+ (ou jamais commandé), hors ceux relancés récemment ── */
   const inactifs = suiviClients
     .map(sc => {
       const lastDate = lastCommandeMap[sc.client_id] || null
       const jours = lastDate ? daysDiff(lastDate) : null
       return { client: sc, lastDate, jours }
     })
-    .filter(x => x.jours === null || x.jours >= 25)
+    .filter(x => {
+      const isInactive = x.jours === null || x.jours >= 25
+      if (!isInactive) return false
+      if (x.client.derniere_relance && daysDiff(x.client.derniere_relance) < 25) return false
+      return true
+    })
     .sort((a, b) => {
       if (a.jours === null && b.jours === null) return 0
       if (a.jours === null) return -1
       if (b.jours === null) return 1
       return b.jours - a.jours
     })
+
+  const relancerClient = async (client: SuiviClient) => {
+    const today = new Date().toISOString().slice(0, 10)
+    await supabase.from("suivi_clients").update({ derniere_relance: today }).eq("id", client.id)
+    setSuiviClients(prev => prev.map(c => c.id === client.id ? { ...c, derniere_relance: today } : c))
+  }
 
   const handleSelectInactif = async (client: SuiviClient) => {
     setShowInactifs(false)
@@ -847,7 +878,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           onClose={() => setLivraisonPopup(false)} onDone={load}/>
       )}
       {showInactifs && (
-        <InactifsPanel items={inactifs} onClose={() => setShowInactifs(false)} onSelectClient={handleSelectInactif}/>
+        <InactifsPanel items={inactifs} onClose={() => setShowInactifs(false)} onSelectClient={handleSelectInactif} onRelance={relancerClient}/>
       )}
     </div>
   )
