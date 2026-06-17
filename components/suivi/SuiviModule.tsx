@@ -123,7 +123,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   onClose: () => void; onDone: () => void
 }) {
   const [editMode, setEditMode] = useState(!commande)
-  const [type, setType]         = useState<"commande" | "relance">((commande?.type as any) || "commande")
+  const [type, setType]         = useState<"commande" | "relance" | "absence">((commande?.type as any) || "commande")
   const [montant, setMontant]   = useState(commande?.montant?.toString() || "")
   const [detail, setDetail]     = useState(commande?.detail || "")
   const [date, setDate]         = useState(commande?.date_commande || `${annee}-${String(mois).padStart(2,"0")}-01`)
