@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
 
   if (!code || !profileId) {
+    console.error("Gmail callback: paramètres manquants", { code: !!code, profileId })
     return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_error=missing_params`)
   }
 
@@ -24,7 +25,8 @@ export async function GET(req: NextRequest) {
     })
     const tokens = await tokenRes.json()
     if (!tokenRes.ok || !tokens.access_token) {
-      return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_error=token_exchange`)
+      console.error("Gmail callback: échec échange token", { status: tokenRes.status, tokens })
+      return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_error=token_exchange&detail=${encodeURIComponent(tokens.error || tokens.error_description || "inconnu")}`)
     }
 
     const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
@@ -49,8 +51,8 @@ export async function GET(req: NextRequest) {
     await supabaseAdmin.from("gmail_tokens").upsert(payload, { onConflict: "profile_id" })
 
     return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_connected=1`)
-  } catch (e) {
+  } catch (e: any) {
     console.error("Gmail OAuth callback error:", e)
-    return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_error=unknown`)
+    return NextResponse.redirect(`${appUrl}/dashboard?tab=mail&mail_error=unknown&detail=${encodeURIComponent(e?.message || "inconnu")}`)
   }
 }

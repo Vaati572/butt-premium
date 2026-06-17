@@ -101,9 +101,13 @@ export default function MailModule({ activeSociety, profile }: Props) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get("mail_connected") || params.get("mail_error")) {
-      if (params.get("mail_error")) setError("La connexion à Gmail a échoué. Réessaie.")
+      if (params.get("mail_error")) {
+        const code = params.get("mail_error")
+        const detail = params.get("detail")
+        setError(`Échec de connexion Gmail (${code}${detail ? " : " + detail : ""})`)
+      }
       const url = new URL(window.location.href)
-      url.searchParams.delete("mail_connected"); url.searchParams.delete("mail_error"); url.searchParams.delete("tab")
+      url.searchParams.delete("mail_connected"); url.searchParams.delete("mail_error"); url.searchParams.delete("detail"); url.searchParams.delete("tab")
       window.history.replaceState({}, "", url.toString())
       checkStatus()
     }
