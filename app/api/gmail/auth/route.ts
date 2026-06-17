@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
     response_type: "code",
     access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account consent",
     scope: [
       "https://www.googleapis.com/auth/gmail.readonly",
       "https://www.googleapis.com/auth/gmail.send",
