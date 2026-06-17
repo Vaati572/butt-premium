@@ -398,7 +398,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         const alerts = (data || []).filter((s: any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
         if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
       })
-    supabase.from("taches").select("id,titre,priorite,statut,echeance,assigne_id").eq("society_id", activeSociety.id)
+    supabase.from("liste_taches").select("id,titre,priorite,statut,echeance,assigne_id").eq("society_id", activeSociety.id)
       .not("statut", "in", "(termine,annulee)")
       .then(({ data }) => {
         const todayStr = new Date().toISOString().slice(0, 10)
