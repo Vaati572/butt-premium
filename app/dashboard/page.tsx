@@ -29,6 +29,7 @@ import IAModule from "@/components/IAModule"
 import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
+import TachesModule from "@/components/taches/TachesModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -60,6 +61,7 @@ const ALL_NAV = [
     { id: "suivi",            label: "Suivi clients",      icon: "📋" },
     { id: "agenda",           label: "Agenda",             icon: "📅" },
     { id: "stocks",           label: "Stock",              icon: "📦" },
+    { id: "taches",           label: "Liste des tâches",   icon: "✅" },
   ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
@@ -245,6 +247,52 @@ function StockAlertPopup({ alerts, onGoToStock, onClose }: { alerts: any[]; onGo
   )
 }
 
+function TachesAlertPopup({ taches, onGoToTaches, onClose }: { taches: any[]; onGoToTaches: () => void; onClose: () => void }) {
+  const [progress, setProgress] = useState(100)
+  useEffect(() => {
+    const timer = setInterval(() => setProgress(p => { if (p <= 0) { clearInterval(timer); onClose(); return 0 } return p - 0.4 }), 50)
+    return () => clearInterval(timer)
+  }, [])
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const urgentes = taches.filter((t: any) => t.priorite === "urgente").length
+  const enRetard = taches.filter((t: any) => t.echeance && t.echeance < todayStr).length
+  const isCritical = urgentes > 0
+  return (
+    <div className="fixed top-6 right-6 z-[100] w-80">
+      <div className={`bg-[#18181b] border rounded-2xl shadow-2xl overflow-hidden ${isCritical ? "border-red-500/30" : "border-orange-500/30"}`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80"
+          style={{ background: isCritical ? "linear-gradient(135deg, #ef444415, transparent)" : "linear-gradient(135deg, #f9731615, transparent)" }}>
+          <div className="flex items-center gap-2.5">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg border ${isCritical ? "bg-red-500/20 border-red-500/30" : "bg-orange-500/20 border-orange-500/30"}`}>✅</div>
+            <div>
+              <p className="text-white font-bold text-sm">Tâches à traiter</p>
+              <p className="text-zinc-400 text-[11px]">
+                {urgentes > 0 && `${urgentes} urgente${urgentes > 1 ? "s" : ""}`}{urgentes > 0 && enRetard > 0 && " · "}{enRetard > 0 && `${enRetard} en retard`}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white text-sm">✕</button>
+        </div>
+        <div className="px-4 py-2.5 max-h-36 overflow-y-auto space-y-1.5">
+          {taches.slice(0, 5).map((t: any, i: number) => (
+            <div key={i} className="flex items-center justify-between gap-2">
+              <span className="text-zinc-300 text-xs truncate flex-1">{t.titre}</span>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${t.priorite === "urgente" ? "bg-red-500/20 text-red-400" : "bg-orange-500/20 text-orange-400"}`}>
+                {t.priorite === "urgente" ? "Urgent" : "Retard"}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="px-4 py-3 border-t border-zinc-800/80 flex gap-2">
+          <button onClick={onGoToTaches} className={`flex-1 py-2 rounded-xl text-black font-bold text-xs ${isCritical ? "bg-red-500 hover:bg-red-400" : "bg-orange-500 hover:bg-orange-400"}`}>Voir les tâches →</button>
+          <button onClick={onClose} className="px-3 py-2 rounded-xl text-zinc-400 font-medium text-xs bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
+        </div>
+        <div className="h-0.5 bg-zinc-800"><div className={`h-full rounded-full ${isCritical ? "bg-red-500" : "bg-orange-500"}`} style={{ width: `${progress}%` }} /></div>
+      </div>
+    </div>
+  )
+}
+
 function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-[#0a0a0a]">
@@ -294,6 +342,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [showUnreadPopup, setShowUnreadPopup] = useState(false)
   const [stockAlerts, setStockAlerts]       = useState<any[]>([])
   const [showStockAlert, setShowStockAlert] = useState(false)
+  const [tachesAlerts, setTachesAlerts]     = useState<any[]>([])
+  const [showTachesAlert, setShowTachesAlert] = useState(false)
   const [globalSearch, setGlobalSearch]     = useState("")
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [globalResults, setGlobalResults]   = useState<any[]>([])
@@ -342,6 +392,16 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       .then(({ data }) => {
         const alerts = (data || []).filter((s: any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
         if (alerts.length > 0) { setStockAlerts(alerts); setTimeout(() => setShowStockAlert(true), 3000) }
+      })
+    supabase.from("taches").select("id,titre,priorite,statut,echeance,assigne_id").eq("society_id", activeSociety.id)
+      .neq("statut", "termine")
+      .then(({ data }) => {
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const relevant = (data || []).filter((t: any) =>
+          (t.priorite === "urgente" || (t.echeance && t.echeance < todayStr)) &&
+          (!t.assigne_id || t.assigne_id === profile?.id)
+        )
+        if (relevant.length > 0) { setTachesAlerts(relevant); setTimeout(() => setShowTachesAlert(true), 4500) }
       })
   }, [activeSociety])
 
@@ -533,6 +593,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "messages":          return <MessagesModule        activeSociety={activeSociety} profile={profile} />
       case "parametres":        return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "agenda":            return <AgendaModule          activeSociety={activeSociety} profile={profile} />
+      case "taches":            return <TachesModule          activeSociety={activeSociety} profile={profile} />
       case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
@@ -554,6 +615,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
   const stockAlertPopup = stockAlerts.length > 0 && showStockAlert && (
     <StockAlertPopup alerts={stockAlerts} onGoToStock={() => { openTab("stocks"); setShowStockAlert(false) }} onClose={() => setShowStockAlert(false)} />
+  )
+  const tachesAlertPopup = tachesAlerts.length > 0 && showTachesAlert && (
+    <TachesAlertPopup taches={tachesAlerts} onGoToTaches={() => { openTab("taches"); setShowTachesAlert(false) }} onClose={() => setShowTachesAlert(false)} />
   )
   const unreadPopup = showUnreadPopup && unreadNotifs.length > 0 && (
     <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
@@ -577,7 +641,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         logout={logout} showConvPopup={showConvPopup}
         setShowConvPopup={setShowConvPopup} activeConvention={activeConvention}
       />
-      {unreadPopup}{stockAlertPopup}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
     </>
   )
 
@@ -980,7 +1044,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </main>
       </div>
 
-      {unreadPopup}{stockAlertPopup}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
     </div>
   )
 }
