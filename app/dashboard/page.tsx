@@ -74,7 +74,6 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
-    { id: "publications", label: "Publications", icon: "📣" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
@@ -524,7 +523,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "pharmacies":        return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
       case "commandes":         return <CommandesModule       activeSociety={activeSociety} profile={profile} />
       case "playlists":         return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
-      case "publications":      return <PublicationModule     activeSociety={activeSociety} profile={profile} />
       case "tournees":          return <TourneesModule        activeSociety={activeSociety} profile={profile}
           onLaunchOnMap={(t: any) => setActiveTournee(t)} onSwitchToMap={() => openTab("map")} />
       case "prospects":         return <ProspectsModule       activeSociety={activeSociety} profile={profile}
