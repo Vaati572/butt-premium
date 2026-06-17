@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { supabase } from "@/lib/supabase"
 import {
-  Plus, X, Search, Check, Trash2, AlertTriangle, Clock, CheckCircle2,
-  Circle, List, LayoutGrid, ChevronLeft, ChevronRight, Tag, Flag, Pencil,
+  Plus, X, Search, Check, Trash2, Clock, CheckCircle2,
+  Circle, List, LayoutGrid, ChevronLeft, ChevronRight,
 } from "lucide-react"
 
 interface Props { activeSociety: any; profile: any }
@@ -214,7 +214,7 @@ function TacheRow({ tache, membre, onOpen, onCycleStatut }: {
   tache: Tache; membre?: Membre; onOpen: () => void; onCycleStatut: () => void
 }) {
   const ech = echeanceInfo(tache.echeance, tache.statut)
-  const prio = PRIORITE[tache.priorite]
+  const prio = PRIORITE[tache.priorite] || PRIORITE.normale
   const isDone = tache.statut === "termine"
   return (
     <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl px-3 py-3 transition-colors group"
@@ -249,8 +249,8 @@ function TacheCard({ tache, membre, onOpen, onMove }: {
   tache: Tache; membre?: Membre; onOpen: () => void; onMove: (dir: 1 | -1) => void
 }) {
   const ech = echeanceInfo(tache.echeance, tache.statut)
-  const prio = PRIORITE[tache.priorite]
-  const idx = STATUT_CYCLE.indexOf(tache.statut)
+  const prio = PRIORITE[tache.priorite] || PRIORITE.normale
+  const idx = Math.max(0, STATUT_CYCLE.indexOf(tache.statut))
   return (
     <div className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl p-3 transition-colors group"
       style={{ borderLeft: `3px solid ${prio.color}` }}>
@@ -340,7 +340,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
   const sorted = [...filtered].sort((a, b) => {
     if (a.statut === "termine" && b.statut !== "termine") return 1
     if (b.statut === "termine" && a.statut !== "termine") return -1
-    const pDiff = PRIORITE[b.priorite].order - PRIORITE[a.priorite].order
+    const pDiff = (PRIORITE[b.priorite] || PRIORITE.normale).order - (PRIORITE[a.priorite] || PRIORITE.normale).order
     if (pDiff !== 0) return pDiff
     if (a.echeance && b.echeance) return a.echeance < b.echeance ? -1 : 1
     if (a.echeance) return -1
