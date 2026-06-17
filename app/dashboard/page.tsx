@@ -63,6 +63,7 @@ const ALL_NAV = [
     { id: "agenda",           label: "Agenda",             icon: "📅" },
     { id: "stocks",           label: "Stock",              icon: "📦" },
     { id: "taches",           label: "Liste des tâches",   icon: "✅" },
+    { id: "mail",             label: "Boîte mail",         icon: "📧" },
   ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
@@ -77,7 +78,6 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
-    { id: "mail",         label: "Boîte mail",   icon: "📧" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
