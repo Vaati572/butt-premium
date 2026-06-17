@@ -23,6 +23,8 @@ interface Commande {
   statut_colis?: string
   date_expedition?: string
   date_validation_paiement?: string
+  type?: "commande" | "relance"
+  vente_id?: string | null
 }
 
 const MOIS_SHORT = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
@@ -121,6 +123,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   onClose: () => void; onDone: () => void
 }) {
   const [editMode, setEditMode] = useState(!commande)
+  const [type, setType]         = useState<"commande" | "relance">((commande?.type as any) || "commande")
   const [montant, setMontant]   = useState(commande?.montant?.toString() || "")
   const [detail, setDetail]     = useState(commande?.detail || "")
   const [date, setDate]         = useState(commande?.date_commande || `${annee}-${String(mois).padStart(2,"0")}-01`)
@@ -129,25 +132,66 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   const [colis, setColis]       = useState(commande?.statut_colis || "a_preparer")
   const [dateExp, setDateExp]   = useState(commande?.date_expedition || "")
   const [saving, setSaving]     = useState(false)
+  const [showConvert, setShowConvert]     = useState(false)
+  const [ventesDispo, setVentesDispo]     = useState<any[]>([])
+  const [loadingVentes, setLoadingVentes] = useState(false)
+  const [linkingId, setLinkingId]         = useState<string | null>(null)
   const montantRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (!commande) setTimeout(() => montantRef.current?.focus(), 100) }, [])
 
+  const openConvert = async () => {
+    setShowConvert(true)
+    setLoadingVentes(true)
+    const { data } = await supabase.from("ventes").select("id, client_nom, total_ttc, paiement, created_at")
+      .eq("society_id", societyId).eq("client_id", client.client_id)
+      .order("created_at", { ascending: false }).limit(15)
+    setVentesDispo(data || [])
+    setLoadingVentes(false)
+  }
+
+  const linkVente = async (vente: any) => {
+    if (!commande?.id) return
+    setLinkingId(vente.id)
+    const venteDateStr = vente.created_at ? vente.created_at.slice(0, 10) : date
+    const payload: any = {
+      type: "commande", vente_id: vente.id, montant: Number(vente.total_ttc) || 0,
+      date_commande: venteDateStr,
+      detail: `Liée à la vente du ${new Date(venteDateStr + "T00:00:00").toLocaleDateString("fr-FR")}`,
+      statut_paiement: "valide", statut_colis: "a_preparer",
+      date_validation_paiement: venteDateStr,
+    }
+    await supabase.from("suivi_commandes").update(payload).eq("id", commande.id)
+    setLinkingId(null); setShowConvert(false); onDone(); onClose()
+  }
+
+  const switchToManualCommande = () => {
+    setShowConvert(false)
+    setType("commande")
+    setEditMode(true)
+  }
+
   const save = async () => {
-    if (!montant || parseFloat(montant) <= 0) return
+    if (type === "commande" && (!montant || parseFloat(montant) <= 0)) return
     setSaving(true)
     const now = new Date().toISOString().slice(0, 10)
     const payload: any = {
-      society_id: societyId, client_id: client.client_id, annee, mois,
-      montant: parseFloat(montant), detail: detail || null,
+      society_id: societyId, client_id: client.client_id, annee, mois, type,
+      montant: type === "commande" ? parseFloat(montant) : 0,
+      detail: type === "commande" ? (detail || null) : null,
       date_commande: date || null, notes: notes || null,
-      statut_paiement: paiement, statut_colis: colis,
-      date_expedition: colis === "en_livraison" ? (dateExp || now) : null,
+      statut_paiement: type === "commande" ? paiement : null,
+      statut_colis: type === "commande" ? colis : null,
+      date_expedition: type === "commande" && colis === "en_livraison" ? (dateExp || now) : null,
     }
-    if (paiement === "valide" && (!commande?.date_validation_paiement || commande.statut_paiement !== "valide")) {
-      payload.date_validation_paiement = now
-    } else if (commande?.date_validation_paiement) {
-      payload.date_validation_paiement = commande.date_validation_paiement
+    if (type === "commande") {
+      if (paiement === "valide" && (!commande?.date_validation_paiement || commande.statut_paiement !== "valide")) {
+        payload.date_validation_paiement = now
+      } else if (commande?.date_validation_paiement) {
+        payload.date_validation_paiement = commande.date_validation_paiement
+      }
+    } else {
+      payload.date_validation_paiement = null
     }
     if (commande?.id) await supabase.from("suivi_commandes").update(payload).eq("id", commande.id)
     else              await supabase.from("suivi_commandes").insert(payload)
@@ -155,7 +199,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
   }
 
   const deleteCmd = async () => {
-    if (!commande?.id || !confirm("Supprimer cette commande ?")) return
+    if (!commande?.id || !confirm("Supprimer cette entrée ?")) return
     await supabase.from("suivi_commandes").delete().eq("id", commande.id)
     onDone(); onClose()
   }
@@ -175,8 +219,9 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
 
   const contratColor = CONTRAT_COLORS[client.client_contrat || ""] || ""
   const clientName   = client.client_prenom ? `${client.client_prenom} ${client.client_nom}` : client.client_nom
-  const relanceAlert = commande?.date_validation_paiement && paiement === "valide"
+  const relanceAlert = commande?.date_validation_paiement && paiement === "valide" && type === "commande"
     ? daysDiff(commande.date_validation_paiement) : null
+  const isRelanceEntry = commande?.type === "relance"
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
@@ -217,17 +262,71 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
             </div>
           )}
 
-          {/* Commande */}
+          {/* Commande / Relance */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Commande</p>
-              {commande && !editMode && (
+              <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
+                {showConvert ? "Lier à une vente" : isRelanceEntry ? "Relance" : "Commande"}
+              </p>
+              {commande && !editMode && !showConvert && (
                 <button onClick={() => setEditMode(true)} className="text-zinc-600 hover:text-white flex items-center gap-1 text-[10px]">
                   <Pencil size={10}/> Modifier
                 </button>
               )}
             </div>
-            {!editMode && commande ? (
+
+            {showConvert ? (
+              <div className="space-y-2">
+                <button onClick={() => setShowConvert(false)} className="text-zinc-500 hover:text-white text-[10px] mb-1">← Retour</button>
+                {loadingVentes ? (
+                  <div className="flex items-center justify-center py-8"><div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"/></div>
+                ) : ventesDispo.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-zinc-500 text-sm mb-3">Aucune vente trouvée pour ce client</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {ventesDispo.map(v => (
+                      <button key={v.id} onClick={() => linkVente(v)} disabled={linkingId === v.id}
+                        className="w-full flex items-center justify-between gap-2 bg-zinc-900 border border-zinc-800 hover:border-green-500/40 rounded-xl px-3 py-2.5 text-left disabled:opacity-50">
+                        <div>
+                          <p className="text-white text-sm font-bold">{Number(v.total_ttc).toFixed(2)}€</p>
+                          <p className="text-zinc-500 text-[10px]">{v.created_at ? new Date(v.created_at).toLocaleDateString("fr-FR", { day:"numeric", month:"short", year:"numeric" }) : ""} · {v.paiement || "—"}</p>
+                        </div>
+                        {linkingId === v.id
+                          ? <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"/>
+                          : <Check size={14} className="text-zinc-600"/>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button onClick={switchToManualCommande}
+                  className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-semibold text-xs mt-2">
+                  Pas de vente correspondante → saisir manuellement
+                </button>
+              </div>
+            ) : !editMode && commande && isRelanceEntry ? (
+              <div className="space-y-2">
+                <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl px-4 py-3 text-center">
+                  <p className="text-blue-300 text-sm font-bold flex items-center justify-center gap-1.5"><Bell size={14}/> Relance effectuée</p>
+                  {commande.date_commande && (
+                    <p className="text-blue-400/70 text-xs mt-0.5">
+                      {new Date(commande.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"long" })}
+                    </p>
+                  )}
+                </div>
+                {commande.notes && (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+                    <p className="text-zinc-500 text-[10px] mb-0.5">📝 Notes</p>
+                    <p className="text-zinc-400 text-sm">{commande.notes}</p>
+                  </div>
+                )}
+                <button onClick={openConvert}
+                  className="w-full py-2.5 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-500/20">
+                  💰 Transformer en commande
+                </button>
+              </div>
+            ) : !editMode && commande ? (
               <div className="space-y-2">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-center">
                   <p className="text-white text-2xl font-black">{Number(commande.montant).toFixed(2)}€</p>
@@ -252,26 +351,63 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="relative">
-                  <input ref={montantRef} type="number" step="0.01" min="0" value={montant}
-                    onChange={e => setMontant(e.target.value)} placeholder="0.00"
-                    onKeyDown={e => e.key === "Enter" && save()}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-xl text-white font-bold focus:outline-none focus:border-green-500/60 pr-10"/>
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">€</span>
-                </div>
-                <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
-                <textarea value={detail} onChange={e => setDetail(e.target.value)} rows={2}
-                  placeholder="Détail de la commande..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
-                <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Notes..."
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                {(!commande || isRelanceEntry) && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button onClick={() => setType("relance")}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all"
+                      style={{
+                        backgroundColor: type === "relance" ? "rgba(59,130,246,0.12)" : "rgba(39,39,42,0.5)",
+                        borderColor: type === "relance" ? "rgba(59,130,246,0.4)" : "rgba(63,63,70,0.5)",
+                        color: type === "relance" ? "#3b82f6" : "#52525b",
+                      }}>
+                      <Bell size={12}/> Relance
+                    </button>
+                    <button onClick={() => setType("commande")}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-xs font-bold transition-all"
+                      style={{
+                        backgroundColor: type === "commande" ? "rgba(34,197,94,0.12)" : "rgba(39,39,42,0.5)",
+                        borderColor: type === "commande" ? "rgba(34,197,94,0.4)" : "rgba(63,63,70,0.5)",
+                        color: type === "commande" ? "#22c55e" : "#52525b",
+                      }}>
+                      💰 Commande
+                    </button>
+                  </div>
+                )}
+
+                {type === "relance" ? (
+                  <>
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+                    <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && save()}
+                      placeholder="Note de relance (optionnel)..."
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <input ref={montantRef} type="number" step="0.01" min="0" value={montant}
+                        onChange={e => setMontant(e.target.value)} placeholder="0.00"
+                        onKeyDown={e => e.key === "Enter" && save()}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-xl text-white font-bold focus:outline-none focus:border-green-500/60 pr-10"/>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">€</span>
+                    </div>
+                    <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none"/>
+                    <textarea value={detail} onChange={e => setDetail(e.target.value)} rows={2}
+                      placeholder="Détail de la commande..."
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none"/>
+                    <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+                      placeholder="Notes..."
+                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none"/>
+                  </>
+                )}
               </div>
             )}
           </div>
 
           {/* Paiement */}
+          {type === "commande" && !showConvert && (
           <div>
             <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">💳 Paiement</p>
             <div className="grid grid-cols-3 gap-1.5">
@@ -299,8 +435,10 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               </p>
             )}
           </div>
+          )}
 
           {/* Livraison */}
+          {type === "commande" && !showConvert && (
           <div>
             <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-2">📦 Livraison</p>
             <div className="grid grid-cols-3 gap-1.5">
@@ -338,15 +476,16 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               </p>
             )}
           </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="p-4 border-t border-zinc-800 space-y-2 shrink-0">
-          {editMode && (
+          {editMode && !showConvert && (
             <div className="flex gap-2">
-              <button onClick={save} disabled={saving || !montant || parseFloat(montant) <= 0}
+              <button onClick={save} disabled={saving || (type === "commande" && (!montant || parseFloat(montant) <= 0))}
                 className="flex-1 py-3 rounded-xl bg-green-500 hover:bg-green-400 disabled:opacity-40 text-black font-bold text-sm flex items-center justify-center gap-2">
-                {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={14}/> {commande ? "Mettre à jour" : "Valider"}</>}
+                {saving ? <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"/> : <><Check size={14}/> {commande ? "Mettre à jour" : type === "relance" ? "Valider la relance" : "Valider"}</>}
               </button>
               {commande && (
                 <button onClick={() => setEditMode(false)}
@@ -354,7 +493,7 @@ function CommandePanel({ client, mois, annee, commande, societyId, onClose, onDo
               )}
             </div>
           )}
-          {commande && (
+          {commande && !showConvert && (
             <button onClick={deleteCmd}
               className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400/70 hover:bg-red-500/15 font-semibold text-sm flex items-center justify-center gap-2">
               <Trash2 size={12}/> Supprimer
@@ -767,7 +906,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                           <div className="flex gap-0.5 mt-1">
                             {Array.from({ length: 12 }).map((_, i) => {
                               const cmd = getCmd(sc.client_id, i + 1)
-                              const pColor = cmd?.statut_paiement === "valide" ? "#22c55e" : cmd?.statut_paiement === "relance" ? "#3b82f6" : cmd ? "#eab308" : year === NOW_YEAR && i + 1 === NOW_MONTH ? "#eab30830" : "#27272a"
+                              const pColor = cmd?.type === "relance" ? "#06b6d4" : cmd?.statut_paiement === "valide" ? "#22c55e" : cmd?.statut_paiement === "relance" ? "#3b82f6" : cmd ? "#eab308" : year === NOW_YEAR && i + 1 === NOW_MONTH ? "#eab30830" : "#27272a"
                               return <div key={i} className="w-2 h-1 rounded-full" style={{ backgroundColor: pColor }}/>
                             })}
                           </div>
@@ -782,7 +921,8 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                       const isPast    = year < NOW_YEAR || (year === NOW_YEAR && moisNum < NOW_MONTH)
                       const isActive  = panel?.client.client_id === sc.client_id && panel?.mois === moisNum
                       let cellBg = "rgba(39,39,42,0.2)"; let cellBorder = "rgba(63,63,70,0.3)"
-                      if (cmd) {
+                      if (cmd?.type === "relance") { cellBg = "rgba(6,182,212,0.12)"; cellBorder = "rgba(6,182,212,0.4)" }
+                      else if (cmd) {
                         const p = (cmd.statut_paiement || "attente") as keyof typeof PAIEMENT
                         cellBg = PAIEMENT[p]?.bg || cellBg; cellBorder = PAIEMENT[p]?.border || cellBorder
                       } else if (isPast) { cellBg = "rgba(239,68,68,0.04)"; cellBorder = "rgba(239,68,68,0.1)" }
@@ -799,7 +939,17 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
                                 <Bell size={7} className="text-white"/>
                               </div>
                             )}
-                            {cmd ? (
+                            {cmd?.type === "relance" ? (
+                              <>
+                                <Bell size={14} className="text-cyan-400"/>
+                                <p className="text-[9px] font-bold leading-none text-cyan-400">Relancé</p>
+                                {cmd.date_commande && (
+                                  <p className="text-[8px] leading-none opacity-70 text-cyan-400">
+                                    {new Date(cmd.date_commande + "T00:00:00").toLocaleDateString("fr-FR", { day:"numeric", month:"short" })}
+                                  </p>
+                                )}
+                              </>
+                            ) : cmd ? (
                               <>
                                 <p className="text-[12px] font-black leading-none"
                                   style={{ color: PAIEMENT[(cmd.statut_paiement || "attente") as keyof typeof PAIEMENT]?.color || "#eab308" }}>
@@ -853,7 +1003,7 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           </table>
 
           <div className="flex items-center gap-4 px-4 py-2.5 border-t border-zinc-900/60 flex-wrap">
-            {[{ color: "#eab308", label: "En attente" }, { color: "#22c55e", label: "Validé" }, { color: "#3b82f6", label: "Relancé" }].map(({ color, label }) => (
+            {[{ color: "#eab308", label: "En attente" }, { color: "#22c55e", label: "Validé" }, { color: "#3b82f6", label: "Paiement relancé" }, { color: "#06b6d4", label: "Relance commerciale" }].map(({ color, label }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}/><span className="text-zinc-600 text-[10px]">{label}</span>
               </div>
