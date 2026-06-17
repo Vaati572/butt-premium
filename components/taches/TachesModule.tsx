@@ -115,7 +115,7 @@ function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
 
   useEffect(() => {
     if (!tache?.id) return
-    supabase.from("taches_commentaires").select("*").eq("tache_id", tache.id)
+    supabase.from("liste_taches_commentaires").select("*").eq("tache_id", tache.id)
       .order("created_at", { ascending: true })
       .then(({ data }) => setComments(data || []))
   }, [tache?.id])
@@ -135,7 +135,7 @@ function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
       tache_id: tache.id, society_id: societyId, auteur_id: profile?.id || null,
       auteur_nom: profile?.nom || "?", contenu: newComment.trim(),
     }
-    const { data } = await supabase.from("taches_commentaires").insert(payload).select().single()
+    const { data } = await supabase.from("liste_taches_commentaires").insert(payload).select().single()
     if (data) setComments(prev => [...prev, data])
     setNewComment(""); setPostingComment(false)
   }
@@ -155,17 +155,17 @@ function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
     if (statut !== "termine") payload.completed_at = null
 
     if (tache?.id) {
-      await supabase.from("taches").update(payload).eq("id", tache.id)
+      await supabase.from("liste_taches").update(payload).eq("id", tache.id)
     } else {
       payload.created_by = profile?.id || null
-      await supabase.from("taches").insert(payload)
+      await supabase.from("liste_taches").insert(payload)
     }
 
     // Récurrence : si on vient de terminer une tâche récurrente, on crée la prochaine occurrence
     if (statut === "termine" && !wasTermine && recurrence !== "aucune" && echeance) {
       const next = nextEcheance(echeance, recurrence)
       if (next) {
-        await supabase.from("taches").insert({
+        await supabase.from("liste_taches").insert({
           society_id: societyId, titre: titre.trim(), description: description || null,
           priorite, statut: "a_faire", date_debut: null, echeance: next,
           heure_echeance: heureEcheance || null, categorie: categorie || null,
@@ -180,8 +180,8 @@ function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
 
   const deleteTache = async () => {
     if (!tache?.id || !confirm("Supprimer définitivement cette tâche ?")) return
-    await supabase.from("taches_commentaires").delete().eq("tache_id", tache.id)
-    await supabase.from("taches").delete().eq("id", tache.id)
+    await supabase.from("liste_taches_commentaires").delete().eq("tache_id", tache.id)
+    await supabase.from("liste_taches").delete().eq("id", tache.id)
     onSaved(); onClose()
   }
 
@@ -527,7 +527,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
     if (!activeSociety?.id) return
     setLoading(true)
     const [{ data: t }, { data: mem }] = await Promise.all([
-      supabase.from("taches").select("*").eq("society_id", activeSociety.id).order("created_at", { ascending: false }),
+      supabase.from("liste_taches").select("*").eq("society_id", activeSociety.id).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id,nom,avatar_url,color").eq("society_id", activeSociety.id),
     ])
     setTaches(t || [])
@@ -544,12 +544,12 @@ export default function TachesModule({ activeSociety, profile }: Props) {
     const idx = Math.max(0, STATUT_CYCLE.indexOf(tache.statut))
     const next = STATUT_CYCLE[(idx + 1) % STATUT_CYCLE.length]
     const payload: any = { statut: next, completed_at: next === "termine" ? new Date().toISOString() : null }
-    await supabase.from("taches").update(payload).eq("id", tache.id)
+    await supabase.from("liste_taches").update(payload).eq("id", tache.id)
     setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, ...payload } : t))
     if (next === "termine" && tache.recurrence && tache.recurrence !== "aucune" && tache.echeance) {
       const nextDate = nextEcheance(tache.echeance, tache.recurrence)
       if (nextDate) {
-        await supabase.from("taches").insert({
+        await supabase.from("liste_taches").insert({
           society_id: activeSociety.id, titre: tache.titre, description: tache.description || null,
           priorite: tache.priorite, statut: "a_faire", echeance: nextDate,
           heure_echeance: tache.heure_echeance || null, categorie: tache.categorie || null,
@@ -568,7 +568,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
     if (nextIdx < 0 || nextIdx >= STATUT_CYCLE.length) return
     const next = STATUT_CYCLE[nextIdx]
     const payload: any = { statut: next, completed_at: next === "termine" ? new Date().toISOString() : null }
-    await supabase.from("taches").update(payload).eq("id", tache.id)
+    await supabase.from("liste_taches").update(payload).eq("id", tache.id)
     setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, ...payload } : t))
   }
 
