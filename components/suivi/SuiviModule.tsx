@@ -5,8 +5,10 @@ import { supabase } from "@/lib/supabase"
 import {
   Plus, X, Search, Check, Trash2, ChevronLeft, ChevronRight,
   Calendar, Pencil, Bell, Package, Truck, CheckCircle2,
-  Clock, AlertTriangle,
+  Clock, AlertTriangle, Table2, LayoutGrid, PanelLeftOpen, List,
 } from "lucide-react"
+
+type ViewMode = "tableau" | "cartes" | "split" | "liste"
 
 interface Props { activeSociety: any; profile: any }
 
@@ -701,7 +703,308 @@ function InactifsPanel({ items, onClose, onSelectClient, onRelance }: {
 /* ══════════════════════════════════════════════
    MAIN MODULE
 ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   VUE CARTES
+══════════════════════════════════════════════ */
+function VueCartes({ clients, commandes, year, onCellClick }: {
+  clients: SuiviClient[]; commandes: Commande[]; year: number
+  onCellClick: (client: SuiviClient, mois: number) => void
+}) {
+  const getCmd = (clientId: string, mois: number) => commandes.find(c => c.client_id === clientId && c.mois === mois) || null
+  const dotColor = (cmd: Commande | null, mois: number) => {
+    if (!cmd) return year === NOW_YEAR && mois === NOW_MONTH ? "#eab30840" : "#27272a"
+    if (cmd.type === "relance") return "#06b6d4"
+    if (cmd.type === "absence") return "#52525b"
+    if (cmd.statut_paiement === "valide") return "#22c55e"
+    if (cmd.statut_paiement === "relance") return "#3b82f6"
+    return "#eab308"
+  }
+
+  return (
+    <div className="flex-1 overflow-auto p-4">
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+        {clients.map(sc => {
+          const clientCmds = commandes.filter(c => c.client_id === sc.client_id)
+          const clientTotal = clientCmds.filter(c => c.type !== "relance" && c.type !== "absence").reduce((s, c) => s + Number(c.montant || 0), 0)
+          const contratColor = CONTRAT_COLORS[sc.client_contrat || ""] || ""
+          const clientName = sc.client_prenom ? `${sc.client_prenom} ${sc.client_nom}` : sc.client_nom
+          const initials = clientName.split(" ").map(w => w[0]).filter(Boolean).join("").toUpperCase().slice(0, 2)
+          const cmdMois = getCmd(sc.client_id, NOW_MONTH)
+          const statusNow = !cmdMois ? "vide" : cmdMois.type === "relance" ? "relance" : cmdMois.type === "absence" ? "absent" : cmdMois.statut_paiement === "valide" ? "ok" : "attente"
+          return (
+            <div key={sc.id} className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-2xl p-4 flex flex-col gap-3 transition-colors"
+              style={{ borderLeft: contratColor ? `3px solid ${contratColor}` : undefined }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0"
+                  style={{ backgroundColor: contratColor ? contratColor + "25" : "#27272a", color: contratColor || "#a1a1aa" }}>
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-bold truncate">{clientName}</p>
+                  {sc.client_nom_shop && <p className="text-zinc-500 text-[11px] truncate">🏪 {sc.client_nom_shop}</p>}
+                  {sc.client_contrat && sc.client_contrat !== "Aucun" && !sc.client_nom_shop && (
+                    <p className="text-[11px] font-semibold truncate" style={{ color: contratColor || "#71717a" }}>{sc.client_contrat}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {MOIS_SHORT.map((m, i) => {
+                  const cmd = getCmd(sc.client_id, i + 1)
+                  const isCurrent = year === NOW_YEAR && i + 1 === NOW_MONTH
+                  return (
+                    <button key={i} onClick={() => onCellClick(sc, i + 1)}
+                      className="flex flex-col items-center gap-0.5 rounded-lg transition-all hover:scale-110"
+                      style={{ width: "28px", padding: "4px 2px", backgroundColor: isCurrent ? "#eab30812" : "rgba(39,39,42,0.4)", border: `1px solid ${isCurrent ? "#eab30840" : "rgba(63,63,70,0.3)"}` }}>
+                      <span className="text-[8px] font-bold" style={{ color: isCurrent ? "#eab308" : "#52525b" }}>{m.slice(0,1)}</span>
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: dotColor(cmd, i + 1) }}/>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-yellow-400 text-sm font-black">{clientTotal > 0 ? clientTotal.toFixed(0) + "€" : "—"}</p>
+                  <p className="text-zinc-600 text-[10px]">{clientCmds.filter(c => c.type !== "relance" && c.type !== "absence").length} commandes</p>
+                </div>
+                <button onClick={() => onCellClick(sc, NOW_MONTH)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl border transition-colors"
+                  style={statusNow === "ok" ? { backgroundColor: "rgba(34,197,94,0.12)", borderColor: "rgba(34,197,94,0.4)", color: "#22c55e" }
+                    : statusNow === "relance" ? { backgroundColor: "rgba(6,182,212,0.12)", borderColor: "rgba(6,182,212,0.4)", color: "#06b6d4" }
+                    : statusNow === "absent" ? { backgroundColor: "rgba(82,82,91,0.2)", borderColor: "rgba(82,82,91,0.4)", color: "#71717a" }
+                    : statusNow === "attente" ? { backgroundColor: "rgba(234,179,8,0.12)", borderColor: "rgba(234,179,8,0.4)", color: "#eab308" }
+                    : { backgroundColor: "rgba(39,39,42,0.5)", borderColor: "rgba(63,63,70,0.5)", color: "#52525b" }}>
+                  {statusNow === "ok" ? "✓ Validé" : statusNow === "relance" ? "Relancé" : statusNow === "absent" ? "Pas ce mois" : statusNow === "attente" ? "En attente" : "+ Ce mois"}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   VUE SPLIT
+══════════════════════════════════════════════ */
+function VueSplit({ clients, commandes, year, onCellClick }: {
+  clients: SuiviClient[]; commandes: Commande[]; year: number
+  onCellClick: (client: SuiviClient, mois: number) => void
+}) {
+  const [selectedId, setSelectedId] = useState<string | null>(clients[0]?.client_id || null)
+  const selected = clients.find(c => c.client_id === selectedId) || clients[0]
+  const getCmd = (clientId: string, mois: number) => commandes.find(c => c.client_id === clientId && c.mois === mois) || null
+
+  const statusDot = (clientId: string) => {
+    const cmd = getCmd(clientId, NOW_MONTH)
+    if (!cmd) { const last = commandes.filter(c => c.client_id === clientId); return last.length === 0 ? "#ef4444" : "#52525b" }
+    if (cmd.type === "relance") return "#06b6d4"
+    if (cmd.type === "absence") return "#52525b"
+    if (cmd.statut_paiement === "valide") return "#22c55e"
+    return "#eab308"
+  }
+
+  if (!selected) return null
+  const selCmds = commandes.filter(c => c.client_id === selected.client_id)
+  const selTotal = selCmds.filter(c => c.type !== "relance" && c.type !== "absence").reduce((s, c) => s + Number(c.montant || 0), 0)
+  const selNb = selCmds.filter(c => c.type !== "relance" && c.type !== "absence").length
+  const selMoy = selNb > 0 ? Math.round(selTotal / selNb) : 0
+  const contratColor = CONTRAT_COLORS[selected.client_contrat || ""] || ""
+  const clientName = selected.client_prenom ? `${selected.client_prenom} ${selected.client_nom}` : selected.client_nom
+  const initials = clientName.split(" ").map(w => w[0]).filter(Boolean).join("").toUpperCase().slice(0, 2)
+
+  return (
+    <div className="flex-1 overflow-hidden flex">
+      {/* Liste gauche */}
+      <div className="w-56 shrink-0 border-r border-zinc-900 overflow-y-auto flex flex-col">
+        {clients.map(sc => {
+          const name = sc.client_prenom ? `${sc.client_prenom} ${sc.client_nom}` : sc.client_nom
+          const cc = CONTRAT_COLORS[sc.client_contrat || ""] || ""
+          const isSelected = sc.client_id === selectedId
+          const cmdMoisTotal = commandes.filter(c => c.client_id === sc.client_id && c.type !== "relance" && c.type !== "absence").reduce((s, c) => s + Number(c.montant || 0), 0)
+          return (
+            <button key={sc.id} onClick={() => setSelectedId(sc.client_id)}
+              className="flex items-center gap-2.5 px-3 py-3 border-b border-zinc-900/60 text-left transition-colors"
+              style={{ backgroundColor: isSelected ? "#eab30812" : "transparent" }}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusDot(sc.client_id) }}/>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-semibold truncate">{name}</p>
+                <p className="text-zinc-500 text-[10px] truncate">{cmdMoisTotal > 0 ? cmdMoisTotal.toFixed(0) + "€" : "Aucune cmd"}</p>
+              </div>
+              {isSelected && <ChevronRight size={12} className="text-yellow-500 shrink-0"/>}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Détail droit */}
+      <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-base shrink-0"
+            style={{ backgroundColor: contratColor ? contratColor + "25" : "#27272a", color: contratColor || "#a1a1aa" }}>
+            {initials}
+          </div>
+          <div>
+            <h2 className="text-white font-bold text-lg">{clientName}</h2>
+            {selected.client_nom_shop && <p className="text-zinc-400 text-xs">🏪 {selected.client_nom_shop}</p>}
+            {selected.client_contrat && selected.client_contrat !== "Aucun" && (
+              <p className="text-[11px] font-bold" style={{ color: contratColor || "#71717a" }}>{selected.client_contrat}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "CA annuel", value: selTotal.toFixed(0) + "€", color: "text-yellow-400" },
+            { label: "Panier moyen", value: selMoy > 0 ? selMoy + "€" : "—", color: "text-zinc-300" },
+            { label: "Mois couverts", value: selNb + "/12", color: "text-zinc-300" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5">
+              <p className={`text-base font-black ${color}`}>{value}</p>
+              <p className="text-zinc-600 text-[10px]">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-6 gap-1.5">
+          {MOIS_SHORT.map((m, i) => {
+            const moisNum = i + 1
+            const cmd = getCmd(selected.client_id, moisNum)
+            const isCurrent = year === NOW_YEAR && moisNum === NOW_MONTH
+            const isPast = year < NOW_YEAR || (year === NOW_YEAR && moisNum < NOW_MONTH)
+            let bg = "rgba(39,39,42,0.3)"; let border = "rgba(63,63,70,0.4)"; let valColor = "#52525b"; let val = "—"
+            if (cmd?.type === "relance") { bg = "rgba(6,182,212,0.12)"; border = "rgba(6,182,212,0.4)"; valColor = "#06b6d4"; val = "Rel." }
+            else if (cmd?.type === "absence") { bg = "rgba(82,82,91,0.12)"; border = "rgba(82,82,91,0.35)"; valColor = "#71717a"; val = "✕" }
+            else if (cmd) {
+              const p = (cmd.statut_paiement || "attente") as keyof typeof PAIEMENT
+              bg = PAIEMENT[p]?.bg || bg; border = PAIEMENT[p]?.border || border
+              valColor = PAIEMENT[p]?.color || "#eab308"
+              val = Number(cmd.montant).toFixed(0) + "€"
+            } else if (isPast) { bg = "rgba(239,68,68,0.05)"; border = "rgba(239,68,68,0.15)" }
+            if (isCurrent) { border = "#eab30860" }
+            return (
+              <button key={moisNum} onClick={() => onCellClick(selected, moisNum)}
+                className="flex flex-col items-center gap-1 py-3 rounded-xl border transition-all hover:border-yellow-500/40"
+                style={{ backgroundColor: bg, borderColor: border }}>
+                <span className="text-[9px] font-bold" style={{ color: isCurrent ? "#eab308" : "#52525b" }}>{m}{isCurrent ? " ●" : ""}</span>
+                <span className="text-[11px] font-black" style={{ color: valColor }}>{val}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "💰 Commande", type: "commande", color: "#22c55e" },
+            { label: "🔔 Relancer", type: "relance", color: "#06b6d4" },
+            { label: "✕ Pas ce mois", type: "absence", color: "#71717a" },
+          ].map(({ label, color }) => (
+            <button key={label} onClick={() => onCellClick(selected, NOW_MONTH)}
+              className="py-2.5 rounded-xl border text-xs font-bold transition-colors hover:opacity-90"
+              style={{ backgroundColor: color + "15", borderColor: color + "40", color }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   VUE LISTE ENRICHIE
+══════════════════════════════════════════════ */
+function VueListe({ clients, commandes, year, lastCommandeMap, onCellClick }: {
+  clients: SuiviClient[]; commandes: Commande[]; year: number
+  lastCommandeMap: Record<string, string | null>
+  onCellClick: (client: SuiviClient, mois: number) => void
+}) {
+  const getCmd = (clientId: string, mois: number) => commandes.find(c => c.client_id === clientId && c.mois === mois) || null
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      {clients.map(sc => {
+        const contratColor = CONTRAT_COLORS[sc.client_contrat || ""] || ""
+        const clientName = sc.client_prenom ? `${sc.client_prenom} ${sc.client_nom}` : sc.client_nom
+        const initials = clientName.split(" ").map(w => w[0]).filter(Boolean).join("").toUpperCase().slice(0, 2)
+        const cmdMois = getCmd(sc.client_id, NOW_MONTH)
+        const lastDate = lastCommandeMap[sc.client_id] || null
+        const jours = lastDate ? daysDiff(lastDate) : null
+        const clientTotal = commandes.filter(c => c.client_id === sc.client_id && c.type !== "relance" && c.type !== "absence").reduce((s, c) => s + Number(c.montant || 0), 0)
+
+        // 6 derniers mois (en remontant depuis le mois courant)
+        const sixMois = Array.from({ length: 6 }, (_, i) => {
+          let m = NOW_MONTH - 5 + i
+          let y = year
+          if (m <= 0) { m += 12; y -= 1 }
+          return { mois: m, year: y, label: MOIS_SHORT[m - 1] }
+        })
+
+        return (
+          <div key={sc.id} className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors"
+            style={{ borderLeft: contratColor ? `3px solid ${contratColor}60` : undefined }}>
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0"
+                style={{ backgroundColor: contratColor ? contratColor + "20" : "#27272a", color: contratColor || "#71717a" }}>
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-bold truncate">{clientName}</p>
+                <p className="text-zinc-500 text-[10px] truncate">
+                  {sc.client_nom_shop ? "🏪 " + sc.client_nom_shop : sc.client_contrat && sc.client_contrat !== "Aucun" ? sc.client_contrat : ""}
+                  {jours !== null && jours >= 25 && <span className="ml-2 text-red-400 font-bold">{jours}j sans commande</span>}
+                  {jours === null && <span className="ml-1 text-red-400 font-bold">Jamais commandé</span>}
+                </p>
+              </div>
+              <p className="text-yellow-400 text-xs font-black shrink-0">{clientTotal > 0 ? clientTotal.toFixed(0) + "€" : ""}</p>
+            </div>
+            <div className="flex items-center gap-1 px-3 pb-2.5">
+              {sixMois.map(({ mois, year: y, label }) => {
+                const cmd = getCmd(sc.client_id, mois)
+                const isCurrent = y === NOW_YEAR && mois === NOW_MONTH
+                let bg = "rgba(39,39,42,0.4)"; let valColor = "#52525b"; let val = "—"; let border = "rgba(63,63,70,0.3)"
+                if (cmd?.type === "relance") { bg = "rgba(6,182,212,0.15)"; border = "rgba(6,182,212,0.4)"; valColor = "#06b6d4"; val = "Rel" }
+                else if (cmd?.type === "absence") { bg = "rgba(82,82,91,0.15)"; border = "rgba(82,82,91,0.35)"; valColor = "#71717a"; val = "✕" }
+                else if (cmd) {
+                  const p = (cmd.statut_paiement || "attente") as keyof typeof PAIEMENT
+                  bg = PAIEMENT[p]?.bg || bg; border = PAIEMENT[p]?.border || border
+                  valColor = PAIEMENT[p]?.color || "#eab308"
+                  val = Number(cmd.montant).toFixed(0) + "€"
+                }
+                if (isCurrent) border = "#eab30860"
+                return (
+                  <button key={mois} onClick={() => onCellClick(sc, mois)}
+                    className="flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 flex-1 transition-all hover:border-yellow-500/40"
+                    style={{ backgroundColor: bg, border: `1px solid ${border}` }}>
+                    <span className="text-[8px] font-bold" style={{ color: isCurrent ? "#eab308" : "#52525b" }}>{label}{isCurrent ? "●" : ""}</span>
+                    <span className="text-[10px] font-black truncate w-full text-center" style={{ color: valColor }}>{val}</span>
+                  </button>
+                )
+              })}
+              <button onClick={() => onCellClick(sc, NOW_MONTH)}
+                className="flex items-center justify-center rounded-xl border px-2 py-1 ml-1 shrink-0 transition-colors"
+                style={cmdMois ? { backgroundColor: "rgba(39,39,42,0.4)", borderColor: "rgba(63,63,70,0.4)", color: "#52525b" }
+                  : { backgroundColor: "rgba(234,179,8,0.12)", borderColor: "rgba(234,179,8,0.4)", color: "#eab308" }}>
+                <span className="text-[10px] font-bold">{cmdMois ? "✎" : "+ Saisir"}</span>
+              </button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SuiviModule({ activeSociety, profile }: Props) {
+  const STORAGE_KEY = `suivi_view_${profile?.id || "default"}`
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    try { return (localStorage.getItem(STORAGE_KEY) as ViewMode) || "tableau" } catch { return "tableau" }
+  })
+
+  const setViewMode = (v: ViewMode) => {
+    setViewModeState(v)
+    try { localStorage.setItem(STORAGE_KEY, v) } catch {}
+  }
   const [suiviClients, setSuiviClients]   = useState<SuiviClient[]>([])
   const [commandes, setCommandes]         = useState<Commande[]>([])
   const [lastCommandeMap, setLastCommandeMap] = useState<Record<string, string | null>>({})
@@ -851,6 +1154,21 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
               className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-4 py-2.5 rounded-xl text-sm shadow-lg shadow-yellow-500/20">
               <Plus size={15}/> Ajouter
             </button>
+            {/* Switcher de vue */}
+            <div className="flex items-center gap-0.5 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+              {([
+                { id: "tableau", Icon: Table2, title: "Tableau" },
+                { id: "cartes", Icon: LayoutGrid, title: "Cartes" },
+                { id: "split", Icon: PanelLeftOpen, title: "Split" },
+                { id: "liste", Icon: List, title: "Liste" },
+              ] as { id: ViewMode; Icon: any; title: string }[]).map(({ id, Icon, title }) => (
+                <button key={id} onClick={() => setViewMode(id)} title={title}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                  style={{ backgroundColor: viewMode === id ? "#eab30820" : "transparent", color: viewMode === id ? "#eab308" : "#52525b" }}>
+                  <Icon size={14}/>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -894,6 +1212,15 @@ export default function SuiviModule({ activeSociety, profile }: Props) {
           <p className="text-zinc-500 text-sm mb-6">Ajoutez vos clients pour suivre leurs commandes</p>
           <button onClick={() => setShowAddClient(true)} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-5 py-3 rounded-xl text-sm"><Plus size={15}/> Ajouter un client</button>
         </div>
+      ) : viewMode === "cartes" ? (
+        <VueCartes clients={filteredClients} commandes={commandes} year={year}
+          onCellClick={(client, mois) => setPanel({ client, mois, commande: getCmd(client.client_id, mois) })}/>
+      ) : viewMode === "split" ? (
+        <VueSplit clients={filteredClients} commandes={commandes} year={year}
+          onCellClick={(client, mois) => setPanel({ client, mois, commande: getCmd(client.client_id, mois) })}/>
+      ) : viewMode === "liste" ? (
+        <VueListe clients={filteredClients} commandes={commandes} year={year} lastCommandeMap={lastCommandeMap}
+          onCellClick={(client, mois) => setPanel({ client, mois, commande: getCmd(client.client_id, mois) })}/>
       ) : (
         <div className="flex-1 overflow-auto">
           <table className="border-collapse" style={{ minWidth: `${180 + 12 * 84 + 72}px` }}>
