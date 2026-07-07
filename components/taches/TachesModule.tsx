@@ -407,40 +407,96 @@ function TachePanel({ tache, membres, societyId, profile, onClose, onSaved }: {
 }
 
 /* ── Ligne vue Liste ── */
-function TacheRow({ tache, membre, onOpen, onCycleStatut }: {
-  tache: Tache; membre?: Membre; onOpen: () => void; onCycleStatut: () => void
+function TacheRow({ tache, membre, onOpen, onCycleStatut, onToggleSousTache }: {
+  tache: Tache; membre?: Membre
+  onOpen: () => void
+  onCycleStatut: () => void
+  onToggleSousTache: (sousTacheId: string) => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const ech = echeanceInfo(tache.echeance, tache.statut)
   const prio = PRIORITE[tache.priorite] || PRIORITE.normale
   const isDone = tache.statut === "termine"
   const isCancelled = tache.statut === "annulee"
   const sousTaches = tache.sous_taches || []
   const doneCount = sousTaches.filter(s => s.done).length
+  const hasSousTaches = sousTaches.length > 0
+  const progress = hasSousTaches ? Math.round((doneCount / sousTaches.length) * 100) : 0
+
   return (
-    <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl px-3 py-3 transition-colors group"
-      style={{ opacity: isDone || isCancelled ? 0.5 : 1, borderLeft: tache.couleur ? `3px solid ${tache.couleur}` : undefined }}>
-      <button onClick={onCycleStatut} className="shrink-0" disabled={isCancelled}>
-        {isCancelled ? <Ban size={20} className="text-zinc-600"/> :
-         tache.statut === "termine" ? <CheckCircle2 size={20} className="text-green-500"/> :
-         tache.statut === "en_cours" ? <Clock size={20} className="text-yellow-500"/> :
-         <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400"/>}
-      </button>
-      <button onClick={onOpen} className="flex-1 min-w-0 text-left">
-        <p className={`text-white text-sm font-semibold truncate ${isDone || isCancelled ? "line-through text-zinc-500" : ""}`}>{tache.titre}</p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: prio.bg, color: prio.color }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: prio.color }}/>{prio.label}
-          </span>
-          {ech && <span className="text-[10px] font-semibold" style={{ color: ech.color }}>📅 {ech.label}{tache.heure_echeance ? ` à ${tache.heure_echeance.slice(0,5)}` : ""}</span>}
-          {tache.recurrence && tache.recurrence !== "aucune" && <Repeat size={10} className="text-zinc-500"/>}
-          {sousTaches.length > 0 && <span className="text-[10px] text-zinc-500">☑ {doneCount}/{sousTaches.length}</span>}
-          {tache.categorie && <span className="text-[10px] text-zinc-500">🏷️ {tache.categorie}</span>}
+    <div className="bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl transition-colors group"
+      style={{ opacity: isDone || isCancelled ? 0.55 : 1, borderLeft: tache.couleur ? `3px solid ${tache.couleur}` : undefined }}>
+      {/* Ligne principale */}
+      <div className="flex items-center gap-2.5 px-3 py-3">
+        {/* Bouton statut */}
+        <button onClick={onCycleStatut} className="shrink-0" disabled={isCancelled}>
+          {isCancelled ? <Ban size={20} className="text-zinc-600"/> :
+           tache.statut === "termine" ? <CheckCircle2 size={20} className="text-green-500"/> :
+           tache.statut === "en_cours" ? <Clock size={20} className="text-yellow-500"/> :
+           <Circle size={20} className="text-zinc-600 group-hover:text-zinc-400"/>}
+        </button>
+
+        {/* Contenu cliquable → déplie les sous-tâches ou ouvre le panel si pas de sous-tâches */}
+        <button onClick={() => hasSousTaches ? setExpanded(p => !p) : onOpen()} className="flex-1 min-w-0 text-left">
+          <p className={`text-white text-sm font-semibold truncate ${isDone || isCancelled ? "line-through text-zinc-500" : ""}`}>{tache.titre}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: prio.bg, color: prio.color }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: prio.color }}/>{prio.label}
+            </span>
+            {ech && <span className="text-[10px] font-semibold" style={{ color: ech.color }}>📅 {ech.label}{tache.heure_echeance ? ` à ${tache.heure_echeance.slice(0,5)}` : ""}</span>}
+            {tache.recurrence && tache.recurrence !== "aucune" && <Repeat size={10} className="text-zinc-500"/>}
+            {hasSousTaches && (
+              <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: doneCount === sousTaches.length ? "#22c55e" : "#a1a1aa" }}>
+                <ListChecks size={10}/> {doneCount}/{sousTaches.length}
+              </span>
+            )}
+            {tache.categorie && <span className="text-[10px] text-zinc-500">🏷️ {tache.categorie}</span>}
+          </div>
+        </button>
+
+        {/* Avatar membre */}
+        {membre && (
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-black shrink-0"
+            style={{ backgroundColor: membre.color || "#eab308" }} title={membre.nom}>
+            {membre.avatar_url ? <img src={membre.avatar_url} className="w-full h-full rounded-full object-cover"/> : initials(membre.nom)}
+          </div>
+        )}
+
+        {/* Bouton ouvrir en grand */}
+        <button onClick={e => { e.stopPropagation(); onOpen() }}
+          className="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-500 hover:text-white shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Ouvrir les détails">
+          <ChevronRight size={14}/>
+        </button>
+      </div>
+
+      {/* Barre de progression mini sous-tâches */}
+      {hasSousTaches && (
+        <div className="px-3 pb-2 -mt-1">
+          <div className="h-1 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${progress}%`, backgroundColor: progress === 100 ? "#22c55e" : "#eab308" }}/>
+          </div>
         </div>
-      </button>
-      {membre && (
-        <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-black shrink-0"
-          style={{ backgroundColor: membre.color || "#eab308" }} title={membre.nom}>
-          {membre.avatar_url ? <img src={membre.avatar_url} className="w-full h-full rounded-full object-cover"/> : initials(membre.nom)}
+      )}
+
+      {/* Liste des sous-tâches dépliable */}
+      {hasSousTaches && expanded && (
+        <div className="border-t border-zinc-800/60 px-3 py-2 space-y-1.5">
+          {sousTaches.map(s => (
+            <button key={s.id} onClick={() => onToggleSousTache(s.id)}
+              className="w-full flex items-center gap-2.5 py-1.5 text-left group/st">
+              <div className={`w-4.5 h-4.5 rounded border flex items-center justify-center shrink-0 transition-colors ${s.done ? "bg-green-500 border-green-500" : "border-zinc-600 group-hover/st:border-zinc-400"}`}
+                style={{ width: "18px", height: "18px" }}>
+                {s.done && <Check size={10} className="text-black"/>}
+              </div>
+              <span className={`text-xs flex-1 ${s.done ? "line-through text-zinc-600" : "text-zinc-300"}`}>{s.label}</span>
+            </button>
+          ))}
+          <button onClick={onOpen}
+            className="w-full flex items-center justify-center gap-1.5 mt-1 py-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 text-[10px] font-bold transition-colors">
+            <ChevronRight size={10}/> Modifier · Ajouter des sous-tâches
+          </button>
         </div>
       )}
     </div>
@@ -487,9 +543,10 @@ function TacheCard({ tache, membre, onOpen, onMove }: {
 }
 
 /* ── Groupe vue Échéancier ── */
-function EcheancierGroup({ title, color, taches, membres, onOpen, onCycleStatut }: {
+function EcheancierGroup({ title, color, taches, membres, onOpen, onCycleStatut, onToggleSousTache }: {
   title: string; color: string; taches: Tache[]; membres: Membre[]
   onOpen: (t: Tache) => void; onCycleStatut: (t: Tache) => void
+  onToggleSousTache: (tache: Tache, sousTacheId: string) => void
 }) {
   if (taches.length === 0) return null
   return (
@@ -502,7 +559,8 @@ function EcheancierGroup({ title, color, taches, membres, onOpen, onCycleStatut 
       <div className="space-y-2">
         {taches.map(t => (
           <TacheRow key={t.id} tache={t} membre={membres.find(m => m.id === t.assigne_id)}
-            onOpen={() => onOpen(t)} onCycleStatut={() => onCycleStatut(t)}/>
+            onOpen={() => onOpen(t)} onCycleStatut={() => onCycleStatut(t)}
+            onToggleSousTache={sid => onToggleSousTache(t, sid)}/>
         ))}
       </div>
     </div>
@@ -570,6 +628,14 @@ export default function TachesModule({ activeSociety, profile }: Props) {
     const payload: any = { statut: next, completed_at: next === "termine" ? new Date().toISOString() : null }
     await supabase.from("liste_taches").update(payload).eq("id", tache.id)
     setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, ...payload } : t))
+  }
+
+  const toggleSousTache = async (tache: Tache, sousTacheId: string) => {
+    const updated = (tache.sous_taches || []).map(s =>
+      s.id === sousTacheId ? { ...s, done: !s.done } : s
+    )
+    await supabase.from("liste_taches").update({ sous_taches: updated }).eq("id", tache.id)
+    setTaches(prev => prev.map(t => t.id === tache.id ? { ...t, sous_taches: updated } : t))
   }
 
   const filtered = taches.filter(t => {
@@ -694,12 +760,12 @@ export default function TachesModule({ activeSociety, profile }: Props) {
         </div>
       ) : view === "echeancier" ? (
         <div className="flex-1 overflow-y-auto p-4">
-          <EcheancierGroup title="En retard" color="#ef4444" taches={grpRetard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
-          <EcheancierGroup title="Aujourd'hui" color="#f97316" taches={grpAujourdhui} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
-          <EcheancierGroup title="Demain" color="#eab308" taches={grpDemain} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
-          <EcheancierGroup title="Cette semaine" color="#3b82f6" taches={grpSemaine} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
-          <EcheancierGroup title="Plus tard" color="#71717a" taches={grpPlusTard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
-          <EcheancierGroup title="Sans échéance" color="#52525b" taches={grpSansEcheance} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut}/>
+          <EcheancierGroup title="En retard" color="#ef4444" taches={grpRetard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
+          <EcheancierGroup title="Aujourd'hui" color="#f97316" taches={grpAujourdhui} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
+          <EcheancierGroup title="Demain" color="#eab308" taches={grpDemain} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
+          <EcheancierGroup title="Cette semaine" color="#3b82f6" taches={grpSemaine} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
+          <EcheancierGroup title="Plus tard" color="#71717a" taches={grpPlusTard} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
+          <EcheancierGroup title="Sans échéance" color="#52525b" taches={grpSansEcheance} membres={membres} onOpen={setPanelTache} onCycleStatut={cycleStatut} onToggleSousTache={toggleSousTache}/>
           {grpTermineesAnnulees.length > 0 && (
             <div className="mt-2">
               <button onClick={() => setShowTerminees(p => !p)} className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-xs font-bold uppercase tracking-wider mb-2">
@@ -708,7 +774,7 @@ export default function TachesModule({ activeSociety, profile }: Props) {
               {showTerminees && (
                 <div className="space-y-2">
                   {grpTermineesAnnulees.map(t => (
-                    <TacheRow key={t.id} tache={t} membre={getMembre(t.assigne_id)} onOpen={() => setPanelTache(t)} onCycleStatut={() => cycleStatut(t)}/>
+                    <TacheRow key={t.id} tache={t} membre={getMembre(t.assigne_id)} onOpen={() => setPanelTache(t)} onCycleStatut={() => cycleStatut(t)} onToggleSousTache={sid => toggleSousTache(t, sid)}/>
                   ))}
                 </div>
               )}
@@ -719,7 +785,8 @@ export default function TachesModule({ activeSociety, profile }: Props) {
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {sorted.map(t => (
             <TacheRow key={t.id} tache={t} membre={getMembre(t.assigne_id)}
-              onOpen={() => setPanelTache(t)} onCycleStatut={() => cycleStatut(t)}/>
+              onOpen={() => setPanelTache(t)} onCycleStatut={() => cycleStatut(t)}
+              onToggleSousTache={sid => toggleSousTache(t, sid)}/>
           ))}
         </div>
       ) : (
