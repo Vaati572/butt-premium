@@ -31,6 +31,7 @@ import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
 import MailModule from "@/components/mail/MailModule"
+import LaunchScreen from "@/components/launch/LaunchScreen"
 
 const ADMIN_PIN = "18072209"
 
@@ -63,7 +64,6 @@ const ALL_NAV = [
     { id: "agenda",           label: "Agenda",             icon: "📅" },
     { id: "stocks",           label: "Stock",              icon: "📦" },
     { id: "taches",           label: "Liste des tâches",   icon: "✅" },
-    { id: "mail",             label: "Boîte mail",         icon: "📧" },
   ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
@@ -78,6 +78,7 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
+    { id: "mail",         label: "Boîte mail",   icon: "📧" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
@@ -322,9 +323,41 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [openTabs, setOpenTabs]   = useState<string[]>([settings.start_page || "vente"])
   const [activeTab, setActiveTab] = useState<string>(settings.start_page || "vente")
 
+  // ── Launch screen ──
+  const [showLaunch, setShowLaunch] = useState<boolean>(() => {
+    try { return !sessionStorage.getItem("launch_shown") } catch { return false }
+  })
+
+  const FREQ_KEY = `tab_freq_${profile?.id || "default"}`
+  const getTopTabs = () => {
+    try {
+      const freq: Record<string, number> = JSON.parse(localStorage.getItem(FREQ_KEY) || "{}")
+      const ALL_TABS_FOR_FREQ = ALL_NAV.flatMap(s => s.items)
+      return Object.entries(freq)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 6)
+        .map(([id]) => ALL_TABS_FOR_FREQ.find(t => t.id === id))
+        .filter(Boolean) as { id: string; label: string; icon: string }[]
+    } catch { return [] }
+  }
+
+  const topTabs = getTopTabs().length >= 3 ? getTopTabs() : ALL_NAV.find(s => s.section === "Activité")?.items.slice(0, 6) || []
+
   const openTab = (id: string) => {
     setOpenTabs(prev => prev.includes(id) ? prev : [...prev, id])
     setActiveTab(id)
+    // Track fréquence
+    try {
+      const freq: Record<string, number> = JSON.parse(localStorage.getItem(FREQ_KEY) || "{}")
+      freq[id] = (freq[id] || 0) + 1
+      localStorage.setItem(FREQ_KEY, JSON.stringify(freq))
+    } catch {}
+  }
+
+  const closeLaunch = (tabId?: string) => {
+    try { sessionStorage.setItem("launch_shown", "1") } catch {}
+    setShowLaunch(false)
+    if (tabId) openTab(tabId)
   }
 
   // Ouvre l'onglet indiqué dans l'URL au chargement (ex: retour du flux OAuth Gmail ?tab=mail)
@@ -656,7 +689,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         logout={logout} showConvPopup={showConvPopup}
         setShowConvPopup={setShowConvPopup} activeConvention={activeConvention}
       />
-      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}{showLaunch && <LaunchScreen profile={profile} activeSociety={activeSociety} topTabs={topTabs} onClose={closeLaunch}/>}
     </>
   )
 
@@ -1059,7 +1092,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         </main>
       </div>
 
-      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}{showLaunch && <LaunchScreen profile={profile} activeSociety={activeSociety} topTabs={topTabs} onClose={closeLaunch}/>}
     </div>
   )
 }
