@@ -64,6 +64,9 @@ const ALL_NAV = [
     { id: "agenda",           label: "Agenda",             icon: "📅" },
     { id: "stocks",           label: "Stock",              icon: "📦" },
     { id: "taches",           label: "Liste des tâches",   icon: "✅" },
+    { id: "pharmacies",       label: "Pharmacies",         icon: "🏥" },
+    { id: "commandes",        label: "Fournisseurs",       icon: "🏭" },
+    { id: "playlists",        label: "Playlists clients",  icon: "🎵" },
   ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
@@ -87,11 +90,6 @@ const ALL_NAV = [
     { id: "tournees",  label: "Tournées",       icon: "🛣️" },
     { id: "map",       label: "Map",            icon: "🗺️" },
     { id: "ia",        label: "IA",             icon: "🤖" },
-  ]},
-  { section: "Gestion", items: [
-    { id: "commandes",  label: "Fournisseurs",       icon: "🏭" },
-    { id: "pharmacies", label: "Pharmacies",         icon: "🏥" },
-    { id: "playlists",  label: "Playlists clients",  icon: "🎵" },
   ]},
   { section: "Système", items: [
     { id: "accueil",    label: "Accueil",        icon: "🏠" },
