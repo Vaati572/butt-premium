@@ -138,6 +138,26 @@ tbody tr:last-child td{border-bottom:none;}
 .callout ul{color:var(--ink-soft); font-size:.95rem; margin:.5rem 0 0; padding-left:1.2rem;}
 .callout li{margin-bottom:.4rem;}
 
+/* SWATCHES */
+.swatches{display:flex; flex-wrap:wrap; gap:1rem; margin:0 0 1.4rem;}
+.swatch{width:118px;}
+.swatch__chip{height:60px; border-radius:10px; border:1px solid var(--line); margin-bottom:.5rem;}
+.swatch__name{font-size:.85rem; font-weight:600;}
+.swatch__hex{font-family:'IBM Plex Mono',monospace; font-size:.76rem; color:var(--ink-soft);}
+
+/* WIREFRAME */
+.wireframe{border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:1rem; display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.4rem;}
+.wireframe--split{flex-direction:row; flex-wrap:wrap; align-items:stretch;}
+.wf-col{flex:1 1 260px; display:flex; flex-direction:column; gap:.5rem;}
+.wf-block{border:1px dashed var(--line); border-radius:8px; padding:.9rem 1rem; font-size:.8rem; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; text-align:center; background:var(--porcelain);}
+.wf-header{background:var(--ink); color:#fff; opacity:.85;}
+.wf-hero{background:var(--crystal-soft); color:var(--crystal); font-weight:600; padding:1.7rem 1rem;}
+.wf-grid{background:var(--champagne-soft);}
+.wf-mini-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem; margin-top:.6rem;}
+.wf-mini-grid div{aspect-ratio:3/4; background:#fff; border:1px solid var(--line); border-radius:4px;}
+.wf-media{flex:1; min-height:200px; display:flex; align-items:center; justify-content:center;}
+.wf-footer{background:var(--ink); color:#fff; opacity:.7;}
+
 /* CODE */
 pre.code{background:var(--ink); color:#E7E4F1; border-radius:var(--radius); padding:1.3rem 1.4rem; overflow-x:auto; font-family:'IBM Plex Mono',monospace; font-size:.8rem; line-height:1.65; margin:1rem 0;}
 .code-label{font-family:'IBM Plex Mono',monospace; font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:.5rem; display:block;}
@@ -212,6 +232,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
     <a href="#hypotheses">Hypothèses</a>
     <a href="#feuille-de-route">Feuille de route</a>
     <a href="#arborescence">Arborescence</a>
+    <a href="#design">Design du site</a>
     <a href="#seo-onpage">SEO on-page</a>
     <a href="#mots-cles">Mots-clés</a>
     <a href="#seo-technique">SEO technique</a>
@@ -279,7 +300,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
         <li><label><input type="checkbox"><span>Créer la boutique Shopify, thème Dawn (gratuit, rapide — vous le maîtrisez déjà sur Sublime Blazer)</span></label></li>
         <li><label><input type="checkbox"><span>Réunir les infos légales de l'entreprise (SIRET, statut) avant mise en ligne</span></label></li>
       </ul>
-      <p class="note">Suggestion de palette (facultatif) : un fond ivoire/porcelaine, un violet cristal profond et une touche or/champagne évoquent à la fois le strass et le blanc dentaire sans tomber dans le glitter premier degré. À ajuster librement selon votre marque.</p>
+      <p class="note">Direction visuelle complète (palette, typographie, wireframes) : voir la section « Design du site » ci-dessous.</p>
     </div>
 
     <div class="phase">
@@ -408,12 +429,127 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   </div>
 </section>
 
+<!-- DESIGN DU SITE -->
+<section class="section" id="design">
+  <div class="section-head">
+    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
+    <div>
+      <span class="section-num">03 — Direction artistique</span>
+      <h2>Design du site — épuré &amp; optimisé</h2>
+    </div>
+  </div>
+  <p class="section-intro">Ce qui manquait dans la première version : la direction visuelle de la boutique elle-même (ce rapport avait sa propre esthétique, pas encore la vôtre). Voici un système volontairement restreint : peu de couleurs, peu de polices, peu de composants, réutilisés partout — c'est ça, l'épuré.</p>
+
+  <div class="card" style="margin-bottom:1.4rem;">
+    <h3>Concept</h3>
+    <p style="color:var(--ink-soft);">Un minimalisme précis plutôt qu'un glam premier degré : beaucoup de blanc, une seule couleur signature utilisée avec parcimonie, une typographie nette, et la photographie comme unique « éclat » du site — pas d'effets scintillants en CSS. Ce rapport applique déjà cette direction (violet cristal + or en touches, sur fond clair) : vous pouvez vous en inspirer tel quel pour la boutique.</p>
+  </div>
+
+  <h3 style="margin-bottom:.8rem;">Palette</h3>
+  <div class="swatches">
+    <div class="swatch"><div class="swatch__chip" style="background:#FAF9F7;"></div><div class="swatch__name">Fond</div><div class="swatch__hex">#FAF9F7</div></div>
+    <div class="swatch"><div class="swatch__chip" style="background:#1C1B22;"></div><div class="swatch__name">Encre</div><div class="swatch__hex">#1C1B22</div></div>
+    <div class="swatch"><div class="swatch__chip" style="background:#6B5CA0;"></div><div class="swatch__name">Signature</div><div class="swatch__hex">#6B5CA0</div></div>
+    <div class="swatch"><div class="swatch__chip" style="background:#B8894F;"></div><div class="swatch__name">Détail</div><div class="swatch__hex">#B8894F</div></div>
+  </div>
+  <div class="callout callout--tip">
+    <span class="callout__label">💡 Règle de restraint</span>
+    <p>Le violet n'apparaît qu'à un seul endroit par écran : le bouton d'action principal et les liens. L'or n'est jamais utilisé en aplat large, seulement en badge fin ou en filet. Dans Dawn, ces couleurs se configurent en <strong>jeux de couleurs</strong> (Paramètres du thème → Couleurs) : créez-en deux — un jeu clair pour l'essentiel du site, un jeu accent réservé à une seule section par page pour créer un point focal, jamais plus.</p>
+  </div>
+
+  <h3 style="margin:1.8rem 0 .8rem;">Typographie</h3>
+  <div class="grid grid-2">
+    <div class="card">
+      <h3 style="font-size:1rem;">Option A — cohérente avec ce rapport</h3>
+      <ul><li>Titres : Fraunces</li><li>Corps : IBM Plex Sans</li></ul>
+    </div>
+    <div class="card">
+      <h3 style="font-size:1rem;">Option B — plus éditorial classique</h3>
+      <ul><li>Titres : Newsreader</li><li>Corps : Public Sans</li></ul>
+    </div>
+  </div>
+  <p style="color:var(--ink-soft); font-size:.9rem; margin-top:.8rem;">Se configure dans Paramètres du thème → Typographie (sélecteurs séparés Titres / Corps, aperçu en direct depuis la bibliothèque de polices Shopify). Limitez-vous à 2 graisses par police : chaque graisse supplémentaire est un fichier de plus à charger, donc du poids en moins pour l'INP.</p>
+
+  <h3 style="margin:1.8rem 0 .8rem;">Page d'accueil — structure</h3>
+  <div class="wireframe">
+    <div class="wf-block wf-header">Header — logo, 5 liens de nav max, panier</div>
+    <div class="wf-block wf-hero">Hero — 1 visuel photo, H1 court, 1 CTA</div>
+    <div class="wf-block wf-trust">Réassurance — 4 points clés en ligne</div>
+    <div class="wf-block wf-grid">
+      Nos formations — grille de 4 cartes
+      <div class="wf-mini-grid"><div></div><div></div><div></div><div></div></div>
+    </div>
+    <div class="wf-block wf-proof">Preuve sociale — note globale + 1 avis</div>
+    <div class="wf-block wf-why">Pourquoi nous — 3 colonnes</div>
+    <div class="wf-block wf-about">À propos (teaser) + CTA</div>
+    <div class="wf-block wf-faq">FAQ courte — 3 à 4 questions</div>
+    <div class="wf-block wf-footer">Footer — légal, réseaux, newsletter</div>
+  </div>
+
+  <h3 style="margin:1.8rem 0 .8rem;">Fiche produit — structure</h3>
+  <div class="wireframe wireframe--split">
+    <div class="wf-col">
+      <div class="wf-block wf-media">Galerie photo grand format</div>
+    </div>
+    <div class="wf-col">
+      <div class="wf-block wf-info">Titre + prix + 1 badge maximum</div>
+      <div class="wf-block wf-cta">CTA + paiement en plusieurs fois visible</div>
+      <div class="wf-block wf-accordion">Programme · Inclus · Modalités · FAQ — en accordéons</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-top:.4rem;">
+    <div class="card">
+      <h3>Composants</h3>
+      <ul>
+        <li>Boutons : coins peu arrondis (4-6px), un seul style plein + un style contour, jamais plus de 2 styles sur un même écran</li>
+        <li>Badges : un seul par élément — n'empilez pas note, tag et promo sur une même carte</li>
+        <li>Cartes produit : photo en 3:4, titre, prix, un seul CTA</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Direction photo</h3>
+      <ul>
+        <li>Lumière claire, fond neutre, ratio cohérent (3:4 partout)</li>
+        <li>Gestes et matériel en gros plan plutôt que visages si contrainte RGPD</li>
+        <li>Éviter le stock photo générique « dentiste souriant » — préférez vos propres photos de formation</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout callout--tip" style="margin-top:1.8rem;">
+    <span class="callout__label">Design × performance</span>
+    <ul>
+      <li>Hero en image fixe &lt;200 Ko, jamais de slider JS ni de vidéo autoplay lourde</li>
+      <li>aspect-ratio CSS défini sur chaque image, pour éviter les sauts de mise en page (CLS)</li>
+      <li>Maximum 7-8 sections sur la page d'accueil — chaque section ajoutée pèse sur l'INP</li>
+      <li>Aucun popup d'entrée : mauvais pour le CLS, et contre-productif sur un achat aussi réfléchi</li>
+    </ul>
+  </div>
+
+  <h3 style="margin:1.8rem 0 .8rem;">Correspondance avec les sections Dawn</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Élément du site</th><th>Section Dawn à utiliser</th></tr></thead>
+      <tbody>
+        <tr><td>Header épuré</td><td>Header — logo centré, menu simple</td></tr>
+        <tr><td>Hero</td><td>Image banner — 1 image, 1 bouton, pas de slideshow</td></tr>
+        <tr><td>Réassurance</td><td>Multicolumn — 4 colonnes avec icônes</td></tr>
+        <tr><td>Nos formations</td><td>Featured collection</td></tr>
+        <tr><td>Pourquoi nous</td><td>Multicolumn — 3 colonnes</td></tr>
+        <tr><td>FAQ</td><td>Collapsible content — accordéon natif</td></tr>
+        <tr><td>Footer</td><td>Footer standard, colonnes réduites</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <!-- SEO ON-PAGE -->
 <section class="section" id="seo-onpage">
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">03 — H1 à H6, title, meta</span>
+      <span class="section-num">04 — H1 à H6, title, meta</span>
       <h2>Structure SEO on-page, page par page</h2>
     </div>
   </div>
@@ -537,7 +673,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">04 — Ciblage</span>
+      <span class="section-num">05 — Ciblage</span>
       <h2>Tableau de mots-clés stratégiques</h2>
     </div>
   </div>
@@ -572,7 +708,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">05 — Sous le capot</span>
+      <span class="section-num">06 — Sous le capot</span>
       <h2>SEO technique sur Shopify</h2>
     </div>
   </div>
@@ -601,7 +737,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">06 — Rich results</span>
+      <span class="section-num">07 — Rich results</span>
       <h2>Données structurées (schema markup)</h2>
     </div>
   </div>
@@ -661,7 +797,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">07 — Configuration</span>
+      <span class="section-num">08 — Configuration</span>
       <h2>Optimisation Shopify avancée</h2>
     </div>
   </div>
@@ -707,7 +843,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">08 — Autorité</span>
+      <span class="section-num">09 — Autorité</span>
       <h2>Stratégie de contenu &amp; calendrier éditorial</h2>
     </div>
   </div>
@@ -734,7 +870,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">09 — Taux de conversion</span>
+      <span class="section-num">10 — Taux de conversion</span>
       <h2>Conversion &amp; éléments de confiance</h2>
     </div>
   </div>
@@ -766,7 +902,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">10 — Conformité</span>
+      <span class="section-num">11 — Conformité</span>
       <h2>Conformité légale France</h2>
     </div>
   </div>
@@ -806,7 +942,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">11 — Mesure</span>
+      <span class="section-num">12 — Mesure</span>
       <h2>Tracking &amp; analytics</h2>
     </div>
   </div>
@@ -823,7 +959,7 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   <div class="section-head">
     <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
     <div>
-      <span class="section-num">12 — Avant de publier</span>
+      <span class="section-num">13 — Avant de publier</span>
       <h2>Checklist finale de lancement</h2>
     </div>
   </div>
