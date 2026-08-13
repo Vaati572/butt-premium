@@ -33,6 +33,7 @@ import TachesModule from "@/components/taches/TachesModule"
 import MailModule from "@/components/mail/MailModule"
 import LaunchScreen from "@/components/launch/LaunchScreen"
 import ProspectionModule from "@/components/prospection/ProspectionModule"
+import FormationModal from "@/components/formation/FormationModal"
 
 const ADMIN_PIN = "18072209"
 
@@ -954,6 +955,11 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
             )}
           </div>
         </div>
+
+        {/* Bouton FORMATION */}
+        <div className="px-3 pb-4 shrink-0">
+          <FormationModal/>
+        </div>
       </aside>
 
       {/* ══ SIDEBAR MOBILE ══ */}
@@ -1001,6 +1007,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               )
             })}
           </nav>
+          <div className="border-t border-zinc-800/60 px-3 pt-3 pb-2 shrink-0">
+            <FormationModal/>
+          </div>
           <div className="border-t border-zinc-800/60 p-3 shrink-0">
             <div className="flex items-center gap-2 px-2 py-2 rounded-xl" style={{ backgroundColor: "rgba(39,39,42,0.5)", border: "1px solid rgba(63,63,70,0.5)" }}>
               <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={26} />
