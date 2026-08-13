@@ -32,6 +32,7 @@ import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
 import MailModule from "@/components/mail/MailModule"
 import LaunchScreen from "@/components/launch/LaunchScreen"
+import ProspectionModule from "@/components/prospection/ProspectionModule"
 
 const ADMIN_PIN = "18072209"
 
@@ -65,6 +66,7 @@ const ALL_NAV = [
     { id: "stocks",           label: "Stock",              icon: "📦" },
     { id: "taches",           label: "Liste des tâches",   icon: "✅" },
     { id: "pharmacies",       label: "Pharmacies",         icon: "🏥" },
+    { id: "prospection",      label: "Prospection",        icon: "💊" },
     { id: "commandes",        label: "Fournisseurs",       icon: "🏭" },
     { id: "playlists",        label: "Playlists clients",  icon: "🎵" },
   ]},
@@ -626,6 +628,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "contrats":          return <ContratsModule        activeSociety={activeSociety} profile={profile} />
       case "facturesdevis":     return <FacturesDevisModule   activeSociety={activeSociety} profile={profile} />
       case "pharmacies":        return <PharmaciesModule      activeSociety={activeSociety} profile={profile} />
+      case "prospection":       return <ProspectionModule     activeSociety={activeSociety} profile={profile} />
       case "commandes":         return <CommandesModule       activeSociety={activeSociety} profile={profile} />
       case "playlists":         return <PlaylistsModule       activeSociety={activeSociety} profile={profile} />
       case "tournees":          return <TourneesModule        activeSociety={activeSociety} profile={profile}
