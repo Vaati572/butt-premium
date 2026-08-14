@@ -1,9 +1,4 @@
-"use client"
-
-import { useState } from "react"
-import { X } from "lucide-react"
-
-const FORMATION_HTML = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -601,10 +596,10 @@ function makeChecklist(containerId, prefix, items){
   el.innerHTML = items.map((text, i) => {
     const key = prefix + '_' + i;
     const checked = !!state[key];
-    return \`<div class="check-row\${checked?' checked':''}" onclick="toggle('\${key}')">
-      <div class="check-box">\${checked?'✓':''}</div>
-      <span class="check-text">\${text}</span>
-    </div>\`;
+    return `<div class="check-row${checked?' checked':''}" onclick="toggle('${key}')">
+      <div class="check-box">${checked?'✓':''}</div>
+      <span class="check-text">${text}</span>
+    </div>`;
   }).join('');
 }
 
@@ -613,25 +608,25 @@ function makePhases(){
   if(!el) return;
   el.innerHTML = PHASES.map((phase, pi) => {
     const items = phase.items.map((text, i) => {
-      const key = \`roadmap_\${pi}_\${i}\`;
+      const key = `roadmap_${pi}_${i}`;
       const checked = !!state[key];
-      return \`<div class="check-row\${checked?' checked':''}" onclick="toggle('\${key}')">
-        <div class="check-box">\${checked?'✓':''}</div>
-        <span class="check-text">\${text}</span>
-      </div>\`;
+      return `<div class="check-row${checked?' checked':''}" onclick="toggle('${key}')">
+        <div class="check-box">${checked?'✓':''}</div>
+        <span class="check-text">${text}</span>
+      </div>`;
     }).join('');
-    const doneCount = phase.items.filter((_,i)=>!!state[\`roadmap_\${pi}_\${i}\`]).length;
+    const doneCount = phase.items.filter((_,i)=>!!state[`roadmap_${pi}_${i}`]).length;
     const allDone = doneCount === phase.items.length;
-    return \`<div class="phase\${pi<2?' open':''}">
+    return `<div class="phase${pi<2?' open':''}">
       <div class="phase-header" onclick="togglePhase(this.parentElement)">
-        <span class="phase-num">\${phase.num}</span>
-        <span class="phase-title">\${phase.title}</span>
-        <span class="phase-count">\${doneCount}/\${phase.items.length}</span>
-        \${allDone ? '<span style="color:var(--green);font-size:13px">✓</span>' : ''}
+        <span class="phase-num">${phase.num}</span>
+        <span class="phase-title">${phase.title}</span>
+        <span class="phase-count">${doneCount}/${phase.items.length}</span>
+        ${allDone ? '<span style="color:var(--green);font-size:13px">✓</span>' : ''}
         <span class="phase-chevron">›</span>
       </div>
-      <div class="phase-body"><div style="padding:8px 16px 12px">\${items}</div></div>
-    </div>\`;
+      <div class="phase-body"><div style="padding:8px 16px 12px">${items}</div></div>
+    </div>`;
   }).join('');
 }
 
@@ -640,36 +635,36 @@ function makeKeywords(){
   if(!el) return;
   el.innerHTML = KEYWORDS.map(([kw, intent, page, prio]) => {
     const prioCls = prio === 'Haute' ? 'priority-haute' : 'priority-moyenne';
-    return \`<tr>
-      <td><strong>\${kw}</strong></td>
-      <td><span class="intent-badge">\${intent}</span></td>
-      <td style="color:var(--muted)">\${page}</td>
-      <td><span class="priority-badge \${prioCls}">\${prio}</span></td>
-    </tr>\`;
+    return `<tr>
+      <td><strong>${kw}</strong></td>
+      <td><span class="intent-badge">${intent}</span></td>
+      <td style="color:var(--muted)">${page}</td>
+      <td><span class="priority-badge ${prioCls}">${prio}</span></td>
+    </tr>`;
   }).join('');
 }
 
 function updateProgress(){
   const allKeys = [];
   // phases
-  PHASES.forEach((p,pi) => p.items.forEach((_,i) => allKeys.push(\`roadmap_\${pi}_\${i}\`)));
+  PHASES.forEach((p,pi) => p.items.forEach((_,i) => allKeys.push(`roadmap_${pi}_${i}`)));
   // checklists
-  Object.entries(CHECKS).forEach(([prefix, items]) => items.forEach((_,i) => allKeys.push(\`\${prefix}_\${i}\`)));
+  Object.entries(CHECKS).forEach(([prefix, items]) => items.forEach((_,i) => allKeys.push(`${prefix}_${i}`)));
   const done = allKeys.filter(k => !!state[k]).length;
   const pct = allKeys.length > 0 ? Math.round(done/allKeys.length*100) : 0;
   document.getElementById('progress-pct').textContent = pct + '%';
   document.getElementById('progress-fill').style.width = pct + '%';
   // nav checks
   const navChecks = {
-    roadmap: PHASES.flatMap((p,pi)=>p.items.map((_,i)=>\`roadmap_\${pi}_\${i}\`)),
-    design: CHECKS.design.map((_,i)=>\`design_\${i}\`),
-    'seo-onpage': CHECKS['seo-onpage'].map((_,i)=>\`seo-onpage_\${i}\`),
-    'seo-technique': CHECKS['seo-technique'].map((_,i)=>\`seo-technique_\${i}\`),
-    shopify: CHECKS.shopify.map((_,i)=>\`shopify_\${i}\`),
-    conversion: CHECKS.conversion.map((_,i)=>\`conversion_\${i}\`),
-    legal: CHECKS.legal.map((_,i)=>\`legal_\${i}\`),
-    tracking: CHECKS.tracking.map((_,i)=>\`tracking_\${i}\`),
-    checklist: [...CHECKS['cl-contenu'],...CHECKS['cl-seo'],...CHECKS['cl-legal'],...CHECKS['cl-ux']].map((_,i)=>\`cl-\${i}\`),
+    roadmap: PHASES.flatMap((p,pi)=>p.items.map((_,i)=>`roadmap_${pi}_${i}`)),
+    design: CHECKS.design.map((_,i)=>`design_${i}`),
+    'seo-onpage': CHECKS['seo-onpage'].map((_,i)=>`seo-onpage_${i}`),
+    'seo-technique': CHECKS['seo-technique'].map((_,i)=>`seo-technique_${i}`),
+    shopify: CHECKS.shopify.map((_,i)=>`shopify_${i}`),
+    conversion: CHECKS.conversion.map((_,i)=>`conversion_${i}`),
+    legal: CHECKS.legal.map((_,i)=>`legal_${i}`),
+    tracking: CHECKS.tracking.map((_,i)=>`tracking_${i}`),
+    checklist: [...CHECKS['cl-contenu'],...CHECKS['cl-seo'],...CHECKS['cl-legal'],...CHECKS['cl-ux']].map((_,i)=>`cl-${i}`),
   };
   Object.entries(navChecks).forEach(([id, keys]) => {
     const el = document.getElementById('nc-'+id);
@@ -724,47 +719,3 @@ renderAll();
 </script>
 </body>
 </html>
-`
-
-export default function FormationModal() {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <>
-      {/* Bouton FORMATION dans le sidebar */}
-      <button
-        onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 font-black text-sm tracking-widest uppercase transition-all rounded-2xl py-3.5 px-4"
-        style={{
-          background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-          color: "#fff",
-          boxShadow: "0 4px 20px rgba(124,58,237,0.45)",
-          border: "none",
-          letterSpacing: "0.12em",
-          fontSize: "13px",
-        }}>
-        🎓 Formation
-      </button>
-
-      {/* Modal plein écran */}
-      {open && (
-        <div className="fixed inset-0 z-[300] flex flex-col" style={{ background: "#fff" }}>
-          <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200 shrink-0"
-            style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}>
-            <span className="text-white font-black text-base tracking-widest uppercase">🎓 Formation</span>
-            <button
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors">
-              <X size={15}/> Fermer
-            </button>
-          </div>
-          <iframe
-            srcDoc={FORMATION_HTML}
-            className="flex-1 border-0 w-full"
-            title="Formation"
-          />
-        </div>
-      )}
-    </>
-  )
-}
