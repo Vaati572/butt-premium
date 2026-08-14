@@ -37,7 +37,7 @@ export default function FormationModal() {
             </button>
           </div>
           <iframe
-            src="/formation.html"
+            src="/formation_eclats.html"
             className="flex-1 border-0 w-full"
             title="Formation Éclats et Strass"
           />
