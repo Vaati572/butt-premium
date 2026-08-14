@@ -34,6 +34,7 @@ import MailModule from "@/components/mail/MailModule"
 import LaunchScreen from "@/components/launch/LaunchScreen"
 import ProspectionModule from "@/components/prospection/ProspectionModule"
 import FormationModal from "@/components/formation/FormationModal"
+import ProspectionModal from "@/components/formation/ProspectionModal"
 
 const ADMIN_PIN = "18072209"
 
@@ -956,8 +957,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           </div>
         </div>
 
-        {/* Bouton FORMATION */}
-        <div className="px-3 pb-4 shrink-0">
+        {/* Boutons PROSPECTION + FORMATION */}
+        <div className="px-3 pb-4 shrink-0 flex flex-col gap-2">
+          <ProspectionModal/>
           <FormationModal/>
         </div>
       </aside>
@@ -1007,7 +1009,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
               )
             })}
           </nav>
-          <div className="border-t border-zinc-800/60 px-3 pt-3 pb-2 shrink-0">
+          <div className="border-t border-zinc-800/60 px-3 pt-3 pb-2 shrink-0 flex flex-col gap-2">
+            <ProspectionModal/>
             <FormationModal/>
           </div>
           <div className="border-t border-zinc-800/60 p-3 shrink-0">
