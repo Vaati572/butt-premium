@@ -8,743 +8,403 @@ const FORMATION_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Éclats et Strass — Compte rendu total Shopify & SEO</title>
+<title>Éclats et Strass — Plan Shopify & SEO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --ink:#171922;
-  --ink-soft:#4A4C5C;
-  --porcelain:#F7F5FA;
-  --paper:#FFFFFF;
-  --crystal:#6B5CA0;
-  --crystal-soft:#EDE9F6;
-  --champagne:#B8894F;
-  --champagne-soft:#F6ECDC;
-  --garnet:#96423F;
-  --garnet-soft:#F5E7E6;
-  --line:#E3E0EC;
-  --radius:16px;
-  --maxw:1080px;
+  --bg:#0D0D14;
+  --surface:#141420;
+  --surface2:#1A1A2C;
+  --border:#252538;
+  --border2:#2E2E48;
+  --text:#E8E6F0;
+  --muted:#7B7998;
+  --faint:#44435A;
+  --violet:#8B5CF6;
+  --violet-soft:rgba(139,92,246,0.12);
+  --violet-border:rgba(139,92,246,0.30);
+  --gold:#D4A853;
+  --gold-soft:rgba(212,168,83,0.10);
+  --gold-border:rgba(212,168,83,0.28);
+  --green:#34D399;
+  --green-soft:rgba(52,211,153,0.08);
+  --green-border:rgba(52,211,153,0.25);
+  --red:#F87171;
+  --red-soft:rgba(248,113,113,0.08);
+  --blue:#60A5FA;
+  --blue-soft:rgba(96,165,250,0.08);
+  --radius:14px;
+  --sidebar:260px;
 }
-*,*::before,*::after{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
-body{
-  margin:0;
-  background:var(--porcelain);
-  color:var(--ink);
-  font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
-  line-height:1.65;
-  -webkit-font-smoothing:antialiased;
+html{scroll-behavior:smooth;height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;display:flex;min-height:100vh}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar);flex-shrink:0;position:fixed;top:0;left:0;height:100vh;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;z-index:100
 }
-h1,h2,h3{font-family:'Fraunces',Georgia,serif; font-weight:600; margin:0; color:var(--ink);}
-p{margin:0 0 1em;}
-p:last-child{margin-bottom:0;}
-a{color:var(--crystal);}
-code,.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;}
-svg{max-width:100%;}
-.container{max-width:var(--maxw); margin:0 auto; padding:0 1.5rem;}
+.sidebar-logo{
+  padding:20px 16px 16px;border-bottom:1px solid var(--border)
+}
+.logo-gem{width:36px;height:36px;background:linear-gradient(135deg,var(--violet),#A855F7);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:10px}
+.logo-title{font-weight:800;font-size:13px;color:var(--text);letter-spacing:.02em}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.progress-ring{padding:14px 16px;border-bottom:1px solid var(--border)}
+.progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px}
+.progress-label span:last-child{color:var(--violet);font-weight:700}
+.progress-track{height:4px;background:var(--border2);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--violet),#A855F7);border-radius:99px;transition:width .4s ease}
+.nav{flex:1;overflow-y:auto;padding:12px 0}
+.nav::-webkit-scrollbar{width:4px}
+.nav::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px}
+.nav-section{padding:16px 16px 4px;font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.1em}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;
+  border-radius:0;transition:background .15s;text-decoration:none;color:var(--muted);font-size:13px;font-weight:500;
+  border-left:2px solid transparent;position:relative
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{color:var(--violet);background:var(--violet-soft);border-left-color:var(--violet)}
+.nav-item .nav-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--border)}
+.nav-item.active .nav-icon{background:var(--violet-soft)}
+.nav-check{margin-left:auto;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--faint);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px}
+.nav-check.done{background:var(--green);border-color:var(--green);color:#000}
+.sidebar-footer{padding:14px 16px;border-top:1px solid var(--border)}
+.reset-btn{width:100%;background:var(--red-soft);border:1px solid rgba(248,113,113,0.2);color:var(--red);font-size:12px;font-weight:600;padding:8px;border-radius:10px;cursor:pointer}
+.reset-btn:hover{background:rgba(248,113,113,0.15)}
+
+/* ── MAIN ── */
+.main{margin-left:var(--sidebar);flex:1;min-height:100vh;display:flex;flex-direction:column}
+.content{flex:1;padding:32px 40px;max-width:900px}
 
 /* HERO */
-.hero{background:linear-gradient(180deg,#14141D 0%,#1C1B2C 100%); color:#F4F2F9; padding:4.5rem 0 3rem; position:relative;}
-.hero .container{display:flex; gap:2.5rem; align-items:center; flex-wrap:wrap;}
-.hero-text{flex:1 1 380px; min-width:280px;}
-.eyebrow{font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.14em; font-size:.78rem; color:var(--champagne); margin-bottom:1rem; display:block;}
-.hero h1{font-size:clamp(2rem,4.4vw,3rem); line-height:1.14; color:#fff; margin-bottom:1rem;}
-.hero p.lead{color:#C9C5D9; font-size:1.05rem; max-width:48ch; margin-bottom:1.6rem;}
-.hero-meta{display:flex; flex-wrap:wrap; gap:.6rem;}
-.hero-meta span{border:1px solid rgba(244,242,249,.22); color:#E7E4F1; padding:.35rem .8rem; border-radius:999px; font-size:.78rem; font-family:'IBM Plex Mono',monospace;}
-.gem-wrap{flex:0 0 210px; display:flex; justify-content:center;}
-.gem-wrap svg{filter:drop-shadow(0 18px 34px rgba(107,92,160,.4));}
+.hero{background:linear-gradient(135deg,#18162E 0%,#1E1A35 60%,#0D0D14 100%);border:1px solid var(--border);border-radius:20px;padding:36px 40px;margin-bottom:32px;position:relative;overflow:hidden}
+.hero::before{content:'💎';position:absolute;right:32px;top:24px;font-size:72px;opacity:.12;line-height:1}
+.hero-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.1em;font-family:'JetBrains Mono',monospace;background:var(--gold-soft);border:1px solid var(--gold-border);padding:4px 10px;border-radius:99px;margin-bottom:16px}
+.hero h1{font-size:26px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:10px}
+.hero-sub{color:#9490B8;font-size:14px;max-width:55ch;margin-bottom:20px}
+.hero-badges{display:flex;flex-wrap:wrap;gap:8px}
+.hero-badge{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#C8C4E0;font-size:11px;font-weight:500;padding:5px 12px;border-radius:99px;font-family:'JetBrains Mono',monospace}
 
-/* NAV */
-.toc{position:sticky; top:0; z-index:30; background:rgba(247,245,250,.94); backdrop-filter:blur(6px); border-bottom:1px solid var(--line);}
-.toc .container{display:flex; gap:.35rem; overflow-x:auto; padding-top:.65rem; padding-bottom:.65rem;}
-.toc a{white-space:nowrap; text-decoration:none; font-size:.8rem; font-weight:500; color:var(--ink-soft); padding:.4rem .8rem; border-radius:999px; border:1px solid transparent;}
-.toc a:hover{border-color:var(--crystal); color:var(--crystal);}
+/* SECTION */
+.section-page{display:none}
+.section-page.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.section-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:28px}
+.section-num{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--gold);background:var(--gold-soft);border:1px solid var(--gold-border);padding:3px 10px;border-radius:99px}
+.section-title{font-size:22px;font-weight:800;color:var(--text);line-height:1.2}
+.section-intro{color:var(--muted);font-size:14px;line-height:1.7;max-width:70ch;margin-bottom:28px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;border-left:3px solid var(--violet)}
 
-/* SECTIONS */
-.section{padding:3.4rem 0; border-bottom:1px solid var(--line); scroll-margin-top:3.6rem;}
-.section:last-of-type{border-bottom:none;}
-.section-head{margin-bottom:1.8rem; display:flex; gap:.9rem; align-items:flex-start;}
-.section-head h2{font-size:clamp(1.4rem,2.6vw,1.9rem);}
-.section-num{font-family:'IBM Plex Mono',monospace; color:var(--champagne); font-size:.82rem; display:block; margin-bottom:.35rem;}
-.section-intro{color:var(--ink-soft); max-width:72ch; margin-bottom:2rem;}
-.gem-mark{flex:0 0 auto; margin-top:.35rem;}
-
-/* GRID / CARD */
-.grid{display:grid; gap:1.2rem;}
-.grid-2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr));}
-.card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:1.5rem;}
-.card h3{font-size:1.05rem; margin-bottom:.6rem;}
-.card ul{margin:0; padding-left:1.15rem; color:var(--ink-soft);}
-.card li{margin-bottom:.35rem;}
-
-/* PAGE CARD */
-.page-card{background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:1.5rem 1.6rem; margin-bottom:1.2rem;}
-.page-card__url{font-family:'IBM Plex Mono',monospace; font-size:.83rem; color:var(--crystal); background:var(--crystal-soft); padding:.28rem .65rem; border-radius:6px; display:inline-block; margin-bottom:1.1rem;}
-.kv{margin-bottom:.9rem;}
-.kv__label{display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-bottom:.2rem;}
-.kv__value{font-size:.97rem;}
-.h2list{margin:.3rem 0 1.1rem; padding-left:1.2rem;}
-.h2list li{margin-bottom:.32rem;}
-.tagrow{display:flex; flex-wrap:wrap; gap:.4rem;}
-.tag{background:var(--champagne-soft); color:#8A6431; font-family:'IBM Plex Mono',monospace; font-size:.75rem; padding:.26rem .6rem; border-radius:999px;}
-
-/* TREE */
-.tree,.tree ul{list-style:none; margin:0; padding-left:1.3rem;}
-.tree{padding-left:0;}
-.tree > li{padding-left:0;}
-.tree li{position:relative; padding:.42rem 0 .42rem 1.1rem;}
-.tree ul{border-left:1px dashed var(--line); margin-left:.15rem;}
-.tree li ul li::before{content:""; position:absolute; left:0; top:1.05rem; width:.9rem; height:1px; background:var(--line);}
-.tree code{font-size:.78rem; color:var(--ink-soft); margin-left:.5rem;}
-.tree strong{font-weight:600;}
-
-/* PHASES */
-.phases{position:relative; margin-left:.6rem; padding-left:2.3rem; border-left:2px solid var(--crystal-soft);}
-.phase{position:relative; margin-bottom:2.1rem;}
-.phase:last-child{margin-bottom:0;}
-.phase__num{position:absolute; left:-3rem; top:0; width:2.2rem; height:2.2rem; border-radius:50%; background:var(--ink); color:var(--champagne); display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:.83rem; font-weight:600;}
-.phase h3{font-size:1.12rem; margin-bottom:.6rem;}
-.phase .note{font-size:.85rem; font-style:italic; color:var(--ink-soft); margin-top:.6rem;}
-
-/* TABLE */
-.table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper);}
-table{width:100%; border-collapse:collapse; font-size:.92rem;}
-th,td{text-align:left; padding:.78rem 1rem; border-bottom:1px solid var(--line); vertical-align:top;}
-thead th{background:var(--porcelain); font-family:'IBM Plex Mono',monospace; font-size:.74rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft);}
-tbody tr:last-child td{border-bottom:none;}
-.prio{font-size:.75rem; font-weight:600; padding:.2rem .55rem; border-radius:999px; font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
-.prio--haute{background:var(--champagne-soft); color:#8A6431;}
-.prio--moyenne{background:var(--crystal-soft); color:var(--crystal);}
+/* CARDS */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .15s}
+.card:hover{border-color:var(--border2)}
+.card h3{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
 
 /* CHECKLIST */
-.checklist{list-style:none; margin:0; padding:0;}
-.checklist li{margin-bottom:.65rem;}
-.checklist label{display:flex; align-items:flex-start; gap:.7rem; cursor:pointer;}
-.checklist input{margin-top:.28rem; width:1.05rem; height:1.05rem; accent-color:var(--crystal); flex:0 0 auto;}
-.checklist input:checked ~ span{color:var(--ink-soft); text-decoration:line-through; text-decoration-color:var(--crystal);}
-.checklist-group h3{font-size:.98rem; margin-bottom:.7rem; color:var(--crystal);}
+.checklist{display:flex;flex-direction:column;gap:6px;margin-bottom:24px}
+.check-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:11px;cursor:pointer;transition:all .15s;-webkit-user-select:none;user-select:none}
+.check-row:hover{border-color:var(--border2);background:var(--surface2)}
+.check-row.checked{opacity:.6;border-color:var(--green-border);background:var(--green-soft)}
+.check-row.checked .check-box{background:var(--green);border-color:var(--green)}
+.check-row.checked .check-text{text-decoration:line-through;color:var(--muted)}
+.check-box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--faint);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;font-size:11px;color:#000;transition:all .15s}
+.check-text{font-size:13.5px;color:var(--text);line-height:1.5}
 
-/* CALLOUTS */
-.callout{border-radius:var(--radius); padding:1.35rem 1.5rem; margin:1.6rem 0; border:1px solid;}
-.callout__label{display:block; font-family:'IBM Plex Mono',monospace; font-size:.78rem; text-transform:uppercase; letter-spacing:.06em; margin-bottom:.6rem; font-weight:600;}
-.callout--warn{background:var(--garnet-soft); border-color:#E2C3C1;}
-.callout--warn .callout__label{color:var(--garnet);}
-.callout--tip{background:var(--crystal-soft); border-color:#D6CFEA;}
-.callout--tip .callout__label{color:var(--crystal);}
-.callout p{color:var(--ink-soft); font-size:.95rem;}
-.callout ul{color:var(--ink-soft); font-size:.95rem; margin:.5rem 0 0; padding-left:1.2rem;}
-.callout li{margin-bottom:.4rem;}
+/* PHASES */
+.phases{display:flex;flex-direction:column;gap:8px}
+.phase{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.phase-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer;transition:background .15s}
+.phase-header:hover{background:var(--surface2)}
+.phase-num{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--violet);background:var(--violet-soft);border:1px solid var(--violet-border);padding:3px 8px;border-radius:99px;flex-shrink:0}
+.phase-title{font-size:14px;font-weight:700;color:var(--text);flex:1}
+.phase-count{font-size:11px;color:var(--muted);flex-shrink:0}
+.phase-chevron{color:var(--faint);flex-shrink:0;font-size:12px;transition:transform .2s}
+.phase.open .phase-chevron{transform:rotate(90deg)}
+.phase-body{display:none;border-top:1px solid var(--border);padding:4px 0}
+.phase.open .phase-body{display:block}
 
-/* SWATCHES */
-.swatches{display:flex; flex-wrap:wrap; gap:1rem; margin:0 0 1.4rem;}
-.swatch{width:118px;}
-.swatch__chip{height:60px; border-radius:10px; border:1px solid var(--line); margin-bottom:.5rem;}
-.swatch__name{font-size:.85rem; font-weight:600;}
-.swatch__hex{font-family:'IBM Plex Mono',monospace; font-size:.76rem; color:var(--ink-soft);}
-
-/* WIREFRAME */
-.wireframe{border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:1rem; display:flex; flex-direction:column; gap:.5rem; margin-bottom:1.4rem;}
-.wireframe--split{flex-direction:row; flex-wrap:wrap; align-items:stretch;}
-.wf-col{flex:1 1 260px; display:flex; flex-direction:column; gap:.5rem;}
-.wf-block{border:1px dashed var(--line); border-radius:8px; padding:.9rem 1rem; font-size:.8rem; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; text-align:center; background:var(--porcelain);}
-.wf-header{background:var(--ink); color:#fff; opacity:.85;}
-.wf-hero{background:var(--crystal-soft); color:var(--crystal); font-weight:600; padding:1.7rem 1rem;}
-.wf-grid{background:var(--champagne-soft);}
-.wf-mini-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:.4rem; margin-top:.6rem;}
-.wf-mini-grid div{aspect-ratio:3/4; background:#fff; border:1px solid var(--line); border-radius:4px;}
-.wf-media{flex:1; min-height:200px; display:flex; align-items:center; justify-content:center;}
-.wf-footer{background:var(--ink); color:#fff; opacity:.7;}
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;margin-bottom:24px}
+.data-table th{text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface)}
+.data-table td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text);vertical-align:top}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--surface2)}
+.priority-badge{display:inline-flex;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+.priority-haute{background:rgba(139,92,246,0.15);color:var(--violet)}
+.priority-moyenne{background:rgba(212,168,83,0.12);color:var(--gold)}
+.intent-badge{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace}
 
 /* CODE */
-pre.code{background:var(--ink); color:#E7E4F1; border-radius:var(--radius); padding:1.3rem 1.4rem; overflow-x:auto; font-family:'IBM Plex Mono',monospace; font-size:.8rem; line-height:1.65; margin:1rem 0;}
-.code-label{font-family:'IBM Plex Mono',monospace; font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:.5rem; display:block;}
+.code-block{background:#0A0A12;border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:16px 0;overflow-x:auto}
+.code-block pre{font-family:'JetBrains Mono',monospace;font-size:12px;color:#C8C4E0;white-space:pre;line-height:1.7}
 
-footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:.88rem;}
+/* SITE TREE */
+.tree{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+.tree-item{display:flex;align-items:baseline;gap:8px;padding:6px 0;color:var(--text);font-size:13px}
+.tree-item .tree-url{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--violet);flex-shrink:0}
+.tree-item.level-1{padding-left:0;font-weight:600}
+.tree-item.level-2{padding-left:24px;color:var(--muted)}
+.tree-item.level-2::before{content:'└─ ';color:var(--faint)}
 
-@media (max-width:640px){
-  .hero{padding:3rem 0 2rem;}
-  .gem-wrap{flex-basis:130px;}
-  .phases{padding-left:1.9rem; margin-left:.1rem;}
-  .phase__num{left:-2.55rem; width:1.9rem; height:1.9rem; font-size:.73rem;}
-  .section{padding:2.4rem 0;}
-}
-@media print{
-  .toc{display:none;}
+/* ALERT */
+.alert{padding:14px 18px;border-radius:12px;margin-bottom:20px;font-size:13px;line-height:1.6;border:1px solid}
+.alert-gold{background:var(--gold-soft);border-color:var(--gold-border);color:#D4A853}
+.alert-violet{background:var(--violet-soft);border-color:var(--violet-border);color:#A78BFA}
+.alert-red{background:var(--red-soft);border-color:rgba(248,113,113,0.2);color:var(--red)}
+
+/* TAGS DESIGN */
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;border:1px solid}
+.tag-violet{background:var(--violet-soft);border-color:var(--violet-border);color:#C4B5FD}
+.tag-gold{background:var(--gold-soft);border-color:var(--gold-border);color:var(--gold)}
+.tag-green{background:var(--green-soft);border-color:var(--green-border);color:var(--green)}
+.tag-blue{background:var(--blue-soft);border-color:rgba(96,165,250,.25);color:var(--blue)}
+
+/* Scroll top btn */
+#scroll-top{position:fixed;bottom:24px;right:24px;width:40px;height:40px;background:var(--violet);border-radius:50%;display:none;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:#fff;box-shadow:0 4px 16px rgba(139,92,246,.4);z-index:200;border:none}
+#scroll-top.show{display:flex}
+
+/* Responsive */
+@media(max-width:700px){
+  :root{--sidebar:0px}
+  .sidebar{display:none}
+  .main{margin-left:0}
+  .content{padding:20px}
+  .hero{padding:24px}
 }
 </style>
 </head>
 <body>
 
-<svg style="display:none">
-  <symbol id="gem-mark" viewBox="0 0 24 24">
-    <polygon points="12,1 3,9 12,9" fill="#B8ACD9"/>
-    <polygon points="12,1 12,9 21,9" fill="#C9A05C"/>
-    <polygon points="12,23 3,9 12,9" fill="#6B5CA0"/>
-    <polygon points="12,23 12,9 21,9" fill="#8A6431"/>
-    <polygon points="12,1 3,9 12,9 12,1 12,9 21,9 12,23 3,9 12,9 12,23 12,9 21,9" fill="none" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-  </symbol>
-</svg>
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-gem">💎</div>
+    <div class="logo-title">Éclats et Strass</div>
+    <div class="logo-sub">Plan Shopify & SEO</div>
+  </div>
+  <div class="progress-ring">
+    <div class="progress-label"><span>Progression</span><span id="progress-pct">0%</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+  <nav class="nav" id="nav">
+    <div class="nav-section">Vue d'ensemble</div>
+    <a class="nav-item active" data-page="home" onclick="showPage('home',this)">
+      <span class="nav-icon">🏠</span>Accueil
+    </a>
+    <div class="nav-section">Plan d'action</div>
+    <a class="nav-item" data-page="roadmap" onclick="showPage('roadmap',this)">
+      <span class="nav-icon">🗺️</span>Feuille de route<span class="nav-check" id="nc-roadmap"></span>
+    </a>
+    <a class="nav-item" data-page="arborescence" onclick="showPage('arborescence',this)">
+      <span class="nav-icon">🌲</span>Arborescence
+    </a>
+    <a class="nav-item" data-page="design" onclick="showPage('design',this)">
+      <span class="nav-icon">🎨</span>Design<span class="nav-check" id="nc-design"></span>
+    </a>
+    <div class="nav-section">SEO & Technique</div>
+    <a class="nav-item" data-page="seo-onpage" onclick="showPage('seo-onpage',this)">
+      <span class="nav-icon">📄</span>SEO on-page<span class="nav-check" id="nc-seo-onpage"></span>
+    </a>
+    <a class="nav-item" data-page="mots-cles" onclick="showPage('mots-cles',this)">
+      <span class="nav-icon">🔑</span>Mots-clés
+    </a>
+    <a class="nav-item" data-page="seo-technique" onclick="showPage('seo-technique',this)">
+      <span class="nav-icon">⚙️</span>SEO technique<span class="nav-check" id="nc-seo-technique"></span>
+    </a>
+    <a class="nav-item" data-page="schema" onclick="showPage('schema',this)">
+      <span class="nav-icon">🧩</span>Schema markup
+    </a>
+    <a class="nav-item" data-page="shopify" onclick="showPage('shopify',this)">
+      <span class="nav-icon">🛍️</span>Shopify avancé<span class="nav-check" id="nc-shopify"></span>
+    </a>
+    <div class="nav-section">Contenu & Business</div>
+    <a class="nav-item" data-page="contenu" onclick="showPage('contenu',this)">
+      <span class="nav-icon">✍️</span>Contenu & Blog
+    </a>
+    <a class="nav-item" data-page="conversion" onclick="showPage('conversion',this)">
+      <span class="nav-icon">💰</span>Conversion<span class="nav-check" id="nc-conversion"></span>
+    </a>
+    <a class="nav-item" data-page="legal" onclick="showPage('legal',this)">
+      <span class="nav-icon">⚖️</span>Légal & RGPD<span class="nav-check" id="nc-legal"></span>
+    </a>
+    <a class="nav-item" data-page="tracking" onclick="showPage('tracking',this)">
+      <span class="nav-icon">📊</span>Tracking<span class="nav-check" id="nc-tracking"></span>
+    </a>
+    <div class="nav-section">Lancement</div>
+    <a class="nav-item" data-page="checklist" onclick="showPage('checklist',this)">
+      <span class="nav-icon">✅</span>Checklist finale<span class="nav-check" id="nc-checklist"></span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="reset-btn" onclick="resetAll()">🔄 Réinitialiser la progression</button>
+  </div>
+</aside>
 
-<header class="hero">
-  <div class="container">
-    <div class="hero-text">
-      <span class="eyebrow">Éclats et Strass · Plan de lancement Shopify</span>
-      <h1>Compte rendu total — boutique, SEO &amp; référencement organique</h1>
-      <p class="lead">Le plan complet pour lancer vos formations strass dentaire et blanchiment dentaire sur Shopify : architecture du site, structure SEO (H1 à H6), SEO technique, données structurées et conformité — prêt à exécuter, étape par étape.</p>
-      <div class="hero-meta">
-        <span>4 offres</span>
-        <span>Marché France</span>
-        <span>SEO organique en priorité</span>
-        <span>Thème Dawn</span>
-      </div>
-    </div>
-    <div class="gem-wrap">
-      <svg width="200" height="200" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="120,10 40,85 70,85" fill="#C9BEE0"/>
-        <polygon points="120,10 70,85 95,85" fill="#A996CB"/>
-        <polygon points="120,10 95,85 120,85" fill="#8B76B5"/>
-        <polygon points="120,10 120,85 145,85" fill="#B79A6E"/>
-        <polygon points="120,10 145,85 170,85" fill="#C9A05C"/>
-        <polygon points="120,10 170,85 200,85" fill="#A67D42"/>
-        <polygon points="120,230 40,85 70,85" fill="#8B76B5"/>
-        <polygon points="120,230 70,85 95,85" fill="#6B5CA0"/>
-        <polygon points="120,230 95,85 120,85" fill="#56487F"/>
-        <polygon points="120,230 120,85 145,85" fill="#8C6B3C"/>
-        <polygon points="120,230 145,85 170,85" fill="#B8894F"/>
-        <polygon points="120,230 170,85 200,85" fill="#7A5C31"/>
-        <polyline points="40,85 70,85 95,85 120,85 145,85 170,85 200,85" fill="none" stroke="#171922" stroke-opacity=".18" stroke-width="1"/>
-        <line x1="120" y1="10" x2="120" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-        <line x1="120" y1="230" x2="120" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-        <line x1="120" y1="10" x2="40" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-        <line x1="120" y1="10" x2="200" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-        <line x1="120" y1="230" x2="40" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-        <line x1="120" y1="230" x2="200" y2="85" stroke="#171922" stroke-opacity=".12" stroke-width="1"/>
-      </svg>
+<!-- ══ MAIN ══ -->
+<main class="main">
+<div class="content">
+
+<!-- HOME -->
+<section class="section-page active" id="page-home">
+  <div class="hero">
+    <div class="hero-tag">✦ Formation complète</div>
+    <h1>Éclats et Strass<br>Plan Shopify & SEO</h1>
+    <p class="hero-sub">Un plan complet pour lancer et optimiser votre boutique de formations en strass dentaire et blanchiment. Naviguez par section, cochez au fur et à mesure.</p>
+    <div class="hero-badges">
+      <span class="hero-badge">14 formations</span>
+      <span class="hero-badge">10 phases</span>
+      <span class="hero-badge">Dawn theme</span>
+      <span class="hero-badge">10 mots-clés</span>
     </div>
   </div>
-</header>
 
-<nav class="toc">
-  <div class="container">
-    <a href="#hypotheses">Hypothèses</a>
-    <a href="#feuille-de-route">Feuille de route</a>
-    <a href="#arborescence">Arborescence</a>
-    <a href="#design">Design du site</a>
-    <a href="#seo-onpage">SEO on-page</a>
-    <a href="#mots-cles">Mots-clés</a>
-    <a href="#seo-technique">SEO technique</a>
-    <a href="#donnees-structurees">Données structurées</a>
-    <a href="#shopify-avance">Shopify avancé</a>
-    <a href="#contenu">Contenu</a>
-    <a href="#conversion">Conversion</a>
-    <a href="#legal">Légal</a>
-    <a href="#tracking">Tracking</a>
-    <a href="#checklist-finale">Checklist finale</a>
-  </div>
-</nav>
-
-<main class="container">
-
-<!-- HYPOTHESES -->
-<section class="section" id="hypotheses">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">00 — Périmètre</span>
-      <h2>Hypothèses de départ</h2>
+  <div class="card-grid">
+    <div class="card" onclick="showPage('roadmap',document.querySelector('[data-page=roadmap]'))" style="cursor:pointer;border-left:3px solid var(--violet)">
+      <h3><span class="card-icon" style="background:var(--violet-soft)">🗺️</span>Feuille de route</h3>
+      <p style="color:var(--muted);font-size:13px">25 actions organisées en 10 phases. L'ordre compte : chaque étape s'appuie sur la précédente.</p>
+    </div>
+    <div class="card" onclick="showPage('seo-onpage',document.querySelector('[data-page=seo-onpage]'))" style="cursor:pointer;border-left:3px solid var(--gold)">
+      <h3><span class="card-icon" style="background:var(--gold-soft)">📄</span>SEO on-page</h3>
+      <p style="color:var(--muted);font-size:13px">31 éléments à optimiser page par page : titles, H1, metas, sections, FAQ.</p>
+    </div>
+    <div class="card" onclick="showPage('checklist',document.querySelector('[data-page=checklist]'))" style="cursor:pointer;border-left:3px solid var(--green)">
+      <h3><span class="card-icon" style="background:var(--green-soft)">✅</span>Checklist finale</h3>
+      <p style="color:var(--muted);font-size:13px">20 points à valider avant le lancement. La liste qui évite les oublis au dernier moment.</p>
+    </div>
+    <div class="card" onclick="showPage('legal',document.querySelector('[data-page=legal]'))" style="cursor:pointer;border-left:3px solid var(--red)">
+      <h3><span class="card-icon" style="background:var(--red-soft)">⚖️</span>Légal & RGPD</h3>
+      <p style="color:var(--muted);font-size:13px">9 obligations légales France à respecter pour un lancement conforme.</p>
     </div>
   </div>
-  <p class="section-intro">Avant d'entrer dans le détail, voici ce que j'ai retenu de votre catalogue. Dites-moi si je me trompe quelque part et j'ajuste — tout le reste du plan reste valable dans les deux cas.</p>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3>Catalogue retenu (4 offres)</h3>
-      <ul>
-        <li><strong>Formation Strass Dentaire</strong> — vendue seule</li>
-        <li><strong>Formation Blanchiment Dentaire</strong> — vendue seule</li>
-        <li><strong>Pack Duo + Matériel</strong> — les deux formations + kit professionnel</li>
-        <li><strong>Pack Duo sans Matériel</strong> — les deux formations, sans kit</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Points à confirmer</h3>
-      <ul>
-        <li>Vous mentionnez « une formation strass dentaire » puis « une formation strass » séparément : je pars du principe qu'il s'agit de la même offre citée deux fois. Si « formation strass » est en réalité une 5ᵉ offre distincte, dupliquez simplement la structure de fiche produit ci-dessous pour elle.</li>
-        <li>Le plan fonctionne que vos formations soient en présentiel, à distance, ou en hybride — les rares points qui changent selon le format sont signalés.</li>
-        <li>Le référencement organique est traité en priorité, comme demandé. Le payant (Instagram/TikTok Ads) n'est mentionné qu'en complément.</li>
-      </ul>
-    </div>
+
+  <div class="alert alert-gold">
+    <strong>💡 Produits à créer :</strong> Formation Strass Dentaire · Formation Blanchiment Dentaire · Pack Duo + Matériel · Pack Duo sans Matériel — et un Pack Abonnement mensuel en option.
   </div>
 </section>
 
 <!-- FEUILLE DE ROUTE -->
-<section class="section" id="feuille-de-route">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">01 — Plan d'action</span>
-      <h2>Feuille de route en 10 phases</h2>
-    </div>
+<section class="section-page" id="page-roadmap">
+  <div class="section-header">
+    <div><span class="section-num">01 — Plan d'action</span><div class="section-title">Feuille de route en 10 phases</div></div>
   </div>
-  <p class="section-intro">L'ordre compte : chaque phase s'appuie sur la précédente. Toutes les listes ci-dessous sont cochables — utilisez cette page comme votre suivi de chantier.</p>
+  <p class="section-intro">L'ordre compte : chaque phase s'appuie sur la précédente. Cochez au fur et à mesure — votre progression est sauvegardée.</p>
 
-  <div class="phases">
-    <div class="phase">
-      <div class="phase__num">01</div>
-      <h3>Fondations</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Réserver le nom de domaine eclatsetstrass.fr (+ .com en redirection si disponible)</span></label></li>
-        <li><label><input type="checkbox"><span>Définir l'identité visuelle (palette, typographie, logo)</span></label></li>
-        <li><label><input type="checkbox"><span>Créer la boutique Shopify, thème Dawn (gratuit, rapide — vous le maîtrisez déjà sur Sublime Blazer)</span></label></li>
-        <li><label><input type="checkbox"><span>Réunir les infos légales de l'entreprise (SIRET, statut) avant mise en ligne</span></label></li>
-      </ul>
-      <p class="note">Direction visuelle complète (palette, typographie, wireframes) : voir la section « Design du site » ci-dessous.</p>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">02</div>
-      <h3>Architecture &amp; catalogue</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Créer la collection « Formations »</span></label></li>
-        <li><label><input type="checkbox"><span>Créer les 4 fiches produits (voir arborescence et structure SEO ci-dessous)</span></label></li>
-        <li><label><input type="checkbox"><span>Trancher : pack = produit simple ou app Shopify Bundles (voir section Shopify avancé)</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">03</div>
-      <h3>SEO on-page</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Appliquer les balises title / meta description / H1-H6 de chaque page</span></label></li>
-        <li><label><input type="checkbox"><span>Rédiger les textes en intégrant naturellement les mots-clés cibles</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">04</div>
-      <h3>SEO technique</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Vérifier le sitemap.xml, le soumettre à Search Console</span></label></li>
-        <li><label><input type="checkbox"><span>Vérifier canonical, redirections, breadcrumbs, vitesse</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">05</div>
-      <h3>Conformité légale</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Rédiger CGV, mentions légales, politique de confidentialité, politique de remboursement</span></label></li>
-        <li><label><input type="checkbox"><span>Traiter le point de vigilance réglementaire strass / blanchiment avant toute mise en avant marketing</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">06</div>
-      <h3>Conversion &amp; confiance</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Installer une app d'avis (Judge.me, déjà utilisée sur Butt Premium) et activer le paiement en plusieurs fois</span></label></li>
-        <li><label><input type="checkbox"><span>Construire la FAQ, les badges de réassurance, la preuve sociale</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">07</div>
-      <h3>Contenu &amp; autorité</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Lancer le blog avec le calendrier éditorial fourni</span></label></li>
-        <li><label><input type="checkbox"><span>Créer la fiche Google Business Profile si formations en présentiel</span></label></li>
-        <li><label><input type="checkbox"><span>Démarrer le netlinking (écoles d'esthétique, annuaires du secteur)</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">08</div>
-      <h3>Tracking</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Connecter GA4, Search Console, Meta Pixel</span></label></li>
-        <li><label><input type="checkbox"><span>Définir votre convention UTM pour Instagram/TikTok</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">09</div>
-      <h3>Tests &amp; pré-lancement</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Tester le tunnel de commande complet (les 4 produits) sur mobile</span></label></li>
-        <li><label><input type="checkbox"><span>Auditer PageSpeed Insights, corriger LCP/INP/CLS</span></label></li>
-        <li><label><input type="checkbox"><span>Relire l'orthographe, vérifier les liens, tester les 404</span></label></li>
-      </ul>
-    </div>
-
-    <div class="phase">
-      <div class="phase__num">10</div>
-      <h3>Lancement &amp; suivi</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Soumettre le sitemap, annoncer sur les réseaux</span></label></li>
-        <li><label><input type="checkbox"><span>Suivre le positionnement des mots-clés cibles chaque semaine le premier mois</span></label></li>
-      </ul>
-    </div>
+  <div class="phases" id="phases-container">
+    <!-- Généré par JS -->
   </div>
 </section>
 
 <!-- ARBORESCENCE -->
-<section class="section" id="arborescence">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">02 — Structure</span>
-      <h2>Arborescence du site</h2>
-    </div>
+<section class="section-page" id="page-arborescence">
+  <div class="section-header">
+    <div><span class="section-num">02 — Structure</span><div class="section-title">Arborescence du site</div></div>
   </div>
-  <p class="section-intro">Une architecture plate — 2 clics maximum pour atteindre une fiche produit depuis l'accueil — sert à la fois l'expérience utilisateur et le SEO (le maillage interne remonte plus vite vers les pages qui vendent).</p>
-  <div class="card">
-    <ul class="tree">
-      <li><strong>Accueil</strong> <code>/</code>
-        <ul>
-          <li><strong>Nos Formations</strong> <code>/collections/formations</code>
-            <ul>
-              <li>Formation Strass Dentaire <code>/products/formation-strass-dentaire</code></li>
-              <li>Formation Blanchiment Dentaire <code>/products/formation-blanchiment-dentaire</code></li>
-              <li>Pack Duo + Matériel <code>/products/pack-duo-materiel</code></li>
-              <li>Pack Duo sans Matériel <code>/products/pack-duo</code></li>
-            </ul>
-          </li>
-          <li><strong>Blog</strong> <code>/blogs/conseils</code></li>
-          <li><strong>À propos</strong> <code>/pages/a-propos</code></li>
-          <li><strong>FAQ</strong> <code>/pages/faq</code></li>
-          <li><strong>Contact</strong> <code>/pages/contact</code></li>
-          <li><strong>Pied de page</strong>
-            <ul>
-              <li>CGV <code>/pages/cgv</code></li>
-              <li>Mentions légales <code>/pages/mentions-legales</code></li>
-              <li>Confidentialité <code>/pages/politique-confidentialite</code></li>
-              <li>Remboursement <code>/pages/politique-remboursement</code></li>
-            </ul>
-          </li>
-        </ul>
-      </li>
-    </ul>
+  <p class="section-intro">Toutes les URLs sont en minuscules, sans accent, avec des tirets. La collection principale s'appelle <code style="color:var(--violet);background:var(--violet-soft);padding:2px 6px;border-radius:4px">/collections/formations</code>.</p>
+  <div class="tree">
+    <div class="tree-item level-1">🏠 Accueil <span class="tree-url">/</span></div>
+    <div class="tree-item level-1">📚 Nos Formations <span class="tree-url">/collections/formations</span></div>
+    <div class="tree-item level-2">Formation Strass Dentaire <span class="tree-url">/products/formation-strass-dentaire</span></div>
+    <div class="tree-item level-2">Formation Blanchiment Dentaire <span class="tree-url">/products/formation-blanchiment-dentaire</span></div>
+    <div class="tree-item level-2">Pack Duo + Matériel <span class="tree-url">/products/pack-duo-materiel</span></div>
+    <div class="tree-item level-2">Pack Duo sans Matériel <span class="tree-url">/products/pack-duo</span></div>
+    <div class="tree-item level-1">❓ FAQ <span class="tree-url">/pages/faq</span></div>
+    <div class="tree-item level-1">👩 À propos <span class="tree-url">/pages/a-propos</span></div>
+    <div class="tree-item level-1">📬 Contact <span class="tree-url">/pages/contact</span></div>
+    <div class="tree-item level-1">✍️ Blog <span class="tree-url">/blogs/formation</span></div>
+    <div class="tree-item level-1">⚖️ Mentions légales <span class="tree-url">/pages/mentions-legales</span></div>
+    <div class="tree-item level-1">📋 CGV <span class="tree-url">/pages/cgv</span></div>
   </div>
+  <div class="alert alert-violet">URLs à configurer manuellement dans Shopify (champ "URL et SEO" de chaque produit/page). Évitez les suffixes automatiques -1 ou -2 générés par Shopify en cas de doublon de titre.</div>
 </section>
 
-<!-- DESIGN DU SITE -->
-<section class="section" id="design">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">03 — Direction artistique</span>
-      <h2>Design du site — épuré &amp; optimisé</h2>
+<!-- DESIGN -->
+<section class="section-page" id="page-design">
+  <div class="section-header">
+    <div><span class="section-num">03 — Identité</span><div class="section-title">Design du site</div></div>
+  </div>
+  <p class="section-intro">Deux directions proposées. Choisissez une seule identité et tenez-vous y sur toute la boutique.</p>
+  <div class="card-grid">
+    <div class="card" style="border-top:3px solid #C9AE7C">
+      <h3>🥂 Option A — Champagne & Strass</h3>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <div style="width:24px;height:24px;border-radius:6px;background:#1B1410"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#C9AE7C"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#F5F1E8"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#9B3D4A"></div>
+        </div>
+        <p style="font-size:12px;color:var(--muted)">#1B1410 · #C9AE7C · #F5F1E8 · #9B3D4A</p>
+      </div>
+      <p style="font-size:12px;color:var(--muted)"><strong style="color:var(--text)">Titres :</strong> Fraunces — <strong style="color:var(--text)">Corps :</strong> IBM Plex Sans</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">Ambiance luxe discret, bijouterie fine. Convient si la cible est haut de gamme.</p>
+    </div>
+    <div class="card" style="border-top:3px solid #C96E9B">
+      <h3>🌸 Option B — Moderne & Féminin</h3>
+      <div style="margin-bottom:12px">
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <div style="width:24px;height:24px;border-radius:6px;background:#1A0F1C"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#C96E9B"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#F9F0F5"></div>
+          <div style="width:24px;height:24px;border-radius:6px;background:#4A3670"></div>
+        </div>
+        <p style="font-size:12px;color:var(--muted)">#1A0F1C · #C96E9B · #F9F0F5 · #4A3670</p>
+      </div>
+      <p style="font-size:12px;color:var(--muted)"><strong style="color:var(--text)">Titres :</strong> Newsreader — <strong style="color:var(--text)">Corps :</strong> Public Sans</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px">Tendance esthétique/beauté. Convient si la cible est instagrammable et jeune.</p>
     </div>
   </div>
-  <p class="section-intro">Ce qui manquait dans la première version : la direction visuelle de la boutique elle-même (ce rapport avait sa propre esthétique, pas encore la vôtre). Voici un système volontairement restreint : peu de couleurs, peu de polices, peu de composants, réutilisés partout — c'est ça, l'épuré.</p>
-
-  <div class="card" style="margin-bottom:1.4rem;">
-    <h3>Concept</h3>
-    <p style="color:var(--ink-soft);">Un minimalisme précis plutôt qu'un glam premier degré : beaucoup de blanc, une seule couleur signature utilisée avec parcimonie, une typographie nette, et la photographie comme unique « éclat » du site — pas d'effets scintillants en CSS. Ce rapport applique déjà cette direction (violet cristal + or en touches, sur fond clair) : vous pouvez vous en inspirer tel quel pour la boutique.</p>
-  </div>
-
-  <h3 style="margin-bottom:.8rem;">Palette</h3>
-  <div class="swatches">
-    <div class="swatch"><div class="swatch__chip" style="background:#FAF9F7;"></div><div class="swatch__name">Fond</div><div class="swatch__hex">#FAF9F7</div></div>
-    <div class="swatch"><div class="swatch__chip" style="background:#1C1B22;"></div><div class="swatch__name">Encre</div><div class="swatch__hex">#1C1B22</div></div>
-    <div class="swatch"><div class="swatch__chip" style="background:#6B5CA0;"></div><div class="swatch__name">Signature</div><div class="swatch__hex">#6B5CA0</div></div>
-    <div class="swatch"><div class="swatch__chip" style="background:#B8894F;"></div><div class="swatch__name">Détail</div><div class="swatch__hex">#B8894F</div></div>
-  </div>
-  <div class="callout callout--tip">
-    <span class="callout__label">💡 Règle de restraint</span>
-    <p>Le violet n'apparaît qu'à un seul endroit par écran : le bouton d'action principal et les liens. L'or n'est jamais utilisé en aplat large, seulement en badge fin ou en filet. Dans Dawn, ces couleurs se configurent en <strong>jeux de couleurs</strong> (Paramètres du thème → Couleurs) : créez-en deux — un jeu clair pour l'essentiel du site, un jeu accent réservé à une seule section par page pour créer un point focal, jamais plus.</p>
-  </div>
-
-  <h3 style="margin:1.8rem 0 .8rem;">Typographie</h3>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3 style="font-size:1rem;">Option A — cohérente avec ce rapport</h3>
-      <ul><li>Titres : Fraunces</li><li>Corps : IBM Plex Sans</li></ul>
-    </div>
-    <div class="card">
-      <h3 style="font-size:1rem;">Option B — plus éditorial classique</h3>
-      <ul><li>Titres : Newsreader</li><li>Corps : Public Sans</li></ul>
-    </div>
-  </div>
-  <p style="color:var(--ink-soft); font-size:.9rem; margin-top:.8rem;">Se configure dans Paramètres du thème → Typographie (sélecteurs séparés Titres / Corps, aperçu en direct depuis la bibliothèque de polices Shopify). Limitez-vous à 2 graisses par police : chaque graisse supplémentaire est un fichier de plus à charger, donc du poids en moins pour l'INP.</p>
-
-  <h3 style="margin:1.8rem 0 .8rem;">Page d'accueil — structure</h3>
-  <div class="wireframe">
-    <div class="wf-block wf-header">Header — logo, 5 liens de nav max, panier</div>
-    <div class="wf-block wf-hero">Hero — 1 visuel photo, H1 court, 1 CTA</div>
-    <div class="wf-block wf-trust">Réassurance — 4 points clés en ligne</div>
-    <div class="wf-block wf-grid">
-      Nos formations — grille de 4 cartes
-      <div class="wf-mini-grid"><div></div><div></div><div></div><div></div></div>
-    </div>
-    <div class="wf-block wf-proof">Preuve sociale — note globale + 1 avis</div>
-    <div class="wf-block wf-why">Pourquoi nous — 3 colonnes</div>
-    <div class="wf-block wf-about">À propos (teaser) + CTA</div>
-    <div class="wf-block wf-faq">FAQ courte — 3 à 4 questions</div>
-    <div class="wf-block wf-footer">Footer — légal, réseaux, newsletter</div>
-  </div>
-
-  <h3 style="margin:1.8rem 0 .8rem;">Fiche produit — structure</h3>
-  <div class="wireframe wireframe--split">
-    <div class="wf-col">
-      <div class="wf-block wf-media">Galerie photo grand format</div>
-    </div>
-    <div class="wf-col">
-      <div class="wf-block wf-info">Titre + prix + 1 badge maximum</div>
-      <div class="wf-block wf-cta">CTA + paiement en plusieurs fois visible</div>
-      <div class="wf-block wf-accordion">Programme · Inclus · Modalités · FAQ — en accordéons</div>
-    </div>
-  </div>
-
-  <div class="grid grid-2" style="margin-top:.4rem;">
-    <div class="card">
-      <h3>Composants</h3>
-      <ul>
-        <li>Boutons : coins peu arrondis (4-6px), un seul style plein + un style contour, jamais plus de 2 styles sur un même écran</li>
-        <li>Badges : un seul par élément — n'empilez pas note, tag et promo sur une même carte</li>
-        <li>Cartes produit : photo en 3:4, titre, prix, un seul CTA</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Direction photo</h3>
-      <ul>
-        <li>Lumière claire, fond neutre, ratio cohérent (3:4 partout)</li>
-        <li>Gestes et matériel en gros plan plutôt que visages si contrainte RGPD</li>
-        <li>Éviter le stock photo générique « dentiste souriant » — préférez vos propres photos de formation</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="callout callout--tip" style="margin-top:1.8rem;">
-    <span class="callout__label">Design × performance</span>
-    <ul>
-      <li>Hero en image fixe &lt;200 Ko, jamais de slider JS ni de vidéo autoplay lourde</li>
-      <li>aspect-ratio CSS défini sur chaque image, pour éviter les sauts de mise en page (CLS)</li>
-      <li>Maximum 7-8 sections sur la page d'accueil — chaque section ajoutée pèse sur l'INP</li>
-      <li>Aucun popup d'entrée : mauvais pour le CLS, et contre-productif sur un achat aussi réfléchi</li>
-    </ul>
-  </div>
-
-  <h3 style="margin:1.8rem 0 .8rem;">Correspondance avec les sections Dawn</h3>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Élément du site</th><th>Section Dawn à utiliser</th></tr></thead>
-      <tbody>
-        <tr><td>Header épuré</td><td>Header — logo centré, menu simple</td></tr>
-        <tr><td>Hero</td><td>Image banner — 1 image, 1 bouton, pas de slideshow</td></tr>
-        <tr><td>Réassurance</td><td>Multicolumn — 4 colonnes avec icônes</td></tr>
-        <tr><td>Nos formations</td><td>Featured collection</td></tr>
-        <tr><td>Pourquoi nous</td><td>Multicolumn — 3 colonnes</td></tr>
-        <tr><td>FAQ</td><td>Collapsible content — accordéon natif</td></tr>
-        <tr><td>Footer</td><td>Footer standard, colonnes réduites</td></tr>
-      </tbody>
-    </table>
+  <div class="card">
+    <h3>📐 Sections homepage (Dawn)</h3>
+    <div class="checklist" id="check-design"></div>
   </div>
 </section>
 
 <!-- SEO ON-PAGE -->
-<section class="section" id="seo-onpage">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">04 — H1 à H6, title, meta</span>
-      <h2>Structure SEO on-page, page par page</h2>
-    </div>
+<section class="section-page" id="page-seo-onpage">
+  <div class="section-header">
+    <div><span class="section-num">04 — Référencement</span><div class="section-title">SEO on-page, page par page</div></div>
   </div>
-  <p class="section-intro">Règle d'or : <strong>un seul H1 par page</strong> (Dawn utilise déjà le titre du produit comme H1 — vérifiez qu'aucun H1 en double ne traîne dans une description collée depuis Word). Title ≤ 60 caractères, meta description 120-155 caractères — vérifiez chaque page dans l'aperçu Google que Shopify affiche sous le champ SEO.</p>
-
-  <div class="page-card">
-    <span class="page-card__url">/ (Accueil)</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Formation Strass Dentaire &amp; Blanchiment | Éclats et Strass</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Devenez experte en strass dentaire et blanchiment dentaire avec Éclats et Strass. Formations pro, kit inclus en option, paiement en plusieurs fois.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Formation Strass Dentaire &amp; Blanchiment Dentaire — Éclats et Strass</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Nos formations en un coup d'œil</li>
-      <li>Pourquoi se former avec Éclats et Strass</li>
-      <li>Nos packs formation + matériel</li>
-      <li>Ce qu'en disent nos élèves</li>
-      <li>Questions fréquentes</li>
-    </ol>
-    <div class="tagrow"><span class="tag">formation strass dentaire</span><span class="tag">formation blanchiment dentaire</span><span class="tag">devenir poseuse strass dentaire</span></div>
-  </div>
-
-  <div class="page-card">
-    <span class="page-card__url">/collections/formations</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Nos Formations Strass &amp; Blanchiment Dentaire | Éclats et Strass</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Formations professionnelles strass dentaire, blanchiment dentaire et packs tout compris avec matériel. Certificat inclus, places limitées.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Toutes nos formations en esthétique dentaire</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Formations à l'unité</li>
-      <li>Nos packs tout compris</li>
-      <li>Comment choisir votre formation</li>
-    </ol>
-    <div class="tagrow"><span class="tag">formations esthétique dentaire</span></div>
-  </div>
-
-  <div class="page-card">
-    <span class="page-card__url">/products/formation-strass-dentaire</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Formation Strass Dentaire | Certification Pro — Éclats et Strass</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Formation professionnelle à la pose de strass dentaire : technique, hygiène, cadre légal. Certificat inclus. Avec ou sans matériel.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Formation Strass Dentaire — devenez poseuse professionnelle</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Ce que vous allez apprendre</li>
-      <li>Pour qui est cette formation</li>
-      <li>Ce qui est inclus</li>
-      <li>Modalités (durée, format, certification)</li>
-      <li>Ce que couvre cette formation — la pose (la dépose reste un acte réservé au chirurgien-dentiste)</li>
-      <li>Ce que disent nos élèves</li>
-      <li>Questions fréquentes</li>
-    </ol>
-    <div class="tagrow"><span class="tag">formation strass dentaire</span><span class="tag">formation pose strass dentaire</span><span class="tag">bijou dentaire formation</span><span class="tag">prix formation strass dentaire</span></div>
-  </div>
-
-  <div class="page-card">
-    <span class="page-card__url">/products/formation-blanchiment-dentaire</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Formation Blanchiment Dentaire Pro — Éclats et Strass</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Apprenez à proposer un blanchiment dentaire cosmétique conforme à la réglementation française. Formation complète, certificat, kit en option.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Formation Blanchiment Dentaire — une prestation conforme et sécurisée</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Ce que vous allez apprendre</li>
-      <li>Pour qui est cette formation</li>
-      <li>Ce qui est inclus</li>
-      <li>Cadre réglementaire : ce que vous devez savoir</li>
-      <li>Modalités</li>
-      <li>Ce que disent nos élèves</li>
-      <li>Questions fréquentes</li>
-    </ol>
-    <div class="tagrow"><span class="tag">formation blanchiment dentaire</span><span class="tag">blanchiment des dents professionnel</span><span class="tag">devenir spécialiste blanchiment dentaire</span></div>
-  </div>
-
-  <div class="page-card">
-    <span class="page-card__url">/products/pack-duo-materiel</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Pack Formation Strass + Blanchiment + Kit Matériel</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Les 2 formations (strass + blanchiment) et le kit matériel professionnel complet pour démarrer votre activité immédiatement.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Pack Duo Complet — Formations + Matériel Professionnel</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Tout ce qui est inclus dans ce pack</li>
-      <li>Pourquoi choisir le pack plutôt que les formations séparées</li>
-      <li>Le détail du matériel fourni</li>
-      <li>Modalités</li>
-      <li>Questions fréquentes</li>
-    </ol>
-    <div class="tagrow"><span class="tag">pack formation strass blanchiment dentaire</span><span class="tag">formation esthétique dentaire kit inclus</span></div>
-  </div>
-
-  <div class="page-card">
-    <span class="page-card__url">/products/pack-duo</span>
-    <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Pack Formation Strass + Blanchiment Dentaire</span></div>
-    <div class="kv"><span class="kv__label">Meta description</span><span class="kv__value">Les 2 formations strass dentaire et blanchiment dentaire réunies, sans le kit — idéal si vous avez déjà votre matériel.</span></div>
-    <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Pack Duo — Formation Strass Dentaire + Blanchiment Dentaire</span></div>
-    <div class="kv__label">Structure H2</div>
-    <ol class="h2list">
-      <li>Tout ce qui est inclus dans ce pack</li>
-      <li>Pour qui est cette formule</li>
-      <li>Modalités</li>
-      <li>Questions fréquentes</li>
-    </ol>
-    <div class="tagrow"><span class="tag">pack formation strass et blanchiment dentaire</span><span class="tag">formation duo esthétique dentaire</span></div>
-  </div>
-
-  <div class="grid grid-2">
-    <div class="page-card" style="margin-bottom:0;">
-      <span class="page-card__url">/blogs/conseils</span>
-      <div class="kv"><span class="kv__label">Title</span><span class="kv__value">Blog Esthétique Dentaire — Conseils | Éclats et Strass</span></div>
-      <div class="kv"><span class="kv__label">H1</span><span class="kv__value">Le Blog Éclats et Strass</span></div>
-      <p style="color:var(--ink-soft); font-size:.9rem; margin-top:.8rem;">Chaque article : 1 H1 (titre de l'article), 3 à 5 H2 pour structurer, un mot-clé cible unique. Voir calendrier éditorial en section Contenu.</p>
-    </div>
-    <div class="page-card" style="margin-bottom:0;">
-      <span class="page-card__url">/pages/faq + /pages/a-propos</span>
-      <div class="kv"><span class="kv__label">FAQ — H1</span><span class="kv__value">Questions fréquentes</span></div>
-      <div class="kv"><span class="kv__label">À propos — H1</span><span class="kv__value">À propos d'Éclats et Strass</span></div>
-      <p style="color:var(--ink-soft); font-size:.9rem; margin-top:.8rem;">La page À propos doit afficher vos certifications, votre parcours et votre engagement conformité — c'est ce que Google appelle l'E-E-A-T (expérience, expertise, autorité, confiance), particulièrement scruté sur les sujets proches de la santé comme le blanchiment dentaire.</p>
-    </div>
-  </div>
+  <p class="section-intro">Un seul H1 par page, title entre 50-60 caractères, meta-description 120-155 caractères. À remplir dans le bloc "Référencement" en bas de chaque produit/page Shopify.</p>
+  <div class="checklist" id="check-seo-onpage"></div>
 </section>
 
-<!-- MOTS CLES -->
-<section class="section" id="mots-cles">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">05 — Ciblage</span>
-      <h2>Tableau de mots-clés stratégiques</h2>
-    </div>
+<!-- MOTS-CLÉS -->
+<section class="section-page" id="page-mots-cles">
+  <div class="section-header">
+    <div><span class="section-num">05 — Ciblage</span><div class="section-title">Mots-clés stratégiques</div></div>
   </div>
-  <p class="section-intro">Base de travail à enrichir avec Google Search Console une fois le site en ligne (les requêtes réelles affinent toujours mieux qu'une estimation de départ).</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>Mot-clé cible</th><th>Intention</th><th>Page cible</th><th>Priorité</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>formation strass dentaire</td><td>Transactionnelle</td><td>Fiche produit + Collection</td><td><span class="prio prio--haute">Haute</span></td></tr>
-        <tr><td>formation blanchiment dentaire</td><td>Transactionnelle</td><td>Fiche produit</td><td><span class="prio prio--haute">Haute</span></td></tr>
-        <tr><td>prix formation strass dentaire</td><td>Transactionnelle</td><td>Fiche produit + Blog</td><td><span class="prio prio--haute">Haute</span></td></tr>
-        <tr><td>pack formation strass blanchiment dentaire</td><td>Transactionnelle</td><td>Fiches packs</td><td><span class="prio prio--haute">Haute</span></td></tr>
-        <tr><td>blanchiment dentaire esthéticienne légal</td><td>Informationnelle (E-E-A-T)</td><td>Blog</td><td><span class="prio prio--haute">Haute</span></td></tr>
-        <tr><td>devenir poseuse / prothésiste strass dentaire</td><td>Informationnelle</td><td>Accueil + Blog</td><td><span class="prio prio--moyenne">Moyenne</span></td></tr>
-        <tr><td>formation strass dentaire à distance</td><td>Transactionnelle</td><td>Fiche produit</td><td><span class="prio prio--moyenne">Moyenne</span></td></tr>
-        <tr><td>kit strass dentaire professionnel</td><td>Transactionnelle</td><td>Pack + matériel</td><td><span class="prio prio--moyenne">Moyenne</span></td></tr>
-        <tr><td>formation strass dentaire avis</td><td>Réassurance</td><td>Accueil / avis</td><td><span class="prio prio--moyenne">Moyenne</span></td></tr>
-        <tr><td>formation strass dentaire finançable</td><td>Transactionnelle</td><td>FAQ / Produit</td><td><span class="prio prio--moyenne">Moyenne — à vérifier</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="callout callout--tip">
-    <span class="callout__label">💡 Astuce</span>
-    <p>Le mot-clé « finançable CPF » ne peut être utilisé que si vos formations sont réellement éligibles au Compte Personnel de Formation — ce qui suppose une certification Qualiopi, un chantier distinct et exigeant, séparé de la boutique e-commerce. Ne l'affichez que si c'est vrai : c'est exactement le type d'allégation que la DGCCRF contrôle dans ce secteur.</p>
-  </div>
+  <p class="section-intro">Base de travail à enrichir avec Google Search Console une fois le site en ligne. Les requêtes réelles affinent toujours mieux qu'une estimation de départ.</p>
+  <table class="data-table">
+    <thead><tr><th>Mot-clé</th><th>Intention</th><th>Page cible</th><th>Priorité</th></tr></thead>
+    <tbody id="kw-tbody"></tbody>
+  </table>
 </section>
 
 <!-- SEO TECHNIQUE -->
-<section class="section" id="seo-technique">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">06 — Sous le capot</span>
-      <h2>SEO technique sur Shopify</h2>
-    </div>
+<section class="section-page" id="page-seo-technique">
+  <div class="section-header">
+    <div><span class="section-num">06 — Technique</span><div class="section-title">SEO technique sur Shopify</div></div>
   </div>
-  <p class="section-intro">Ce qui est déjà géré nativement par Shopify est indiqué — vous n'avez rien à faire dessus, juste à le vérifier.</p>
-  <ul class="checklist">
-    <li><label><input type="checkbox"><span>URLs propres : <code>/products/formation-strass-dentaire</code> — évitez les suffixes auto -1, -2 en cas de doublon de handle</span></label></li>
-    <li><label><input type="checkbox"><span>Un seul H1 par page (vérifier qu'aucune description produit collée depuis Word n'en contient un second)</span></label></li>
-    <li><label><input type="checkbox"><span>Title et meta description personnalisés sur CHAQUE page (bloc « Référencement » en bas de chaque fiche)</span></label></li>
-    <li><label><input type="checkbox"><span>Alt text descriptif sur toutes les images (ex : « formation-strass-dentaire-pose-professionnelle »)</span></label></li>
-    <li><label><input type="checkbox"><span>Images compressées en WebP, &lt;200 Ko chacune, avant upload</span></label></li>
-    <li><label><input type="checkbox"><span>Sitemap.xml (généré automatiquement par Shopify) soumis à Google Search Console</span></label></li>
-    <li><label><input type="checkbox"><span>robots.txt.liquid vérifié — aucune page utile bloquée</span></label></li>
-    <li><label><input type="checkbox"><span>Canonical tags automatiques Shopify — attention aux doublons via filtres/tags de collection</span></label></li>
-    <li><label><input type="checkbox"><span>Redirections 301 configurées pour toute ancienne URL (Admin → Navigation → Redirections d'URL)</span></label></li>
-    <li><label><input type="checkbox"><span>Breadcrumbs actifs (natifs sur Dawn, schema BreadcrumbList inclus)</span></label></li>
-    <li><label><input type="checkbox"><span>Vitesse : LCP &lt; 2,5 s · INP &lt; 200 ms · CLS &lt; 0,1, mesurés au 75ᵉ percentile via PageSpeed Insights / Search Console</span></label></li>
-    <li><label><input type="checkbox"><span>Nombre d'apps limité au strict nécessaire (chaque app ajoute du JS qui pèse sur l'INP)</span></label></li>
-    <li><label><input type="checkbox"><span>Indexation mobile testée en priorité (index mobile-first chez Google)</span></label></li>
-    <li><label><input type="checkbox"><span>Google Search Console + Bing Webmaster Tools connectés</span></label></li>
-    <li><label><input type="checkbox"><span>Google Business Profile créé si formations en présentiel (SEO local)</span></label></li>
-  </ul>
+  <p class="section-intro">La plupart sont des vérifications et réglages manuels dans Shopify — aucun développement requis.</p>
+  <div class="checklist" id="check-seo-technique"></div>
 </section>
 
-<!-- DONNEES STRUCTUREES -->
-<section class="section" id="donnees-structurees">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">07 — Rich results</span>
-      <h2>Données structurées (schema markup)</h2>
-    </div>
+<!-- SCHEMA -->
+<section class="section-page" id="page-schema">
+  <div class="section-header">
+    <div><span class="section-num">07 — Rich results</span><div class="section-title">Données structurées (schema markup)</div></div>
   </div>
-  <p class="section-intro">Shopify injecte déjà un schema <code>Product</code> automatiquement. Comme vos produits sont en réalité des <em>formations</em>, ajouter un schema <code>Course</code> en complément aide Google à mieux comprendre l'offre (sans garantir un rich result, mais sans risque non plus). Voici un snippet prêt à coller dans <code>sections/main-product.liquid</code>, actif uniquement sur les produits tagués <code>formation</code>.</p>
-  <span class="code-label">Snippet Liquid — schema Course conditionnel</span>
-  <pre class="code"><code>{% if product.tags contains 'formation' %}
-&lt;script type='application/ld+json'&gt;
+  <p class="section-intro">Shopify injecte déjà un schema <code style="color:var(--violet);background:var(--violet-soft);padding:2px 6px;border-radius:4px">Product</code> automatiquement. Ajoutez un schema <code style="color:var(--violet);background:var(--violet-soft);padding:2px 6px;border-radius:4px">Course</code> pour les formations et un <code style="color:var(--violet);background:var(--violet-soft);padding:2px 6px;border-radius:4px">FAQPage</code> sur les pages avec FAQ.</p>
+  <div class="alert alert-violet">Coller dans <strong>sections/main-product.liquid</strong>, actif uniquement sur les produits tagués <code>formation</code>.</div>
+  <div class="code-block"><pre>{% if product.tags contains 'formation' %}
+&lt;script type="application/ld+json"&gt;
 {
   "@context": "https://schema.org",
   "@type": "Course",
@@ -758,263 +418,310 @@ footer{padding:3rem 0 4rem; text-align:center; color:var(--ink-soft); font-size:
   "offers": {
     "@type": "Offer",
     "price": "{{ product.price | money_without_currency }}",
-    "priceCurrency": "{{ cart.currency.iso_code }}",
-    "availability": "https://schema.org/{% if product.available %}InStock{% else %}SoldOut{% endif %}",
-    "url": "{{ shop.url }}{{ product.url }}"
+    "priceCurrency": "EUR",
+    "availability": "https://schema.org/InStock",
+    "url": "{{ canonical_url }}"
   }
 }
 &lt;/script&gt;
-{% endif %}</code></pre>
-
-  <span class="code-label">FAQPage — à insérer sur chaque fiche produit et sur /pages/faq</span>
-  <pre class="code"><code>{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "La formation strass dentaire est-elle certifiante ?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Oui, un certificat de réussite vous est délivré à l'issue de la formation."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Le matériel est-il fourni avec la formation ?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Le matériel est inclus uniquement dans la formule Pack + Matériel."
-      }
-    }
-  ]
-}</code></pre>
-  <p style="color:var(--ink-soft); font-size:.9rem;">Complétez le tableau <code>mainEntity</code> avec vos vraies FAQ (durée, prérequis, remboursement, légalité). Les avis Judge.me injectent déjà leur propre schema <code>Review</code> / <code>AggregateRating</code> automatiquement — rien à coder de ce côté.</p>
+{% endif %}</pre></div>
+  <div class="alert alert-gold">
+    <strong>FAQPage :</strong> Même principe dans <strong>pages/faq.liquid</strong> — listez les paires question/réponse en JSON-LD. Testez avec l'outil Rich Results Test de Google avant de déployer.
+  </div>
 </section>
 
-<!-- SHOPIFY AVANCE -->
-<section class="section" id="shopify-avance">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">08 — Configuration</span>
-      <h2>Optimisation Shopify avancée</h2>
-    </div>
+<!-- SHOPIFY AVANCÉ -->
+<section class="section-page" id="page-shopify">
+  <div class="section-header">
+    <div><span class="section-num">08 — Boutique</span><div class="section-title">Optimisation Shopify avancée</div></div>
   </div>
-
-  <div class="grid grid-2">
-    <div class="card">
-      <h3>Gérer les « packs »</h3>
-      <ul>
-        <li><strong>Option simple :</strong> un produit unique avec description détaillée du contenu — rapide, mais ne décompte pas le stock du matériel séparément.</li>
-        <li><strong>Option recommandée :</strong> l'app native et gratuite <strong>Shopify Bundles</strong> — elle lie plusieurs composants et décrémente en temps réel le stock physique du kit matériel pendant que les formations restent en vente continue. Idéal pour le Pack + Matériel, où le kit a un stock réel à protéger contre la survente.</li>
-        <li>Pour le Pack sans Matériel (aucun stock physique à gérer), un produit simple suffit très bien.</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Formations à sessions fixes ou accès immédiat ?</h3>
-      <ul>
-        <li><strong>Sessions à dates et places limitées :</strong> activez le suivi de stock avec quantité = nombre de places, et envisagez une app de réservation type Sesami pour associer un calendrier.</li>
-        <li><strong>Accès à distance immédiat :</strong> stock illimité, option « continuer la vente en rupture » activée.</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Apps recommandées</h3>
-      <ul>
-        <li><strong>Judge.me</strong> — avis + rich snippets étoiles (déjà en place sur Butt Premium)</li>
-        <li><strong>Alma / Klarna / Shopify Installments</strong> — paiement en 3-4x, décisif sur un panier formation de plusieurs centaines d'euros</li>
-        <li><strong>Klaviyo ou Shopify Email</strong> — relance de panier abandonné, essentielle sur un achat considéré</li>
-        <li><strong>Shopify Forms</strong> — capture d'email avec réduction sur la première formation</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Vitesse &amp; checkout</h3>
-      <ul>
-        <li>Auditez PageSpeed Insights après chaque nouvelle app installée — chaque script ajouté grignote l'INP</li>
-        <li>Activez Shop Pay, Apple Pay et Google Pay pour réduire la friction au tunnel de commande</li>
-        <li>Thème Dawn conservé tel quel plutôt qu'un thème payant chargé : votre niveau technique en Liquid permet de tout personnaliser dessus sans surcoût de poids</li>
-      </ul>
-    </div>
-  </div>
+  <p class="section-intro">Configuration des packs, des stocks et des options de session dans Shopify.</p>
+  <div class="checklist" id="check-shopify"></div>
 </section>
 
 <!-- CONTENU -->
-<section class="section" id="contenu">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">09 — Autorité</span>
-      <h2>Stratégie de contenu &amp; calendrier éditorial</h2>
+<section class="section-page" id="page-contenu">
+  <div class="section-header">
+    <div><span class="section-num">09 — Autorité</span><div class="section-title">Stratégie de contenu & Blog</div></div>
+  </div>
+  <p class="section-intro">Le blog sert à capter les recherches informationnelles et à construire l'E-E-A-T sur un sujet sensible. 2-3 articles avant le lancement, puis rythme régulier.</p>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--violet)">
+      <h3>📝 Article 1</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">Mot-clé :</strong> strass dentaire danger</p>
+      <p style="font-size:13px;color:var(--muted)">Strass dentaire : est-ce dangereux pour l'émail ? Rassurer + expliquer le protocole enseigné en formation.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--gold)">
+      <h3>📝 Article 2</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">Mot-clé :</strong> prix formation strass dentaire</p>
+      <p style="font-size:13px;color:var(--muted)">Combien coûte une formation strass dentaire en France ? Grille tarifaire du marché + positionnement Éclats et Strass.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red)">
+      <h3>📝 Article 3</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">Mot-clé :</strong> blanchiment dentaire loi esthéticienne</p>
+      <p style="font-size:13px;color:var(--muted)">Blanchiment dentaire par une esthéticienne : que dit la loi ? Fort levier E-E-A-T.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue)">
+      <h3>📝 Article 4</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">Mot-clé :</strong> comment poser des strass dentaires</p>
+      <p style="font-size:13px;color:var(--muted)">Strass dentaire, pose et dépose : qui a le droit de faire quoi. Réassurance technique + légale.</p>
     </div>
   </div>
-  <p class="section-intro">Le blog sert à capter les recherches informationnelles (celles qui ne cherchent pas encore à acheter) et à construire l'E-E-A-T sur un sujet sensible. 2 à 3 articles avant le lancement, puis un rythme régulier.</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Article</th><th>Mot-clé visé</th><th>Angle</th></tr></thead>
-      <tbody>
-        <tr><td>Strass dentaire : est-ce dangereux pour l'émail ?</td><td>strass dentaire danger</td><td>Rassurer + expliquer le protocole enseigné en formation</td></tr>
-        <tr><td>Combien coûte une formation strass dentaire en France ?</td><td>prix formation strass dentaire</td><td>Grille tarifaire du marché + positionnement Éclats et Strass</td></tr>
-        <tr><td>Blanchiment dentaire par une esthéticienne : que dit la loi ?</td><td>blanchiment dentaire loi esthéticienne</td><td>Cadre légal précis (voir encart conformité) — fort levier E-E-A-T</td></tr>
-        <tr><td>Strass dentaire, pose et dépose : qui a le droit de faire quoi ?</td><td>dépose strass dentaire</td><td>Clarifier le périmètre de votre formation</td></tr>
-        <tr><td>Quel kit choisir pour débuter le strass dentaire ?</td><td>kit strass dentaire débutant</td><td>Comparatif + lien vers le Pack + Matériel</td></tr>
-        <tr><td>5 raisons de se former au strass dentaire en 2026</td><td>formation strass dentaire 2026</td><td>Tendance + opportunité business</td></tr>
-        <tr><td>Financer sa formation esthétique dentaire : les options</td><td>financer formation esthétique dentaire</td><td>Panorama honnête des options (à vérifier au cas par cas)</td></tr>
-        <tr><td>Témoignage : d'esthéticienne à experte strass dentaire</td><td>reconversion strass dentaire</td><td>Preuve sociale, storytelling élève</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <div class="alert alert-violet">Cadence cible : 1 article/mois minimum après le lancement. Répondez aux commentaires pour les signaux d'engagement.</div>
 </section>
 
 <!-- CONVERSION -->
-<section class="section" id="conversion">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">10 — Taux de conversion</span>
-      <h2>Conversion &amp; éléments de confiance</h2>
-    </div>
+<section class="section-page" id="page-conversion">
+  <div class="section-header">
+    <div><span class="section-num">10 — Vente</span><div class="section-title">Conversion & Confiance</div></div>
   </div>
-  <p class="section-intro">Une formation à plusieurs centaines d'euros est un achat réfléchi : la confiance se construit avant le clic sur « Ajouter au panier », pas seulement au checkout.</p>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3>Sur les fiches produits</h3>
-      <ul>
-        <li>Paiement en plusieurs fois affiché dès la fiche, pas seulement au checkout</li>
-        <li>Nombre d'élèves déjà formées, avis avec note moyenne visible</li>
-        <li>Vidéo de présentation de la formatrice — renforce l'E-E-A-T autant que la conversion</li>
-        <li>FAQ qui lève les objections concrètes : prix, légalité, matériel, certification</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Réassurance générale</h3>
-      <ul>
-        <li>Badges : paiement sécurisé, assurance RC Pro, matériaux certifiés CE</li>
-        <li>Politique de remboursement claire et facilement trouvable</li>
-        <li>Contact direct pré-achat (WhatsApp ou chat) pour les questions hésitantes</li>
-        <li>Compte à rebours uniquement si les places sont réellement limitées — l'urgence doit rester honnête</li>
-      </ul>
-    </div>
-  </div>
+  <p class="section-intro">Éléments qui transforment les visiteurs en acheteurs. Chaque friction retirée augmente le taux de conversion.</p>
+  <div class="checklist" id="check-conversion"></div>
 </section>
 
-<!-- LEGAL -->
-<section class="section" id="legal">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">11 — Conformité</span>
-      <h2>Conformité légale France</h2>
-    </div>
+<!-- LÉGAL -->
+<section class="section-page" id="page-legal">
+  <div class="section-header">
+    <div><span class="section-num">11 — Conformité</span><div class="section-title">Légal & RGPD</div></div>
   </div>
-  <div class="grid grid-2">
-    <div class="card">
-      <h3>Pages obligatoires</h3>
-      <ul>
-        <li>Mentions légales (raison sociale, SIREN/SIRET, forme juridique, adresse, hébergeur)</li>
-        <li>CGV : modalités d'accès, prérequis, délai de rétractation adapté aux prestations de formation, paiement, propriété intellectuelle des contenus pédagogiques</li>
-        <li>Politique de confidentialité RGPD (Customer Privacy API Shopify + bannière cookies conforme CNIL)</li>
-        <li>Politique de remboursement / annulation</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>À faire relire par un professionnel</h3>
-      <ul>
-        <li>Les CGV, avant mise en ligne — je peux vous donner une base de rédaction, mais un avocat ou un service type LegalStart doit les valider</li>
-        <li>Votre contrat d'assurance RC Pro, pour confirmer qu'il couvre explicitement blanchiment ET pose de strass</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="callout callout--warn">
-    <span class="callout__label">⚠ Point de vigilance réglementaire — à faire valider par un professionnel du droit</span>
-    <p><strong>Blanchiment dentaire :</strong> en France, seuls les produits à 0,1&nbsp;% de peroxyde d'hydrogène ou moins (ou sans peroxyde) peuvent être utilisés par des non-dentistes, dans un cadre strictement cosmétique. Entre 0,1&nbsp;% et 6&nbsp;%, l'usage est réservé aux chirurgiens-dentistes (directive 2011/84/UE, Code de la santé publique). Attention : certains contenus concurrents affirment à tort qu'un taux de 6&nbsp;% serait autorisé pour les non-dentistes — ce n'est pas le cas, et le reprendre dans votre formation ou votre marketing vous exposerait à un risque. La DGCCRF contrôle régulièrement ce secteur, en particulier les allégations commerciales du type « blanchiment professionnel » ou « comme chez le dentiste ».</p>
-    <p><strong>Strass dentaire :</strong> la pose est globalement tolérée tant qu'elle reste superficielle — pas de perçage, de limage, ni d'altération structurelle de la dent. C'est une zone grise sans jurisprudence défavorable connue à ce jour, à condition de rester non invasif. En revanche, la <strong>dépose</strong> (retrait) est un acte réservé au chirurgien-dentiste : à indiquer clairement dans votre formation et vos CGV.</p>
-    <ul>
-      <li>Matériaux certifiés CE, cristaux conformes REACH (sans plomb ni nickel)</li>
-      <li>Fiche de consentement client + questionnaire de santé préalable, pour chaque prestation enseignée</li>
-      <li>Assurance RC Pro couvrant explicitement ces deux prestations</li>
-    </ul>
-  </div>
+  <div class="alert alert-red">⚠️ Le blanchiment dentaire par non-dentiste est encadré. Mettez en avant la formation et le protocole professionnel — pas l'acte lui-même.</div>
+  <div class="checklist" id="check-legal"></div>
 </section>
 
 <!-- TRACKING -->
-<section class="section" id="tracking">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">12 — Mesure</span>
-      <h2>Tracking &amp; analytics</h2>
-    </div>
+<section class="section-page" id="page-tracking">
+  <div class="section-header">
+    <div><span class="section-num">12 — Mesure</span><div class="section-title">Tracking & Analytics</div></div>
   </div>
-  <ul class="checklist">
-    <li><label><input type="checkbox"><span>Google Analytics 4 connecté avec le e-commerce activé (Admin → Preferences)</span></label></li>
-    <li><label><input type="checkbox"><span>Google Search Console vérifié (propriété du domaine)</span></label></li>
-    <li><label><input type="checkbox"><span>Meta Pixel installé si campagnes Instagram/TikTok prévues (canal naturel pour ce secteur très visuel)</span></label></li>
-    <li><label><input type="checkbox"><span>Convention UTM définie pour distinguer bio / paid / affiliation dans vos rapports</span></label></li>
-  </ul>
+  <p class="section-intro">Impossible d'optimiser ce qu'on ne mesure pas. À configurer avant le lancement.</p>
+  <div class="checklist" id="check-tracking"></div>
 </section>
 
-<!-- CHECKLIST FINALE -->
-<section class="section" id="checklist-finale">
-  <div class="section-head">
-    <svg class="gem-mark" width="22" height="22"><use href="#gem-mark"/></svg>
-    <div>
-      <span class="section-num">13 — Avant de publier</span>
-      <h2>Checklist finale de lancement</h2>
-    </div>
+<!-- CHECKLIST -->
+<section class="section-page" id="page-checklist">
+  <div class="section-header">
+    <div><span class="section-num">13 — Avant de publier</span><div class="section-title">Checklist finale de lancement</div></div>
   </div>
-  <div class="grid grid-2">
-    <div class="card checklist-group">
-      <h3>Contenu &amp; structure</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>4 fiches produits rédigées avec title/meta/H1/H2 optimisés</span></label></li>
-        <li><label><input type="checkbox"><span>Collection Formations avec texte descriptif riche (150-300 mots)</span></label></li>
-        <li><label><input type="checkbox"><span>FAQ dédiée + FAQ sur chaque fiche produit</span></label></li>
-        <li><label><input type="checkbox"><span>Page À propos avec certifications visibles</span></label></li>
-        <li><label><input type="checkbox"><span>2-3 articles de blog publiés au minimum</span></label></li>
-      </ul>
-    </div>
-    <div class="card checklist-group">
-      <h3>SEO technique</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>Sitemap soumis à Search Console</span></label></li>
-        <li><label><input type="checkbox"><span>Toutes les images ont un alt text</span></label></li>
-        <li><label><input type="checkbox"><span>LCP &lt; 2,5 s, INP &lt; 200 ms, CLS &lt; 0,1 vérifiés</span></label></li>
-        <li><label><input type="checkbox"><span>Schema Course + FAQPage installés</span></label></li>
-        <li><label><input type="checkbox"><span>Version mobile testée intégralement, tunnel d'achat inclus</span></label></li>
-      </ul>
-    </div>
-    <div class="card checklist-group">
-      <h3>Légal &amp; conformité</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>CGV, mentions légales, confidentialité, remboursement publiées</span></label></li>
-        <li><label><input type="checkbox"><span>Bannière cookies conforme CNIL activée</span></label></li>
-        <li><label><input type="checkbox"><span>Contenu blanchiment aligné sur le seuil 0,1&nbsp;% de peroxyde</span></label></li>
-        <li><label><input type="checkbox"><span>Distinction pose / dépose claire sur la formation strass</span></label></li>
-        <li><label><input type="checkbox"><span>CGV relues par un professionnel du droit</span></label></li>
-      </ul>
-    </div>
-    <div class="card checklist-group">
-      <h3>Conversion &amp; tracking</h3>
-      <ul class="checklist">
-        <li><label><input type="checkbox"><span>App d'avis installée et premiers avis collectés</span></label></li>
-        <li><label><input type="checkbox"><span>Paiement en plusieurs fois activé et visible</span></label></li>
-        <li><label><input type="checkbox"><span>GA4 connecté, e-commerce activé</span></label></li>
-        <li><label><input type="checkbox"><span>Search Console vérifié</span></label></li>
-        <li><label><input type="checkbox"><span>Meta Pixel installé si campagnes prévues</span></label></li>
-      </ul>
-    </div>
+  <p class="section-intro">Validez chaque point avant de rendre le site public. Une seule liste pour tout vérifier.</p>
+  <div class="card">
+    <h3>📝 Contenu & Structure</h3>
+    <div class="checklist" id="check-cl-contenu"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>⚙️ SEO technique</h3>
+    <div class="checklist" id="check-cl-seo"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>⚖️ Légal & Conformité</h3>
+    <div class="checklist" id="check-cl-legal"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h3>💰 Commerce & UX</h3>
+    <div class="checklist" id="check-cl-ux"></div>
   </div>
 </section>
 
+</div><!-- /content -->
 </main>
 
-<footer>
-  <div class="container">
-    Document préparé pour Éclats et Strass — prêt pour l'exécution. Dites-moi par quelle partie vous voulez commencer : fiches produits, snippets Liquid, ou rédaction des CGV.
-  </div>
-</footer>
+<button id="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
+<script>
+// ══════════════════════════════════════════════
+// DONNÉES
+// ══════════════════════════════════════════════
+
+const PHASES = [
+  {num:'01',title:'Fondations',items:['Réserver le nom de domaine eclatsetstrass.fr (+ .com en redirection si disponible)','Définir l\'identité visuelle (palette, typographie, logo)','Créer la boutique Shopify, thème Dawn (gratuit, rapide)','Réunir les infos légales (SIRET, statut) avant mise en ligne','Créer la collection « Formations »']},
+  {num:'02',title:'Contenu produits',items:['Rédiger les 4 fiches produits avec title/meta/H1/H2 optimisés','Ajouter des images professionnelles avec alt text descriptif','Configurer les variantes ou bundles Shopify','Activer le suivi de stock pour les sessions à places limitées']},
+  {num:'03',title:'Pages essentielles',items:['Créer la page FAQ dédiée (questions fréquentes + schema FAQPage)','Créer la page À propos avec certifications visibles','Créer la page Contact avec formulaire fonctionnel','Mentions légales + CGV + Politique de remboursement']},
+  {num:'04',title:'SEO on-page',items:['Renseigner title + meta-description sur chaque page','Structurer chaque fiche avec H1 > H2 > contenu','Vérifier qu\'aucune page n\'a de H1 dupliqué','URLs propres sans suffixes -1 ou -2']},
+  {num:'05',title:'SEO technique',items:['Soumettre le sitemap dans Google Search Console','Tester Core Web Vitals (LCP < 2,5s, INP < 200ms, CLS < 0,1)','Version mobile testée intégralement, tunnel d\'achat inclus','Installer schema Course + FAQPage']},
+  {num:'06',title:'Confiance & Conversion',items:['Ajouter paiement en plusieurs fois visible dès la fiche','Afficher le nombre d\'élèves formées + avis','Ajouter une vidéo de présentation de la formatrice','FAQ qui lève les objections concrètes']},
+  {num:'07',title:'Tracking',items:['Connecter Google Analytics 4 avec e-commerce activé','Vérifier la propriété dans Google Search Console','Installer Meta Pixel si campagnes Instagram/TikTok','Définir une convention UTM pour les campagnes']},
+  {num:'08',title:'Blog & Contenu',items:['Rédiger 2-3 articles avant le lancement','Structurer chaque article avec H1 > H2 > conclusion','Intégrer des liens internes vers les fiches produits']},
+  {num:'09',title:'Tests pré-lancement',items:['Passer toute la boutique en mobile','Tester le tunnel d\'achat jusqu\'à la confirmation','Vérifier les emails transactionnels (confirmation, relance)','Tester le formulaire de contact']},
+  {num:'10',title:'Lancement & Suivi',items:['Retirer le mot de passe Shopify','Annoncer sur Instagram + TikTok','Surveiller Search Console les 30 premiers jours','Premier bilan SEO à 90 jours']},
+];
+
+const CHECKS = {
+  'design':['Image hero pleine largeur avec accroche formation','Section "Nos formations" — grille 2 colonnes','Bloc réassurance (certifiée, à distance, matériel inclus)','Témoignages élèves avec photo','Section FAQ condensée (3-4 questions)','Section "Qui suis-je" avec photo de la formatrice','Footer complet avec liens légaux'],
+  'seo-onpage':['[Accueil] Title : Formation strass dentaire & blanchiment — Éclats et Strass','[Accueil] H1 : Formation strass dentaire et blanchiment par une professionnelle','[Accueil] Meta : apprenez à poser des strass dentaires et à pratiquer le blanchiment...','[Collection] Title : Formations strass dentaire & blanchiment — Éclats et Strass','[Collection] H1 : Nos formations professionnelles','[Strass] Title : Formation strass dentaire professionnelle — Éclats et Strass','[Strass] H1 : Formation strass dentaire — devenez prothésiste strass certifiée','[Strass] H2s : Le programme · Ce que vous apprendrez · Pour qui · FAQ','[Blanchiment] Title : Formation blanchiment dentaire — Éclats et Strass','[Blanchiment] H1 : Formation blanchiment dentaire pour esthéticiennes','[Pack Duo] Title : Pack formation strass + blanchiment dentaire — Éclats et Strass','[Pack Duo] H1 : Pack duo formations strass & blanchiment + matériel professionnel','[FAQ] Title : FAQ formations strass et blanchiment dentaire — Éclats et Strass','[FAQ] H1 : Questions fréquentes sur nos formations','[À propos] H1 : Éclats et Strass — votre formatrice certifiée','[Blog] Structure H1 > H2 sur chaque article','Toutes les images avec alt text descriptif','Liens internes entre les fiches et la FAQ','Schema FAQPage installé sur la page FAQ','Pas de duplicate content entre les fiches produits','Vérifier que Dawn n\'injecte pas de H1 supplémentaire','URL canonique configurée sur chaque page','Minifier JS/CSS dans Shopify (Online Store → Preferences → Performance)'],
+  'seo-technique':['URLs propres sans suffixes -1 ou -2','Un seul H1 par page','Title et meta-description sur CHAQUE page','Alt text descriptif sur toutes les images','Sitemap.xml soumis dans Google Search Console','Redirection 301 du www vers non-www (ou inversement)','Pas de liens brisés (vérifier avec Screaming Frog ou Google Search Console)','Favicon + Apple Touch Icon configurés','Shopify CDN activé (images servies en WebP automatiquement)','HTTPS actif (automatique sur Shopify)','Robots.txt sans blocage des pages importantes','Google Search Console propriété vérifiée','Core Web Vitals vérifiés : LCP < 2,5s, INP < 200ms, CLS < 0,1','PageSpeed mobile > 70','Aucune page d\'erreur 404 dans le menu ou les liens internes'],
+  'shopify':['Option Bundles pour le Pack Duo (app native gratuite Shopify Bundles)','Pack sans Matériel configuré comme produit simple','Suivi de stock activé pour les sessions à places limitées','Paiement en 3 ou 4x visible dès la fiche (Klarna, PayPal Pay Later, ou Alma)','Email de confirmation de commande personnalisé avec contenu de formation','Politique de remboursement adaptée aux formations (droit de rétractation)','App d\'avis : Judge.me ou Loox installée','Upsell configuré : proposer le Pack Duo aux acheteurs d\'une seule formation','Meta Pixel installé via Shopify (pas manuellement dans le thème)','Chat ou FAQ en bas de fiche pour lever les objections'],
+  'conversion':['Paiement en plusieurs fois affiché dès la fiche, pas seulement au checkout','Nombre d\'élèves déjà formées + avis avec note moyenne visible','Vidéo de présentation de la formatrice — renforce l\'E-E-A-T','FAQ qui lève les objections concrètes : prix, légalité, matériel, certification','Bouton d\'achat sticky sur mobile','Garantie de satisfaction ou remboursement mise en avant','Pop-up de récupération de panier abandonné','Badge "Paiement sécurisé" visible au checkout'],
+  'legal':['Mentions légales (raison sociale, SIREN/SIRET, forme juridique, adresse, hébergeur)','CGV : modalités d\'accès, prérequis, délai de rétractation (14 jours pour les formations)','Politique de confidentialité RGPD (Customer Privacy API Shopify + bannière cookies)','Politique de remboursement / annulation','Ne pas promettre de revenus garantis après formation','Cadre légal du blanchiment dentaire précisé (protocole professionnel, pas acte médical)','Organisme de formation : se renseigner sur la déclaration d\'activité (numéro de formation)','Certifications et attestations de la formatrice visibles','Contenu de formation précisé (vidéos, PDF, accès illimité ou limité, support)'],
+  'tracking':['Google Analytics 4 connecté avec le e-commerce activé (Admin → Preferences)','Google Search Console vérifié (propriété du domaine)','Meta Pixel installé si campagnes Instagram/TikTok prévues','Convention UTM définie pour distinguer bio / paid / affiliation dans vos rapports'],
+  'cl-contenu':['4 fiches produits rédigées avec title/meta/H1/H2 optimisés','Collection Formations avec texte descriptif riche (150-300 mots)','FAQ dédiée + FAQ sur chaque fiche produit','Page À propos avec certifications visibles','2-3 articles de blog publiés au minimum'],
+  'cl-seo':['Sitemap soumis à Search Console','Toutes les images ont un alt text','LCP < 2,5s, INP < 200ms, CLS < 0,1 vérifiés','Schema Course + FAQPage installés','Version mobile testée intégralement, tunnel d\'achat inclus'],
+  'cl-legal':['CGV, mentions légales, confidentialité RGPD en place','Politique de remboursement/annulation publiée','Cadre légal du blanchiment dentaire mentionné','Bannière cookies conforme (Customer Privacy API)'],
+  'cl-ux':['Paiement en 3x visible dès les fiches produits','App d\'avis configurée (au moins une demande d\'avis automatique)','Emails transactionnels testés (confirmation, relance panier)','Redirection du mot de passe Shopify désactivée','Favicon et titres d\'onglets corrects sur toutes les pages'],
+};
+
+const KEYWORDS = [
+  ['formation strass dentaire','Transactionnelle','Fiche produit + Collection','Haute'],
+  ['formation blanchiment dentaire','Transactionnelle','Fiche produit','Haute'],
+  ['prix formation strass dentaire','Transactionnelle','Fiche produit + Blog','Haute'],
+  ['pack formation strass blanchiment dentaire','Transactionnelle','Fiches packs','Haute'],
+  ['blanchiment dentaire esthéticienne légal','Informationnelle','Blog','Haute'],
+  ['devenir poseuse strass dentaire','Informationnelle','Accueil + Blog','Moyenne'],
+  ['formation strass dentaire à distance','Transactionnelle','Fiche produit','Moyenne'],
+  ['kit strass dentaire professionnel','Transactionnelle','Pack + matériel','Moyenne'],
+  ['formation strass dentaire avis','Réassurance','Accueil / avis','Moyenne'],
+  ['formation strass dentaire finançable','Transactionnelle','FAQ / Produit','Moyenne'],
+];
+
+// ══════════════════════════════════════════════
+// ÉTAT & PERSISTENCE
+// ══════════════════════════════════════════════
+const STORAGE_KEY = 'eclats_formation_v2';
+let state = {};
+
+function loadState(){
+  try{ const s = localStorage.getItem(STORAGE_KEY); if(s) state = JSON.parse(s); }catch(e){ state = {}; }
+}
+
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+function toggle(key){
+  state[key] = !state[key];
+  saveState();
+  renderAll();
+}
+
+// ══════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════
+
+function makeChecklist(containerId, prefix, items){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML = items.map((text, i) => {
+    const key = prefix + '_' + i;
+    const checked = !!state[key];
+    return \`<div class="check-row\${checked?' checked':''}" onclick="toggle('\${key}')">
+      <div class="check-box">\${checked?'✓':''}</div>
+      <span class="check-text">\${text}</span>
+    </div>\`;
+  }).join('');
+}
+
+function makePhases(){
+  const el = document.getElementById('phases-container');
+  if(!el) return;
+  el.innerHTML = PHASES.map((phase, pi) => {
+    const items = phase.items.map((text, i) => {
+      const key = \`roadmap_\${pi}_\${i}\`;
+      const checked = !!state[key];
+      return \`<div class="check-row\${checked?' checked':''}" onclick="toggle('\${key}')">
+        <div class="check-box">\${checked?'✓':''}</div>
+        <span class="check-text">\${text}</span>
+      </div>\`;
+    }).join('');
+    const doneCount = phase.items.filter((_,i)=>!!state[\`roadmap_\${pi}_\${i}\`]).length;
+    const allDone = doneCount === phase.items.length;
+    return \`<div class="phase\${pi<2?' open':''}">
+      <div class="phase-header" onclick="togglePhase(this.parentElement)">
+        <span class="phase-num">\${phase.num}</span>
+        <span class="phase-title">\${phase.title}</span>
+        <span class="phase-count">\${doneCount}/\${phase.items.length}</span>
+        \${allDone ? '<span style="color:var(--green);font-size:13px">✓</span>' : ''}
+        <span class="phase-chevron">›</span>
+      </div>
+      <div class="phase-body"><div style="padding:8px 16px 12px">\${items}</div></div>
+    </div>\`;
+  }).join('');
+}
+
+function makeKeywords(){
+  const el = document.getElementById('kw-tbody');
+  if(!el) return;
+  el.innerHTML = KEYWORDS.map(([kw, intent, page, prio]) => {
+    const prioCls = prio === 'Haute' ? 'priority-haute' : 'priority-moyenne';
+    return \`<tr>
+      <td><strong>\${kw}</strong></td>
+      <td><span class="intent-badge">\${intent}</span></td>
+      <td style="color:var(--muted)">\${page}</td>
+      <td><span class="priority-badge \${prioCls}">\${prio}</span></td>
+    </tr>\`;
+  }).join('');
+}
+
+function updateProgress(){
+  const allKeys = [];
+  // phases
+  PHASES.forEach((p,pi) => p.items.forEach((_,i) => allKeys.push(\`roadmap_\${pi}_\${i}\`)));
+  // checklists
+  Object.entries(CHECKS).forEach(([prefix, items]) => items.forEach((_,i) => allKeys.push(\`\${prefix}_\${i}\`)));
+  const done = allKeys.filter(k => !!state[k]).length;
+  const pct = allKeys.length > 0 ? Math.round(done/allKeys.length*100) : 0;
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-fill').style.width = pct + '%';
+  // nav checks
+  const navChecks = {
+    roadmap: PHASES.flatMap((p,pi)=>p.items.map((_,i)=>\`roadmap_\${pi}_\${i}\`)),
+    design: CHECKS.design.map((_,i)=>\`design_\${i}\`),
+    'seo-onpage': CHECKS['seo-onpage'].map((_,i)=>\`seo-onpage_\${i}\`),
+    'seo-technique': CHECKS['seo-technique'].map((_,i)=>\`seo-technique_\${i}\`),
+    shopify: CHECKS.shopify.map((_,i)=>\`shopify_\${i}\`),
+    conversion: CHECKS.conversion.map((_,i)=>\`conversion_\${i}\`),
+    legal: CHECKS.legal.map((_,i)=>\`legal_\${i}\`),
+    tracking: CHECKS.tracking.map((_,i)=>\`tracking_\${i}\`),
+    checklist: [...CHECKS['cl-contenu'],...CHECKS['cl-seo'],...CHECKS['cl-legal'],...CHECKS['cl-ux']].map((_,i)=>\`cl-\${i}\`),
+  };
+  Object.entries(navChecks).forEach(([id, keys]) => {
+    const el = document.getElementById('nc-'+id);
+    if(!el) return;
+    const allDone = keys.every(k=>!!state[k]);
+    const anyDone = keys.some(k=>!!state[k]);
+    el.className = 'nav-check' + (allDone?' done':anyDone?' half':'');
+    el.textContent = allDone ? '✓' : anyDone ? '·' : '';
+  });
+}
+
+function renderAll(){
+  makePhases();
+  makeKeywords();
+  Object.entries(CHECKS).forEach(([prefix, items]) => {
+    const containerId = prefix.startsWith('cl-') ? 'check-'+prefix : 'check-'+prefix;
+    makeChecklist(containerId, prefix, items);
+  });
+  updateProgress();
+}
+
+function togglePhase(el){
+  el.classList.toggle('open');
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function showPage(pageId, navEl){
+  document.querySelectorAll('.section-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('page-'+pageId);
+  if(page) page.classList.add('active');
+  if(navEl) navEl.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function resetAll(){
+  if(!confirm('Réinitialiser toute la progression ? Cette action est irréversible.')) return;
+  state = {};
+  saveState();
+  renderAll();
+}
+
+window.addEventListener('scroll', () => {
+  document.getElementById('scroll-top').classList.toggle('show', window.scrollY > 400);
+});
+
+// ══ INIT ══
+loadState();
+renderAll();
+</script>
 </body>
 </html>
 `

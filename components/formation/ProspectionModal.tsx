@@ -10,7 +10,7 @@ export default function ProspectionModal() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 font-black text-sm tracking-widest uppercase transition-all rounded-2xl py-3.5 px-4"
+        className="w-full flex items-center justify-center gap-2 font-black text-sm uppercase transition-all rounded-2xl py-3.5 px-4"
         style={{
           background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
           color: "#fff",
@@ -23,14 +23,17 @@ export default function ProspectionModal() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[300] flex flex-col" style={{ background: "#fff" }}>
-          <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-200 shrink-0"
+        <div className="fixed inset-0 z-[300] flex flex-col bg-black">
+          <div
+            className="flex items-center justify-between px-5 py-3 shrink-0"
             style={{ background: "linear-gradient(135deg, #0ea5e9, #0284c7)" }}>
-            <span className="text-white font-black text-base tracking-widest uppercase">💊 Prospection Pharmacies</span>
+            <span className="text-white font-black text-base tracking-widest uppercase">
+              💊 Prospection Pharmacies
+            </span>
             <button
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm transition-colors">
-              <X size={15}/> Fermer
+              <X size={15} /> Fermer
             </button>
           </div>
           <iframe
