@@ -398,14 +398,19 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   const [globalResults, setGlobalResults]   = useState<any[]>([])
   const [searchLoading, setSearchLoading]   = useState(false)
 
-  // Sections repliables — toutes fermées par défaut (sauf Activité, toujours visible)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
-    new Set(ALL_NAV.filter(s => s.section !== "Activité").map(s => s.section))
-  )
+  // Sections repliables — toutes fermées par défaut y compris Activité
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(`nav_collapsed_${profile?.id || "default"}`)
+      if (saved) return new Set(JSON.parse(saved))
+    } catch {}
+    return new Set(ALL_NAV.map(s => s.section))
+  })
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => {
       const next = new Set(prev)
       next.has(section) ? next.delete(section) : next.add(section)
+      try { localStorage.setItem(`nav_collapsed_${profile?.id || "default"}`, JSON.stringify([...next])) } catch {}
       return next
     })
   }
@@ -852,31 +857,20 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
         {/* NAV */}
         <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1">
-          {/* ── Activité : toujours visible, grandes cases ── */}
-          <div className="mb-3">
-            <div className="flex items-center gap-1.5 px-1.5 mb-1.5">
-              <span className="text-[10px]">⚡</span>
-              <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: ACCENT }}>Activité</p>
-            </div>
-            <div className="space-y-1.5">
-              {visibleNav.find(s => s.section === "Activité")?.items.map(tab => renderPrimaryNavItem(tab))}
-            </div>
-          </div>
-
-          <div className="h-px mx-1.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />
-
-          {/* ── Autres sections, repliables ── */}
-          {visibleNav.filter(s => s.section !== "Activité").map(({ section, items }) => {
+          {/* ── Toutes les sections, repliables ── */}
+          {visibleNav.map(({ section, items }) => {
+            const isActivite  = section === "Activité"
             const isCollapsed = collapsedSections.has(section)
             const hasActive   = items.some(t => t.id === activeTab)
             const hasOpen     = items.some(t => openTabs.includes(t.id))
             return (
               <div key={section} className="mb-0.5">
-                {/* Header section */}
                 <button onClick={() => toggleSection(section)}
                   className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-zinc-800/60 transition-colors group mb-0.5">
                   <div className="flex items-center gap-1.5">
-                    <p className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-300" : "text-zinc-600 group-hover:text-zinc-400"}`}>
+                    {isActivite && <span className="text-[10px]">⚡</span>}
+                    <p className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${isActivite ? "font-black" : ""} ${hasActive ? "text-zinc-300" : "text-zinc-600 group-hover:text-zinc-400"}`}
+                      style={isActivite && hasActive ? { color: ACCENT } : {}}>
                       {section}
                     </p>
                     {isCollapsed && (hasActive || hasOpen) && (
@@ -886,10 +880,9 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
                   <span className={`text-zinc-600 group-hover:text-zinc-400 text-[8px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
                     style={{ display: "inline-block" }}>▶</span>
                 </button>
-
                 {!isCollapsed && (
-                  <div className="space-y-0.5 px-0.5">
-                    {items.map(tab => renderNavItem(tab))}
+                  <div className={isActivite ? "space-y-1.5 mb-2" : "space-y-0.5 px-0.5"}>
+                    {items.map(tab => isActivite ? renderPrimaryNavItem(tab) : renderNavItem(tab))}
                   </div>
                 )}
               </div>
@@ -974,35 +967,32 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
             <img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" />
           </div>
           <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1">
-            {/* ── Activité : toujours visible, grandes cases ── */}
-            <div className="mb-3">
-              <div className="flex items-center gap-1.5 px-1.5 mb-1.5">
-                <span className="text-[10px]">⚡</span>
-                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: ACCENT }}>Activité</p>
-              </div>
-              <div className="space-y-1.5">
-                {visibleNav.find(s => s.section === "Activité")?.items.map(tab => renderPrimaryNavItem(tab))}
-              </div>
-            </div>
-
-            <div className="h-px mx-1.5 mb-2" style={{ backgroundColor: "rgba(255,255,255,0.06)" }} />
-
-            {visibleNav.filter(s => s.section !== "Activité").map(({ section, items }) => {
+            {/* ── Toutes les sections, repliables ── */}
+            {visibleNav.map(({ section, items }) => {
+              const isActivite  = section === "Activité"
               const isCollapsed = collapsedSections.has(section)
               const hasActive   = items.some(t => t.id === activeTab)
+              const hasOpen     = items.some(t => openTabs.includes(t.id))
               return (
                 <div key={section} className="mb-0.5">
                   <button onClick={() => toggleSection(section)}
                     className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-zinc-800/60 transition-colors group mb-0.5">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-[10px] font-bold uppercase tracking-widest ${hasActive ? "text-zinc-300" : "text-zinc-600"}`}>{section}</p>
-                      {isCollapsed && hasActive && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>}
+                      {isActivite && <span className="text-[10px]">⚡</span>}
+                      <p className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${hasActive ? "text-zinc-300" : "text-zinc-600 group-hover:text-zinc-400"}`}
+                        style={isActivite && hasActive ? { color: ACCENT } : {}}>
+                        {section}
+                      </p>
+                      {isCollapsed && (hasActive || hasOpen) && (
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ACCENT }}/>
+                      )}
                     </div>
-                    <span className={`text-zinc-600 text-[8px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`} style={{ display:"inline-block" }}>▶</span>
+                    <span className={`text-zinc-600 group-hover:text-zinc-400 text-[8px] transition-all duration-200 ${isCollapsed ? "" : "rotate-90"}`}
+                      style={{ display: "inline-block" }}>▶</span>
                   </button>
                   {!isCollapsed && (
-                    <div className="space-y-0.5">
-                      {items.map(tab => renderNavItem(tab))}
+                    <div className={isActivite ? "space-y-1.5 mb-2" : "space-y-0.5 px-0.5"}>
+                      {items.map(tab => isActivite ? renderPrimaryNavItem(tab) : renderNavItem(tab))}
                     </div>
                   )}
                 </div>
