@@ -71,7 +71,6 @@ const ALL_NAV = [
     { id: "pharmacies",       label: "Pharmacies",         icon: "🏥" },
     { id: "prospection",      label: "Prospection",        icon: "💊" },
     { id: "commandes",        label: "Fournisseurs",       icon: "🏭" },
-    { id: "playlists",        label: "Playlists clients",  icon: "🎵" },
   ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
@@ -1224,6 +1223,12 @@ function Theme2Layout({
             )
           })}
         </nav>
+        {/* Boutons accès rapide — Theme 2 */}
+        <div className="flex items-center gap-2 px-2 pb-2">
+          <TatoueurModal/>
+          <ProspectionModal/>
+          <FormationModal/>
+        </div>
       </header>
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
         {renderContent()}
