@@ -1381,8 +1381,15 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
         <td><span class="${badgeCls}">${label}</span></td>
         <td style="color:#a1a1aa;font-size:12px">${t.contact||'—'}</td>
         <td class="tp-date">${dateStr}</td>
-        <td class="tp-date" style="color:${t.rappel?'#f97316':'#555'}">${rappelStr}</td>
-        <td class="tp-note" title="${(noteClean||'').replace(/"/g,'&quot;')}">${noteClean||'—'}</td>
+        <td>
+          <input type="date" value="${t.rappel||''}"
+            style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:${t.rappel?'#f97316':'#555'};font-size:11px;padding:3px 6px;width:130px;outline:none;"
+            onchange="(function(el){var id='${p.id}';if(!trackingState[id])trackingState[id]=typeof defaultTracking==='function'?defaultTracking():{statut:'contacte',notes:'',rappel:'',updatedAt:null};trackingState[id].rappel=el.value;trackingState[id].updatedAt=new Date().toISOString();if(typeof saveTracking==='function')saveTracking();el.style.color=el.value?'#f97316':'#555';})(this)">
+        </td>
+        <td>
+          <textarea rows="2" style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:#a1a1aa;font-size:11px;padding:4px 6px;width:100%;min-width:150px;resize:vertical;outline:none;font-family:inherit;" placeholder="Note..."
+            onblur="(function(el){var id='${p.id}';if(!trackingState[id])trackingState[id]=typeof defaultTracking==='function'?defaultTracking():{statut:'contacte',notes:'',rappel:'',updatedAt:null};trackingState[id].notes=el.value;trackingState[id].updatedAt=new Date().toISOString();if(typeof saveTracking==='function')saveTracking();})(this)">${noteClean}</textarea>
+        </td>
       </tr>`;
     }).join('');
   };
