@@ -890,5 +890,624 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
   render();
 })();
 </script>
+
+<style>
+#batch-panel {
+  position:fixed; top:0; right:0; width:360px; height:100vh;
+  background:#0f0f0f; border-left:1px solid #2a2a2a;
+  z-index:9999; display:none; flex-direction:column;
+  font-family:system-ui,sans-serif; box-shadow:-8px 0 32px rgba(0,0,0,.6);
+}
+#batch-panel.open { display:flex; }
+#batch-toggle {
+  position:fixed; bottom:80px; right:16px; z-index:9998;
+  background:linear-gradient(135deg,#0ea5e9,#0284c7);
+  color:#fff; border:none; border-radius:14px;
+  padding:10px 18px; font-size:13px; font-weight:700;
+  cursor:pointer; box-shadow:0 4px 20px rgba(14,165,233,.5);
+  letter-spacing:.05em;
+}
+#batch-toggle:hover { opacity:.9; }
+.bp-header {
+  padding:16px; border-bottom:1px solid #222;
+  background:linear-gradient(135deg,rgba(14,165,233,.12),transparent);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.bp-title { color:#fff; font-weight:800; font-size:15px; }
+.bp-close { background:none; border:none; color:#666; font-size:18px; cursor:pointer; }
+.bp-close:hover { color:#fff; }
+.bp-filters { padding:14px 16px; border-bottom:1px solid #1a1a1a; flex-shrink:0; }
+.bp-label { font-size:10px; font-weight:700; color:#555; text-transform:uppercase;
+  letter-spacing:.08em; margin-bottom:5px; display:block; }
+.bp-input, .bp-select {
+  width:100%; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px;
+  color:#e4e4e7; font-size:13px; padding:8px 12px; margin-bottom:10px;
+  outline:none; font-family:inherit;
+}
+.bp-input:focus, .bp-select:focus { border-color:#0ea5e9; }
+.bp-select option { background:#1a1a1a; }
+.bp-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.bp-check { display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  color:#a1a1aa; font-size:13px; cursor:pointer; }
+.bp-check input { accent-color:#0ea5e9; width:16px; height:16px; cursor:pointer; }
+.bp-actions { padding:12px 16px; flex-shrink:0; }
+.bp-btn {
+  width:100%; padding:12px; border:none; border-radius:12px;
+  font-size:14px; font-weight:800; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  margin-bottom:8px;
+}
+.bp-btn-main {
+  background:linear-gradient(135deg,#0ea5e9,#0284c7);
+  color:#fff; box-shadow:0 4px 16px rgba(14,165,233,.35);
+}
+.bp-btn-main:hover { opacity:.9; }
+.bp-btn-secondary {
+  background:#1a1a1a; border:1px solid #2a2a2a; color:#a1a1aa;
+}
+.bp-btn-secondary:hover { background:#222; color:#fff; }
+.bp-results { flex:1; overflow-y:auto; padding:0 0 12px; }
+.bp-results::-webkit-scrollbar { width:4px; }
+.bp-results::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:99px; }
+.bp-result-header {
+  padding:10px 16px; background:#111;
+  border-bottom:1px solid #1a1a1a; position:sticky; top:0; z-index:1;
+}
+.bp-count { font-size:11px; font-weight:700; }
+.bp-item {
+  padding:10px 16px; border-bottom:1px solid #1a1a1a;
+}
+.bp-item-name { color:#e4e4e7; font-size:13px; font-weight:600; margin-bottom:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bp-item-meta { color:#555; font-size:11px; }
+.bp-item-phone { color:#0ea5e9; font-size:11px; }
+.bp-badge {
+  display:inline-block; background:rgba(34,197,94,.15); color:#22c55e;
+  border:1px solid rgba(34,197,94,.3); border-radius:99px;
+  font-size:9px; font-weight:700; padding:1px 6px; margin-left:6px;
+  vertical-align:middle;
+}
+.bp-empty { padding:32px 16px; text-align:center; color:#444; font-size:13px; }
+.bp-spinner { animation:spin 1s linear infinite; display:inline-block; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+
+<button id="batch-toggle" onclick="document.getElementById('batch-panel').classList.toggle('open')">
+  🎯 Lot de 30
+</button>
+
+<div id="batch-panel">
+  <div class="bp-header">
+    <span class="bp-title">🎯 Prospection — Lot de 30</span>
+    <button class="bp-close" onclick="document.getElementById('batch-panel').classList.remove('open')">✕</button>
+  </div>
+
+  <div class="bp-filters">
+    <div class="bp-row">
+      <div>
+        <label class="bp-label">Département</label>
+        <select id="bp-dept" class="bp-select">
+          <option value="">Tous</option>
+        </select>
+      </div>
+      <div>
+        <label class="bp-label">Région</label>
+        <select id="bp-region" class="bp-select">
+          <option value="">Toutes</option>
+        </select>
+      </div>
+    </div>
+    <label class="bp-label">Ville (contient...)</label>
+    <input id="bp-ville" class="bp-input" placeholder="Ex: Paris, Lyon, Reims...">
+    <label class="bp-label">Nom (contient...)</label>
+    <input id="bp-nom" class="bp-input" placeholder="Ex: Centrale, Saint...">
+    <label class="bp-check">
+      <input type="checkbox" id="bp-phone-only" checked>
+      Uniquement avec numéro de téléphone
+    </label>
+    <label class="bp-label">Quantité</label>
+    <select id="bp-qty" class="bp-select">
+      <option value="10">10 pharmacies</option>
+      <option value="20">20 pharmacies</option>
+      <option value="30" selected>30 pharmacies</option>
+      <option value="50">50 pharmacies</option>
+    </select>
+  </div>
+
+  <div class="bp-actions">
+    <button class="bp-btn bp-btn-main" onclick="batchPick()">
+      🎯 Obtenir le lot &amp; cocher automatiquement
+    </button>
+    <button class="bp-btn bp-btn-secondary" onclick="batchPreview()">
+      👁 Prévisualiser sans cocher
+    </button>
+  </div>
+
+  <div id="bp-results" class="bp-results">
+    <div class="bp-empty">Configurez vos filtres puis cliquez sur<br>« Obtenir le lot ».</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ── Init filtres ──────────────────────────────────────
+  function batchInit(){
+    if(typeof pharmacies === 'undefined') return;
+    const depts = [...new Set(pharmacies.map(p=>p.dept).filter(Boolean))].sort();
+    const regions = [...new Set(pharmacies.map(p=>p.region).filter(Boolean))].sort();
+    const dSel = document.getElementById('bp-dept');
+    const rSel = document.getElementById('bp-region');
+    depts.forEach(d=>{
+      const dep = pharmacies.find(p=>p.dept===d);
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d + (dep?.deptNom ? ' – '+dep.deptNom : '');
+      dSel.appendChild(o);
+    });
+    regions.forEach(r=>{
+      const o = document.createElement('option');
+      o.value = r; o.textContent = r;
+      rSel.appendChild(o);
+    });
+  }
+
+  // ── Filtrer les pharmacies ────────────────────────────
+  function getFiltered(){
+    if(typeof pharmacies === 'undefined') return [];
+    const dept     = document.getElementById('bp-dept').value.trim().toLowerCase();
+    const region   = document.getElementById('bp-region').value.trim().toLowerCase();
+    const ville    = document.getElementById('bp-ville').value.trim().toLowerCase();
+    const nom      = document.getElementById('bp-nom').value.trim().toLowerCase();
+    const phoneOnly= document.getElementById('bp-phone-only').checked;
+
+    return pharmacies.filter(p => {
+      if(dept   && (p.dept||'').toLowerCase() !== dept) return false;
+      if(region && (p.region||'').toLowerCase() !== region) return false;
+      if(ville  && !(p.ville||'').toLowerCase().includes(ville)) return false;
+      if(nom    && !(p.name||'').toLowerCase().includes(nom)) return false;
+      if(phoneOnly && !p.phone) return false;
+      return true;
+    });
+  }
+
+  // ── Pharmacies non encore contactées ─────────────────
+  function getUntouched(list){
+    const ts = typeof trackingState !== 'undefined' ? trackingState : {};
+    return list.filter(p => {
+      const t = ts[p.id];
+      if(!t) return true;
+      return t.statut === 'a_contacter';
+    });
+  }
+
+  // ── Rendre résultats ──────────────────────────────────
+  function renderResults(items, picked, mode){
+    const el = document.getElementById('bp-results');
+    if(!items.length){
+      el.innerHTML = '<div class="bp-empty">Aucune pharmacie disponible<br>pour ces filtres.</div>';
+      return;
+    }
+    const countColor = mode === 'preview' ? '#a1a1aa' : '#22c55e';
+    const countLabel = mode === 'preview'
+      ? items.length + ' résultats (prévisualisation)'
+      : items.length + ' pharmacies cochées automatiquement ✓';
+
+    let html = `<div class="bp-result-header"><span class="bp-count" style="color:${countColor}">${countLabel}</span></div>`;
+    items.forEach((p,i) => {
+      html += `<div class="bp-item">
+        <div class="bp-item-name">${i+1}. ${p.name}${mode==='picked'?'<span class="bp-badge">Cochée</span>':''}</div>
+        <div class="bp-item-meta">${p.address||''} — ${p.ville||''} (${p.dept||''})</div>
+        ${p.phone ? `<div class="bp-item-phone">${p.phone}</div>` : ''}
+      </div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  // ── Prévisualiser ─────────────────────────────────────
+  window.batchPreview = function(){
+    const qty = parseInt(document.getElementById('bp-qty').value) || 30;
+    const filtered = getFiltered();
+    const untouched = getUntouched(filtered);
+    const picked = untouched.slice(0, qty);
+    renderResults(picked, picked, 'preview');
+  };
+
+  // ── Picker et cocher ──────────────────────────────────
+  window.batchPick = async function(){
+    const btn = document.querySelector('.bp-btn-main');
+    btn.innerHTML = '<span class="bp-spinner">⟳</span> Traitement...';
+    btn.disabled = true;
+
+    await new Promise(r=>setTimeout(r, 80));
+
+    const qty = parseInt(document.getElementById('bp-qty').value) || 30;
+    const filtered = getFiltered();
+    const untouched = getUntouched(filtered);
+    const picked = untouched.slice(0, qty);
+
+    if(!picked.length){
+      document.getElementById('bp-results').innerHTML =
+        '<div class="bp-empty">Toutes les pharmacies de ces filtres<br>ont déjà été contactées !</div>';
+      btn.innerHTML = '🎯 Obtenir le lot & cocher automatiquement';
+      btn.disabled = false;
+      return;
+    }
+
+    // Cocher dans trackingState
+    if(typeof trackingState !== 'undefined'){
+      picked.forEach(p => {
+        if(!trackingState[p.id]) trackingState[p.id] = typeof defaultTracking === 'function'
+          ? defaultTracking()
+          : { statut:'a_contacter', priorite:'moyenne', contact:'', dernierContact:'', rappel:'', notes:'', updatedAt:null };
+        trackingState[p.id].statut = 'contacte';
+        trackingState[p.id].updatedAt = new Date().toISOString();
+        trackingState[p.id].notes = (trackingState[p.id].notes||'') + '[Auto-lot ' + new Date().toLocaleDateString('fr-FR') + '] ';
+      });
+      if(typeof saveTracking === 'function') await saveTracking();
+      if(typeof render === 'function') render();
+    }
+
+    renderResults(picked, picked, 'picked');
+    btn.innerHTML = '🎯 Obtenir le lot & cocher automatiquement';
+    btn.disabled = false;
+  };
+
+  // Init au chargement
+  if(document.readyState === 'complete') batchInit();
+  else window.addEventListener('load', batchInit);
+})();
+</script>
+
+<style>
+/* ── Vue Cochées ─────────────────────────────────────── */
+#tracked-panel {
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  background:#0a0a0a; z-index:10000; display:none; flex-direction:column;
+  font-family:system-ui,sans-serif;
+}
+#tracked-panel.open { display:flex; }
+#tracked-toggle {
+  position:fixed; bottom:140px; right:16px; z-index:9998;
+  background:linear-gradient(135deg,#22c55e,#16a34a);
+  color:#fff; border:none; border-radius:14px;
+  padding:10px 18px; font-size:13px; font-weight:700;
+  cursor:pointer; box-shadow:0 4px 20px rgba(34,197,94,.45);
+}
+#tracked-toggle:hover { opacity:.9; }
+.tp-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 20px; border-bottom:1px solid #1f1f1f;
+  background:#0d0d0d; flex-shrink:0;
+}
+.tp-title { color:#fff; font-weight:800; font-size:16px; }
+.tp-actions { display:flex; gap:8px; align-items:center; }
+.tp-close { background:none; border:none; color:#666; font-size:20px; cursor:pointer; }
+.tp-close:hover { color:#fff; }
+.tp-toolbar {
+  display:flex; align-items:center; gap:10px; padding:10px 20px;
+  border-bottom:1px solid #1a1a1a; background:#0d0d0d; flex-shrink:0; flex-wrap:wrap;
+}
+.tp-filter-btn {
+  padding:6px 14px; border-radius:99px; border:1px solid #2a2a2a;
+  background:transparent; color:#666; font-size:12px; font-weight:600;
+  cursor:pointer; transition:all .15s;
+}
+.tp-filter-btn:hover { border-color:#444; color:#aaa; }
+.tp-filter-btn.active { color:#fff; }
+.tp-filter-btn[data-status="all"].active { background:#333; border-color:#555; }
+.tp-filter-btn[data-status="contacte"].active { background:rgba(59,130,246,.2); border-color:#3b82f6; color:#60a5fa; }
+.tp-filter-btn[data-status="interesse"].active { background:rgba(34,197,94,.15); border-color:#22c55e; color:#4ade80; }
+.tp-filter-btn[data-status="client"].active { background:rgba(234,179,8,.15); border-color:#eab308; color:#facc15; }
+.tp-filter-btn[data-status="a_rappeler"].active { background:rgba(249,115,22,.15); border-color:#f97316; color:#fb923c; }
+.tp-filter-btn[data-status="refuse"].active { background:rgba(239,68,68,.15); border-color:#ef4444; color:#f87171; }
+.tp-filter-btn[data-status="injoignable"].active { background:rgba(113,113,122,.2); border-color:#71717a; color:#a1a1aa; }
+.tp-search-input {
+  background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px;
+  color:#e4e4e7; font-size:13px; padding:6px 12px; outline:none; width:200px;
+  font-family:inherit; margin-left:auto;
+}
+.tp-search-input:focus { border-color:#22c55e; }
+.tp-table-wrap { flex:1; overflow:auto; }
+.tp-table {
+  width:100%; border-collapse:collapse; font-size:13px; min-width:900px;
+}
+.tp-table th {
+  position:sticky; top:0; background:#111; color:#555;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  padding:10px 14px; text-align:left; border-bottom:1px solid #222; white-space:nowrap;
+}
+.tp-table td {
+  padding:10px 14px; border-bottom:1px solid #161616; vertical-align:top;
+  color:#d4d4d8;
+}
+.tp-table tr:hover td { background:#111; }
+.tp-name { font-weight:600; color:#fff; }
+.tp-phone { color:#0ea5e9; }
+.tp-note { color:#777; font-style:italic; max-width:200px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tp-date { color:#555; font-size:11px; white-space:nowrap; }
+.tp-badge {
+  display:inline-block; padding:2px 8px; border-radius:99px;
+  font-size:10px; font-weight:700; border:1px solid; white-space:nowrap;
+}
+.tp-badge-contacte { background:rgba(59,130,246,.15); border-color:#3b82f650; color:#60a5fa; }
+.tp-badge-interesse { background:rgba(34,197,94,.15); border-color:#22c55e50; color:#4ade80; }
+.tp-badge-client { background:rgba(234,179,8,.15); border-color:#eab30850; color:#facc15; }
+.tp-badge-a_rappeler { background:rgba(249,115,22,.15); border-color:#f9731650; color:#fb923c; }
+.tp-badge-refuse { background:rgba(239,68,68,.15); border-color:#ef444450; color:#f87171; }
+.tp-badge-injoignable { background:rgba(113,113,122,.2); border-color:#71717a50; color:#a1a1aa; }
+.tp-edit-btn {
+  background:none; border:none; color:#444; font-size:13px; cursor:pointer;
+  padding:2px 6px; border-radius:6px;
+}
+.tp-edit-btn:hover { background:#1a1a1a; color:#fff; }
+.tp-empty { padding:48px; text-align:center; color:#444; font-size:14px; }
+.tp-stat { font-size:12px; color:#666; padding:4px 10px; background:#1a1a1a;
+  border:1px solid #2a2a2a; border-radius:99px; white-space:nowrap; }
+.tp-stat strong { color:#fff; }
+
+/* ── Export imprimable ─────────────────────────────────── */
+.export-btn {
+  display:flex; align-items:center; gap:6px;
+  padding:8px 16px; border-radius:10px; border:none;
+  background:linear-gradient(135deg,#7c3aed,#4f46e5);
+  color:#fff; font-size:13px; font-weight:700; cursor:pointer;
+  white-space:nowrap;
+}
+.export-btn:hover { opacity:.9; }
+
+/* ── Print styles ─────────────────────────────────────── */
+@media print {
+  body > *:not(#print-frame) { display:none !important; }
+}
+</style>
+
+<!-- Bouton Vue cochées -->
+<button id="tracked-toggle" onclick="openTracked()">
+  ✅ Vue cochées
+</button>
+
+<!-- Panneau Vue cochées -->
+<div id="tracked-panel">
+  <div class="tp-header">
+    <span class="tp-title">✅ Pharmacies cochées &amp; suivies</span>
+    <div class="tp-actions">
+      <span id="tp-total-stat" class="tp-stat"></span>
+      <button class="export-btn" onclick="exportTableau()">🖨️ Export tableau imprimable</button>
+      <button class="tp-close" onclick="document.getElementById('tracked-panel').classList.remove('open')">✕</button>
+    </div>
+  </div>
+  <div class="tp-toolbar">
+    <button class="tp-filter-btn active" data-status="all" onclick="setTpFilter('all',this)">Tous</button>
+    <button class="tp-filter-btn" data-status="contacte" onclick="setTpFilter('contacte',this)">Contacté</button>
+    <button class="tp-filter-btn" data-status="interesse" onclick="setTpFilter('interesse',this)">Intéressé</button>
+    <button class="tp-filter-btn" data-status="client" onclick="setTpFilter('client',this)">Client</button>
+    <button class="tp-filter-btn" data-status="a_rappeler" onclick="setTpFilter('a_rappeler',this)">À rappeler</button>
+    <button class="tp-filter-btn" data-status="refuse" onclick="setTpFilter('refuse',this)">Refusé</button>
+    <button class="tp-filter-btn" data-status="injoignable" onclick="setTpFilter('injoignable',this)">Injoignable</button>
+    <input type="text" class="tp-search-input" id="tp-search" placeholder="🔍 Nom, ville, téléphone..." oninput="renderTracked()">
+  </div>
+  <div class="tp-table-wrap">
+    <table class="tp-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Pharmacie</th>
+          <th>Ville / Dépt</th>
+          <th>Téléphone</th>
+          <th>Statut</th>
+          <th>Contact</th>
+          <th>Dernier contact</th>
+          <th>Rappel</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="tp-tbody"></tbody>
+    </table>
+    <div id="tp-empty" class="tp-empty" style="display:none">Aucune pharmacie cochée pour ce filtre.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STATUS_LABELS_TP = {
+    a_contacter:'À contacter', contacte:'Contacté', interesse:'Intéressé',
+    client:'Client', a_rappeler:'À rappeler', injoignable:'Injoignable', refuse:'Refusé'
+  };
+
+  let tpFilter = 'all';
+
+  window.setTpFilter = function(status, btn){
+    tpFilter = status;
+    document.querySelectorAll('.tp-filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTracked();
+  };
+
+  window.openTracked = function(){
+    document.getElementById('tracked-panel').classList.add('open');
+    renderTracked();
+  };
+
+  window.renderTracked = function(){
+    if(typeof trackingState === 'undefined' || typeof pharmacies === 'undefined') return;
+    const search = (document.getElementById('tp-search')?.value||'').toLowerCase().trim();
+    const tbody = document.getElementById('tp-tbody');
+    const empty = document.getElementById('tp-empty');
+
+    // Récupérer toutes les pharmacies avec un statut != a_contacter
+    const allTracked = pharmacies.filter(p => {
+      const t = trackingState[p.id];
+      if(!t || t.statut === 'a_contacter') return false;
+      if(tpFilter !== 'all' && t.statut !== tpFilter) return false;
+      if(search){
+        const haystack = (p.name+p.ville+p.phone+p.dept+(t.notes||'')+(t.contact||'')).toLowerCase();
+        if(!haystack.includes(search)) return false;
+      }
+      return true;
+    });
+
+    // Stats
+    const counts = {};
+    pharmacies.forEach(p => {
+      const t = trackingState[p.id];
+      if(t && t.statut !== 'a_contacter') counts[t.statut] = (counts[t.statut]||0)+1;
+    });
+    const total = Object.values(counts).reduce((a,b)=>a+b,0);
+    document.getElementById('tp-total-stat').innerHTML =
+      `<strong>${total}</strong> suivies · ` +
+      Object.entries(counts).map(([s,n])=>`${STATUS_LABELS_TP[s]||s}: <strong>${n}</strong>`).join(' · ');
+
+    if(!allTracked.length){
+      tbody.innerHTML=''; empty.style.display='block'; return;
+    }
+    empty.style.display='none';
+
+    tbody.innerHTML = allTracked.map((p,i) => {
+      const t = trackingState[p.id] || {};
+      const statut = t.statut || 'a_contacter';
+      const badgeCls = 'tp-badge tp-badge-'+statut;
+      const label = STATUS_LABELS_TP[statut]||statut;
+      const dateStr = t.updatedAt ? new Date(t.updatedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) : '—';
+      const rappelStr = t.rappel ? new Date(t.rappel+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}) : '—';
+      const noteClean = (t.notes||'').replace(/\[Auto-lot[^\]]*\]/g,'').trim();
+      return `<tr>
+        <td style="color:#555;font-size:11px">${i+1}</td>
+        <td>
+          <div class="tp-name">${p.name}</div>
+          <div style="color:#555;font-size:11px">${p.address||''}</div>
+        </td>
+        <td><div style="color:#d4d4d8">${p.ville||'—'}</div><div style="color:#555;font-size:11px">${p.dept||''} ${p.deptNom||''}</div></td>
+        <td class="tp-phone">${p.phone||'<span style="color:#444">—</span>'}</td>
+        <td><span class="${badgeCls}">${label}</span></td>
+        <td style="color:#a1a1aa;font-size:12px">${t.contact||'—'}</td>
+        <td class="tp-date">${dateStr}</td>
+        <td class="tp-date" style="color:${t.rappel?'#f97316':'#555'}">${rappelStr}</td>
+        <td class="tp-note" title="${(noteClean||'').replace(/"/g,'&quot;')}">${noteClean||'—'}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  // ── Export tableau imprimable ───────────────────────────
+  window.exportTableau = function(){
+    if(typeof trackingState==='undefined'||typeof pharmacies==='undefined') return;
+    const search = (document.getElementById('tp-search')?.value||'').toLowerCase().trim();
+
+    const allTracked = pharmacies.filter(p => {
+      const t = trackingState[p.id];
+      if(!t || t.statut==='a_contacter') return false;
+      if(tpFilter !== 'all' && t.statut !== tpFilter) return false;
+      if(search){
+        const hay = (p.name+p.ville+p.phone+p.dept+(t.notes||'')).toLowerCase();
+        if(!hay.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const statusColors = {
+      contacte:'#3b82f6', interesse:'#22c55e', client:'#eab308',
+      a_rappeler:'#f97316', refuse:'#ef4444', injoignable:'#71717a'
+    };
+
+    const now = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const filterLabel = tpFilter==='all' ? 'Tous statuts' : STATUS_LABELS_TP[tpFilter]||tpFilter;
+
+    const rows = allTracked.map((p,i) => {
+      const t = trackingState[p.id]||{};
+      const statut = t.statut||'contacte';
+      const color = statusColors[statut]||'#888';
+      const label = STATUS_LABELS_TP[statut]||statut;
+      const dateStr = t.updatedAt ? new Date(t.updatedAt).toLocaleDateString('fr-FR') : '';
+      const noteClean = (t.notes||'').replace(/\[Auto-lot[^\]]*\]/g,'').trim();
+      return `<tr>
+        <td style="text-align:center;color:#888;font-size:11px">${i+1}</td>
+        <td><strong>${p.name||''}</strong><br><span style="color:#999;font-size:10px">${p.address||''}</span></td>
+        <td>${p.ville||''}<br><span style="color:#999;font-size:10px">${p.dept||''} – ${p.deptNom||''}</span></td>
+        <td style="color:#0284c7">${p.phone||''}</td>
+        <td style="text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:99px;background:${color}22;color:${color};border:1px solid ${color}55;font-size:10px;font-weight:700">${label}</span></td>
+        <td style="color:#666;font-size:11px">${t.contact||''}</td>
+        <td style="color:#666;font-size:11px">${dateStr}</td>
+        <td style="color:#888;font-size:10px;font-style:italic">${noteClean}</td>
+        <td style="min-width:120px">&nbsp;</td>
+        <td style="min-width:120px">&nbsp;</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Prospection Pharmacies — Export</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#1a1a1a;padding:16px}
+  h1{font-size:18px;font-weight:700;margin-bottom:4px;color:#0284c7}
+  .subtitle{color:#666;font-size:11px;margin-bottom:12px}
+  .meta{display:flex;gap:20px;margin-bottom:14px;padding:8px 12px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:0 6px 6px 0}
+  .meta span{font-size:11px;color:#555}
+  .meta strong{color:#0284c7}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#0284c7;color:#fff;padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+  td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+  tr:hover td{background:#f0f9ff}
+  .footer{margin-top:16px;padding-top:8px;border-top:1px solid #e5e7eb;color:#aaa;font-size:10px;display:flex;justify-content:space-between}
+  @media print{
+    body{padding:8px}
+    h1{font-size:15px}
+    th{background:#0284c7!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    tr:nth-child(even) td{background:#f9fafb!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .no-print{display:none!important}
+    @page{margin:12mm;size:A4 landscape}
+  }
+</style>
+</head>
+<body>
+<div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
+  <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimer / Enregistrer PDF</button>
+  <button onclick="window.close()" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer">✕ Fermer</button>
+</div>
+<h1>💊 Prospection Pharmacies — Butt Premium</h1>
+<p class="subtitle">Généré le ${now}</p>
+<div class="meta">
+  <span>Filtre : <strong>${filterLabel}</strong></span>
+  <span>Total : <strong>${allTracked.length} pharmacies</strong></span>
+  <span style="margin-left:auto;font-style:italic">Ce tableau est prévu pour une impression en format A4 paysage</span>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th style="width:28px">#</th>
+      <th style="min-width:160px">Nom de la pharmacie</th>
+      <th style="min-width:100px">Ville / Département</th>
+      <th style="min-width:110px">Téléphone</th>
+      <th style="min-width:80px">Statut</th>
+      <th style="min-width:90px">Contact</th>
+      <th style="min-width:70px">Date contact</th>
+      <th style="min-width:100px">Notes</th>
+      <th style="min-width:120px">Compte-rendu visite</th>
+      <th style="min-width:120px">Suite à donner</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows}
+  </tbody>
+</table>
+<div class="footer">
+  <span>Butt Premium CRM — Prospection Pharmacies</span>
+  <span>Export du ${now}</span>
+</div>
+</body>
+</html>`;
+
+    const w = window.open('','_blank','width=1100,height=700,scrollbars=yes');
+    if(w){ w.document.write(html); w.document.close(); }
+  };
+
+  // Alias pour permettre au panel précédent de notifier
+  const origRender = window.render;
+  window.render = function(){ if(origRender) origRender(); if(document.getElementById('tracked-panel')?.classList.contains('open')) window.renderTracked(); };
+
+})();
+</script>
 </body>
 </html>
