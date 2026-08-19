@@ -7,7 +7,6 @@ window.storage={
   delete:async function(k){try{localStorage.removeItem('butt_finess_'+k);return{key:k,deleted:true};}catch(e){return null;}}
 };
 </script>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Suivi prospection pharmacies — France (base FINESS)</title>
@@ -890,138 +889,130 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
   render();
 })();
 </script>
-
 <style>
-/* Lot de 30 */
-#batch-panel{position:fixed;top:0;right:0;width:360px;height:100vh;background:#0f0f0f;border-left:1px solid #2a2a2a;z-index:9999;display:none;flex-direction:column;font-family:system-ui,sans-serif;box-shadow:-8px 0 32px rgba(0,0,0,.6)}
-#batch-panel.open{display:flex}
-#batch-toggle{position:fixed;bottom:80px;right:16px;z-index:9998;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:14px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(14,165,233,.5);letter-spacing:.05em}
-.bp-header{padding:16px;border-bottom:1px solid #222;background:linear-gradient(135deg,rgba(14,165,233,.12),transparent);display:flex;align-items:center;justify-content:space-between}
-.bp-title{color:#fff;font-weight:800;font-size:15px}
-.bp-close{background:none;border:none;color:#666;font-size:18px;cursor:pointer}
-.bp-filters{padding:14px 16px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
-.bp-label{font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;display:block}
-.bp-input,.bp-select{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;color:#e4e4e7;font-size:13px;padding:8px 12px;margin-bottom:10px;outline:none;font-family:inherit}
-.bp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.bp-check{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#a1a1aa;font-size:13px;cursor:pointer}
-.bp-check input{accent-color:#0ea5e9;width:16px;height:16px;cursor:pointer}
-.bp-actions{padding:12px 16px;flex-shrink:0}
-.bp-btn{width:100%;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px}
-.bp-btn-main{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff}
-.bp-btn-secondary{background:#1a1a1a;border:1px solid #2a2a2a;color:#a1a1aa}
-.bp-results{flex:1;overflow-y:auto;padding:0 0 12px}
-.bp-result-header{padding:10px 16px;background:#111;border-bottom:1px solid #1a1a1a;position:sticky;top:0}
-.bp-count{font-size:11px;font-weight:700}
-.bp-item{padding:10px 16px;border-bottom:1px solid #1a1a1a}
-.bp-item-name{color:#e4e4e7;font-size:13px;font-weight:600;margin-bottom:3px}
-.bp-item-meta{color:#555;font-size:11px}
-.bp-item-phone{color:#0ea5e9;font-size:11px}
-.bp-badge-auto{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;margin-left:6px;vertical-align:middle}
-.bp-empty{padding:32px 16px;text-align:center;color:#444;font-size:13px}
+#bp-panel{position:fixed;top:0;right:0;width:360px;height:100vh;background:#0f0f0f;border-left:1px solid #2a2a2a;z-index:9999;display:none;flex-direction:column;font-family:system-ui,sans-serif;box-shadow:-8px 0 32px rgba(0,0,0,.6)}
+#bp-panel.open{display:flex}
+#bp-toggle{position:fixed;bottom:80px;right:16px;z-index:9998;background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff;border:none;border-radius:14px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(14,165,233,.5)}
+.bp-h{padding:16px;border-bottom:1px solid #222;display:flex;align-items:center;justify-content:space-between}
+.bp-t{color:#fff;font-weight:800;font-size:15px}
+.bp-x{background:none;border:none;color:#666;font-size:18px;cursor:pointer}
+.bp-f{padding:14px 16px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
+.bp-l{font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;display:block}
+.bp-inp,.bp-sel{width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;color:#e4e4e7;font-size:13px;padding:8px 12px;margin-bottom:10px;outline:none;font-family:inherit}
+.bp-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bp-ck{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#a1a1aa;font-size:13px;cursor:pointer}
+.bp-ck input{accent-color:#0ea5e9;width:16px;height:16px}
+.bp-a{padding:12px 16px;flex-shrink:0}
+.bp-b{width:100%;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:8px}
+.bp-bm{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#fff}
+.bp-bs{background:#1a1a1a;border:1px solid #2a2a2a;color:#a1a1aa}
+.bp-r{flex:1;overflow-y:auto}
+.bp-rh{padding:10px 16px;background:#111;border-bottom:1px solid #1a1a1a;position:sticky;top:0}
+.bp-rc{font-size:11px;font-weight:700}
+.bp-ri{padding:10px 16px;border-bottom:1px solid #1a1a1a}
+.bp-rn{color:#e4e4e7;font-size:13px;font-weight:600;margin-bottom:3px}
+.bp-rm{color:#555;font-size:11px}
+.bp-rp{color:#0ea5e9;font-size:11px}
+.bp-rb{display:inline-block;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:99px;font-size:9px;font-weight:700;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.bp-e{padding:32px 16px;text-align:center;color:#444;font-size:13px}
 /* Vue cochees */
-#tracked-panel{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;z-index:10000;display:none;flex-direction:column;font-family:system-ui,sans-serif}
-#tracked-panel.open{display:flex}
-#tracked-toggle{position:fixed;bottom:140px;right:16px;z-index:9998;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;border-radius:14px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(34,197,94,.45)}
-.tp-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #1f1f1f;background:#0d0d0d;flex-shrink:0;gap:8px;flex-wrap:wrap}
-.tp-title{color:#fff;font-weight:800;font-size:16px}
-.tp-hactions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tp-close{background:none;border:none;color:#666;font-size:20px;cursor:pointer;padding:0 4px}
-.tp-toolbar{display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid #1a1a1a;background:#0d0d0d;flex-shrink:0;flex-wrap:wrap}
-.tp-fb{padding:6px 14px;border-radius:99px;border:1px solid #2a2a2a;background:transparent;color:#666;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
-.tp-fb.act{color:#fff;border-color:#555;background:#333}
-.tp-fb[data-s="contacte"].act{background:rgba(59,130,246,.2);border-color:#3b82f6;color:#60a5fa}
-.tp-fb[data-s="interesse"].act{background:rgba(34,197,94,.15);border-color:#22c55e;color:#4ade80}
-.tp-fb[data-s="client"].act{background:rgba(234,179,8,.15);border-color:#eab308;color:#facc15}
-.tp-fb[data-s="a_rappeler"].act{background:rgba(249,115,22,.15);border-color:#f97316;color:#fb923c}
-.tp-fb[data-s="refuse"].act{background:rgba(239,68,68,.15);border-color:#ef4444;color:#f87171}
-.tp-fb[data-s="injoignable"].act{background:rgba(113,113,122,.2);border-color:#71717a;color:#a1a1aa}
-.tp-si{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;color:#e4e4e7;font-size:13px;padding:6px 12px;outline:none;width:200px;font-family:inherit;margin-left:auto}
-.tp-tw{flex:1;overflow:auto}
-.tp-t{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
-.tp-t th{position:sticky;top:0;background:#111;color:#555;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:10px 14px;text-align:left;border-bottom:1px solid #222;white-space:nowrap}
-.tp-t td{padding:10px 14px;border-bottom:1px solid #161616;vertical-align:top;color:#d4d4d8}
-.tp-t tr:hover td{background:#111}
-.tp-nm{font-weight:600;color:#fff}
-.tp-ph{color:#0ea5e9}
-.tp-dt{color:#555;font-size:11px;white-space:nowrap}
-.tp-bdg{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid;white-space:nowrap}
-.tp-bdg-contacte{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:#60a5fa}
-.tp-bdg-interesse{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.3);color:#4ade80}
-.tp-bdg-client{background:rgba(234,179,8,.15);border-color:rgba(234,179,8,.3);color:#facc15}
-.tp-bdg-a_rappeler{background:rgba(249,115,22,.15);border-color:rgba(249,115,22,.3);color:#fb923c}
-.tp-bdg-refuse{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#f87171}
-.tp-bdg-injoignable{background:rgba(113,113,122,.2);border-color:rgba(113,113,122,.3);color:#a1a1aa}
-.tp-mpty{padding:48px;text-align:center;color:#444;font-size:14px}
-.tp-stat{font-size:12px;color:#666;padding:4px 10px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:99px;white-space:nowrap}
-.tp-stat strong{color:#fff}
-.tp-actbtn{padding:8px 14px;border-radius:10px;border:1px solid #2a2a2a;background:#1a1a1a;color:#a1a1aa;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
-.tp-actbtn:hover{color:#fff;border-color:#444}
-.tp-expbtn{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
-.tp-date-inp{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;font-size:11px;padding:3px 6px;width:130px;outline:none;font-family:inherit;color:#555}
-.tp-note-ta{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:#a1a1aa;font-size:11px;padding:4px 6px;width:100%;min-width:150px;resize:vertical;outline:none;font-family:inherit}
+#vc-panel{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0a0a0a;z-index:10000;display:none;flex-direction:column;font-family:system-ui,sans-serif}
+#vc-panel.open{display:flex}
+#vc-toggle{position:fixed;bottom:140px;right:16px;z-index:9998;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;border-radius:14px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(34,197,94,.45)}
+.vc-h{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #1f1f1f;background:#0d0d0d;flex-shrink:0;gap:8px;flex-wrap:wrap}
+.vc-ht{color:#fff;font-weight:800;font-size:16px}
+.vc-ha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.vc-hx{background:none;border:none;color:#666;font-size:20px;cursor:pointer}
+.vc-tb{display:flex;align-items:center;gap:8px;padding:10px 20px;border-bottom:1px solid #1a1a1a;background:#0d0d0d;flex-shrink:0;flex-wrap:wrap}
+.vc-fb{padding:6px 14px;border-radius:99px;border:1px solid #2a2a2a;background:transparent;color:#666;font-size:12px;font-weight:600;cursor:pointer}
+.vc-fb.on{color:#fff;border-color:#555;background:#333}
+.vc-fb[data-s=contacte].on{background:rgba(59,130,246,.2);border-color:#3b82f6;color:#60a5fa}
+.vc-fb[data-s=interesse].on{background:rgba(34,197,94,.15);border-color:#22c55e;color:#4ade80}
+.vc-fb[data-s=client].on{background:rgba(234,179,8,.15);border-color:#eab308;color:#facc15}
+.vc-fb[data-s=a_rappeler].on{background:rgba(249,115,22,.15);border-color:#f97316;color:#fb923c}
+.vc-fb[data-s=refuse].on{background:rgba(239,68,68,.15);border-color:#ef4444;color:#f87171}
+.vc-fb[data-s=injoignable].on{background:rgba(113,113,122,.2);border-color:#71717a;color:#a1a1aa}
+.vc-si{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;color:#e4e4e7;font-size:13px;padding:6px 12px;outline:none;width:200px;font-family:inherit;margin-left:auto}
+.vc-tw{flex:1;overflow:auto}
+.vc-t{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+.vc-t th{position:sticky;top:0;background:#111;color:#555;font-size:10px;font-weight:700;text-transform:uppercase;padding:10px 14px;text-align:left;border-bottom:1px solid #222;white-space:nowrap}
+.vc-t td{padding:10px 14px;border-bottom:1px solid #161616;vertical-align:top;color:#d4d4d8}
+.vc-t tr:hover td{background:#111}
+.vc-nm{font-weight:600;color:#fff}
+.vc-ph{color:#0ea5e9}
+.vc-dt{color:#555;font-size:11px}
+.vc-bdg{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid}
+.vc-bdg-contacte{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:#60a5fa}
+.vc-bdg-interesse{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.3);color:#4ade80}
+.vc-bdg-client{background:rgba(234,179,8,.15);border-color:rgba(234,179,8,.3);color:#facc15}
+.vc-bdg-a_rappeler{background:rgba(249,115,22,.15);border-color:rgba(249,115,22,.3);color:#fb923c}
+.vc-bdg-refuse{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.3);color:#f87171}
+.vc-bdg-injoignable{background:rgba(113,113,122,.2);border-color:rgba(113,113,122,.3);color:#a1a1aa}
+.vc-mpty{padding:48px;text-align:center;color:#444;font-size:14px}
+.vc-stat{font-size:12px;color:#666;padding:4px 10px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:99px;white-space:nowrap}
+.vc-stat strong{color:#fff}
+.vc-abtn{padding:8px 14px;border-radius:10px;border:1px solid #2a2a2a;background:#1a1a1a;color:#a1a1aa;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.vc-ebtn{padding:8px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+.vc-dinp{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;font-size:11px;padding:3px 6px;width:130px;outline:none;font-family:inherit;color:#555}
+.vc-nta{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:#a1a1aa;font-size:11px;padding:4px 6px;width:100%;min-width:150px;resize:vertical;outline:none;font-family:inherit}
 </style>
+<button id="bp-toggle" onclick="document.getElementById('bp-panel').classList.toggle('open')">🎯 Lot de 30</button>
+<button id="vc-toggle" onclick="vcOpen()">✅ Vue cochées</button>
 
-<button id="batch-toggle" onclick="document.getElementById('batch-panel').classList.toggle('open')">🎯 Lot de 30</button>
-<button id="tracked-toggle" onclick="openTrackedPanel()">✅ Vue cochées</button>
-
-<div id="batch-panel">
-  <div class="bp-header"><span class="bp-title">🎯 Prospection — Lot de 30</span><button class="bp-close" onclick="document.getElementById('batch-panel').classList.remove('open')">✕</button></div>
-  <div class="bp-filters">
-    <div class="bp-row">
-      <div><label class="bp-label">Département</label><select id="bp-dept" class="bp-select"><option value="">Tous</option></select></div>
-      <div><label class="bp-label">Région</label><select id="bp-region" class="bp-select"><option value="">Toutes</option></select></div>
+<div id="bp-panel">
+  <div class="bp-h"><span class="bp-t">🎯 Lot de 30</span><button class="bp-x" onclick="document.getElementById('bp-panel').classList.remove('open')">✕</button></div>
+  <div class="bp-f">
+    <div class="bp-2">
+      <div><label class="bp-l">Département</label><select id="bp-dept" class="bp-sel"><option value="">Tous</option></select></div>
+      <div><label class="bp-l">Région</label><select id="bp-region" class="bp-sel"><option value="">Toutes</option></select></div>
     </div>
-    <label class="bp-label">Ville</label><input id="bp-ville" class="bp-input" placeholder="Ex: Paris, Lyon...">
-    <label class="bp-label">Nom</label><input id="bp-nom" class="bp-input" placeholder="Ex: Centrale...">
-    <label class="bp-check"><input type="checkbox" id="bp-phone-only" checked> Avec téléphone uniquement</label>
-    <label class="bp-label">Quantité</label>
-    <select id="bp-qty" class="bp-select"><option value="10">10</option><option value="20">20</option><option value="30" selected>30</option><option value="50">50</option></select>
+    <label class="bp-l">Ville</label><input id="bp-ville" class="bp-inp" placeholder="Ex: Paris...">
+    <label class="bp-l">Nom</label><input id="bp-nom" class="bp-inp" placeholder="Ex: Centrale...">
+    <label class="bp-ck"><input type="checkbox" id="bp-phone" checked> Avec téléphone uniquement</label>
+    <label class="bp-l">Quantité</label>
+    <select id="bp-qty" class="bp-sel"><option value="10">10</option><option value="20">20</option><option value="30" selected>30</option><option value="50">50</option></select>
   </div>
-  <div class="bp-actions">
-    <button class="bp-btn bp-btn-main" onclick="doBatchPick()">🎯 Obtenir le lot &amp; cocher</button>
-    <button class="bp-btn bp-btn-secondary" onclick="doBatchPreview()">👁 Prévisualiser</button>
+  <div class="bp-a">
+    <button class="bp-b bp-bm" id="bp-pick-btn">🎯 Obtenir le lot &amp; cocher</button>
+    <button class="bp-b bp-bs" id="bp-prev-btn">👁 Prévisualiser</button>
   </div>
-  <div id="bp-results" class="bp-results"><div class="bp-empty">Configurez vos filtres puis cliquez sur « Obtenir le lot ».</div></div>
+  <div id="bp-results" class="bp-r"><div class="bp-e">Configurez vos filtres puis cliquez sur Obtenir le lot.</div></div>
 </div>
 
-<div id="tracked-panel">
-  <div class="tp-header">
-    <span class="tp-title">✅ Pharmacies cochées &amp; suivies</span>
-    <div class="tp-hactions">
-      <span id="tp-stat" class="tp-stat">Chargement...</span>
-      <button class="tp-actbtn" id="tp-sync-btn" onclick="doSyncEquipe()">🔄 Sync équipe</button>
-      <button class="tp-expbtn" onclick="doExportTableau()">🖨️ Export imprimable</button>
-      <button class="tp-close" onclick="document.getElementById('tracked-panel').classList.remove('open')">✕</button>
+<div id="vc-panel">
+  <div class="vc-h">
+    <span class="vc-ht">✅ Pharmacies cochées &amp; suivies</span>
+    <div class="vc-ha">
+      <span id="vc-stat" class="vc-stat">—</span>
+      <button class="vc-abtn" id="vc-sync-btn">🔄 Sync équipe</button>
+      <button class="vc-ebtn" id="vc-exp-btn">🖨️ Export</button>
+      <button class="vc-hx" onclick="document.getElementById('vc-panel').classList.remove('open')">✕</button>
     </div>
   </div>
-  <div class="tp-toolbar">
-    <button class="tp-fb act" data-s="all" onclick="setTpF('all',this)">Tous</button>
-    <button class="tp-fb" data-s="contacte" onclick="setTpF('contacte',this)">Contacté</button>
-    <button class="tp-fb" data-s="interesse" onclick="setTpF('interesse',this)">Intéressé</button>
-    <button class="tp-fb" data-s="client" onclick="setTpF('client',this)">Client</button>
-    <button class="tp-fb" data-s="a_rappeler" onclick="setTpF('a_rappeler',this)">À rappeler</button>
-    <button class="tp-fb" data-s="refuse" onclick="setTpF('refuse',this)">Refusé</button>
-    <button class="tp-fb" data-s="injoignable" onclick="setTpF('injoignable',this)">Injoignable</button>
-    <input type="text" class="tp-si" id="tp-search" placeholder="🔍 Nom, ville, téléphone..." oninput="doRenderTracked()">
+  <div class="vc-tb">
+    <button class="vc-fb on" data-s="all">Tous</button>
+    <button class="vc-fb" data-s="contacte">Contacté</button>
+    <button class="vc-fb" data-s="interesse">Intéressé</button>
+    <button class="vc-fb" data-s="client">Client</button>
+    <button class="vc-fb" data-s="a_rappeler">À rappeler</button>
+    <button class="vc-fb" data-s="refuse">Refusé</button>
+    <button class="vc-fb" data-s="injoignable">Injoignable</button>
+    <input type="text" class="vc-si" id="vc-search" placeholder="🔍 Nom, ville, téléphone...">
   </div>
-  <div class="tp-tw">
-    <table class="tp-t">
-      <thead><tr>
-        <th>#</th><th>Pharmacie</th><th>Ville / Dépt</th><th>Téléphone</th>
-        <th>Statut</th><th>Contact</th><th>Dernier contact</th><th>Rappel</th><th>Notes</th>
-      </tr></thead>
-      <tbody id="tp-tbody"></tbody>
+  <div class="vc-tw">
+    <table class="vc-t">
+      <thead><tr><th>#</th><th>Pharmacie</th><th>Ville/Dépt</th><th>Téléphone</th><th>Statut</th><th>Contact</th><th>Dernier contact</th><th>Rappel</th><th>Notes</th></tr></thead>
+      <tbody id="vc-tbody"></tbody>
     </table>
-    <div id="tp-empty" class="tp-mpty" style="display:none">Aucune pharmacie cochée pour ce filtre.</div>
+    <div id="vc-empty" class="vc-mpty" style="display:none">Aucune pharmacie cochée pour ce filtre.</div>
   </div>
 </div>
-
 <script>
 (function(){
-var SL={a_contacter:'À contacter',contacte:'Contacté',interesse:'Intéressé',client:'Client',a_rappeler:'À rappeler',injoignable:'Injoignable',refuse:'Refusé'};
-var tpFilter='all';
+var SL={a_contacter:'A contacter',contacte:'Contacte',interesse:'Interesse',client:'Client',a_rappeler:'A rappeler',injoignable:'Injoignable',refuse:'Refuse'};
+var vcFilter='all';
 
-// ── Lot de 30 ────────────────────────────────────────────
+// === LOT DE 30 ===
 function bpInit(){
   if(typeof pharmacies==='undefined') return;
   var depts=[],regions=[];
@@ -1034,7 +1025,7 @@ function bpInit(){
   depts.forEach(function(d){
     var dep=pharmacies.find(function(p){return p.dept===d;});
     var o=document.createElement('option');
-    o.value=d; o.textContent=d+(dep&&dep.deptNom?' – '+dep.deptNom:'');
+    o.value=d; o.textContent=d+(dep&&dep.deptNom?' - '+dep.deptNom:'');
     ds.appendChild(o);
   });
   regions.forEach(function(r){
@@ -1043,101 +1034,88 @@ function bpInit(){
   });
 }
 
-function bpGetFiltered(){
+function bpFiltered(){
   if(typeof pharmacies==='undefined') return [];
   var dept=document.getElementById('bp-dept').value.toLowerCase();
   var region=document.getElementById('bp-region').value.toLowerCase();
   var ville=document.getElementById('bp-ville').value.trim().toLowerCase();
   var nom=document.getElementById('bp-nom').value.trim().toLowerCase();
-  var phoneOnly=document.getElementById('bp-phone-only').checked;
+  var ph=document.getElementById('bp-phone').checked;
   return pharmacies.filter(function(p){
     if(dept&&(p.dept||'').toLowerCase()!==dept) return false;
     if(region&&(p.region||'').toLowerCase()!==region) return false;
     if(ville&&!(p.ville||'').toLowerCase().includes(ville)) return false;
     if(nom&&!(p.name||'').toLowerCase().includes(nom)) return false;
-    if(phoneOnly&&!p.phone) return false;
+    if(ph&&!p.phone) return false;
     return true;
   });
 }
 
-function bpGetUntouched(list){
+function bpUntouched(list){
   var ts=typeof trackingState!=='undefined'?trackingState:{};
-  return list.filter(function(p){
-    var t=ts[p.id];
-    return !t||t.statut==='a_contacter';
-  });
+  return list.filter(function(p){var t=ts[p.id];return !t||t.statut==='a_contacter';});
 }
 
 function bpRender(items,mode){
   var el=document.getElementById('bp-results');
-  if(!items.length){el.innerHTML='<div class="bp-empty">Aucune pharmacie disponible pour ces filtres.</div>';return;}
+  if(!items.length){el.innerHTML='<div class="bp-e">Aucune pharmacie disponible.</div>';return;}
   var col=mode==='preview'?'#a1a1aa':'#22c55e';
-  var lbl=mode==='preview'?items.length+' résultats (prévisualisation)':items.length+' pharmacies cochées ✓';
-  var h='<div class="bp-result-header"><span class="bp-count" style="color:'+col+'">'+lbl+'</span></div>';
+  var lbl=mode==='preview'?items.length+' resultats':items.length+' pharmacies cochees';
+  var h='<div class="bp-rh"><span class="bp-rc" style="color:'+col+'">'+lbl+'</span></div>';
   items.forEach(function(p,i){
-    h+='<div class="bp-item"><div class="bp-item-name">'+(i+1)+'. '+p.name+(mode==='picked'?'<span class="bp-badge-auto">Cochée</span>':'')+'</div>'
-      +'<div class="bp-item-meta">'+(p.address||'')+' — '+(p.ville||'')+' ('+(p.dept||'')+')</div>'
-      +(p.phone?'<div class="bp-item-phone">'+p.phone+'</div>':'')+'</div>';
+    h+='<div class="bp-ri"><div class="bp-rn">'+(i+1)+'. '+p.name+(mode==='picked'?'<span class="bp-rb">Cochee</span>':'')+'</div>'
+      +'<div class="bp-rm">'+(p.address||'')+' - '+(p.ville||'')+' ('+(p.dept||'')+')</div>'
+      +(p.phone?'<div class="bp-rp">'+p.phone+'</div>':'')+'</div>';
   });
   el.innerHTML=h;
 }
 
-window.doBatchPreview=function(){
-  var qty=parseInt(document.getElementById('bp-qty').value)||30;
-  bpRender(bpGetUntouched(bpGetFiltered()).slice(0,qty),'preview');
-};
+document.getElementById('bp-prev-btn').addEventListener('click',function(){
+  bpRender(bpUntouched(bpFiltered()).slice(0,parseInt(document.getElementById('bp-qty').value)||30),'preview');
+});
 
-window.doBatchPick=async function(){
-  var btn=document.querySelector('.bp-btn-main');
-  btn.disabled=true; btn.textContent='Traitement...';
+document.getElementById('bp-pick-btn').addEventListener('click',async function(){
+  var btn=this; btn.disabled=true; btn.textContent='...';
   await new Promise(function(r){setTimeout(r,50);});
   var qty=parseInt(document.getElementById('bp-qty').value)||30;
-  var picked=bpGetUntouched(bpGetFiltered()).slice(0,qty);
+  var picked=bpUntouched(bpFiltered()).slice(0,qty);
   if(!picked.length){
-    document.getElementById('bp-results').innerHTML='<div class="bp-empty">Toutes les pharmacies de ces filtres ont déjà été contactées !</div>';
+    document.getElementById('bp-results').innerHTML='<div class="bp-e">Toutes les pharmacies de ces filtres ont deja ete contactees !</div>';
     btn.disabled=false; btn.innerHTML='🎯 Obtenir le lot &amp; cocher'; return;
   }
   if(typeof trackingState!=='undefined'){
     var now=new Date().toISOString();
     picked.forEach(function(p){
-      if(!trackingState[p.id]) trackingState[p.id]=typeof defaultTracking==='function'?defaultTracking():{statut:'a_contacter',priorite:'moyenne',contact:'',dernierContact:'',rappel:'',notes:'',updatedAt:null};
+      if(!trackingState[p.id]) trackingState[p.id]={statut:'a_contacter',priorite:'moyenne',contact:'',dernierContact:'',rappel:'',notes:'',updatedAt:null};
       trackingState[p.id].statut='contacte';
       trackingState[p.id].updatedAt=now;
-      trackingState[p.id].notes=(trackingState[p.id].notes||'')+'[Lot '+new Date().toLocaleDateString('fr-FR')+'] ';
     });
     if(typeof saveTracking==='function') await saveTracking();
     if(typeof render==='function') render();
-    await doSyncPush();
+    syncPush();
   }
   bpRender(picked,'picked');
   btn.disabled=false; btn.innerHTML='🎯 Obtenir le lot &amp; cocher';
-};
+});
 
-// ── Vue cochées ──────────────────────────────────────────
-window.setTpF=function(s,btn){
-  tpFilter=s;
-  document.querySelectorAll('.tp-fb').forEach(function(b){b.classList.remove('act');});
-  btn.classList.add('act');
-  doRenderTracked();
-};
+// === VUE COCHEES ===
+function vcOpen(){
+  document.getElementById('vc-panel').classList.add('open');
+  vcRender();
+}
+window.vcOpen=vcOpen;
 
-window.openTrackedPanel=function(){
-  document.getElementById('tracked-panel').classList.add('open');
-  doRenderTracked();
-};
-
-window.doRenderTracked=function(){
+function vcRender(){
   var ts=typeof trackingState!=='undefined'?trackingState:{};
   var ph=typeof pharmacies!=='undefined'?pharmacies:[];
-  var search=(document.getElementById('tp-search')||{value:''}).value.toLowerCase().trim();
-
+  var search=document.getElementById('vc-search').value.toLowerCase().trim();
   var list=ph.filter(function(p){
     var t=ts[p.id];
     if(!t||t.statut==='a_contacter') return false;
-    if(tpFilter!=='all'&&t.statut!==tpFilter) return false;
+    if(vcFilter!=='all'&&t.statut!==vcFilter) return false;
     if(search){
-      var h=((p.name||'')+(p.ville||'')+(p.phone||'')+(p.dept||'')+(t.notes||'')+(t.contact||'')).toLowerCase();
-      if(!h.includes(search)) return false;
+      var hay=((p.name||'')+(p.ville||'')+(p.phone||'')+(p.dept||'')+(t.notes||'')+(t.contact||'')).toLowerCase();
+      if(!hay.includes(search)) return false;
     }
     return true;
   });
@@ -1145,46 +1123,85 @@ window.doRenderTracked=function(){
   // Stats
   var counts={};
   ph.forEach(function(p){var t=ts[p.id];if(t&&t.statut!=='a_contacter') counts[t.statut]=(counts[t.statut]||0)+1;});
-  var total=Object.values(counts).reduce(function(a,b){return a+b;},0);
-  var statEl=document.getElementById('tp-stat');
-  if(statEl) statEl.innerHTML='<strong>'+total+'</strong> suivies'+
-    (Object.keys(counts).length?' · '+Object.entries(counts).map(function(e){return (SL[e[0]]||e[0])+': <strong>'+e[1]+'</strong>';}).join(' · '):'');
-
-  var tbody=document.getElementById('tp-tbody');
-  var empty=document.getElementById('tp-empty');
-  if(!tbody) return;
-
-  if(!list.length){
-    tbody.innerHTML='';
-    if(empty) empty.style.display='block';
-    return;
+  var total=0; Object.values(counts).forEach(function(n){total+=n;});
+  var statEl=document.getElementById('vc-stat');
+  if(statEl){
+    var parts=['<strong>'+total+'</strong> suivies'];
+    Object.keys(counts).forEach(function(s){parts.push((SL[s]||s)+': <strong>'+counts[s]+'</strong>');});
+    statEl.innerHTML=parts.join(' · ');
   }
+
+  var tbody=document.getElementById('vc-tbody');
+  var empty=document.getElementById('vc-empty');
+  if(!tbody) return;
+  if(!list.length){tbody.innerHTML='';if(empty)empty.style.display='block';return;}
   if(empty) empty.style.display='none';
 
   tbody.innerHTML=list.map(function(p,i){
     var t=ts[p.id]||{};
-    var s=t.statut||'a_contacter';
+    var s=t.statut||'contacte';
     var ds=t.updatedAt?new Date(t.updatedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
-    var nc=(t.notes||'').replace(/\[Lot [^\]]*\]/g,'').replace(/\[Auto-lot [^\]]*\]/g,'').trim();
+    var nc=(t.notes||'').replace(/\[Lot\s[^\]]*\]/g,'').trim();
     var rv=t.rappel||'';
+    var rcol=rv?'#f97316':'#555';
     return '<tr>'
       +'<td style="color:#555;font-size:11px">'+(i+1)+'</td>'
-      +'<td><div class="tp-nm">'+p.name+'</div><div style="color:#555;font-size:11px">'+(p.address||'')+'</div></td>'
+      +'<td><div class="vc-nm">'+p.name+'</div><div style="color:#555;font-size:11px">'+(p.address||'')+'</div></td>'
       +'<td><div>'+(p.ville||'—')+'</div><div style="color:#555;font-size:11px">'+(p.dept||'')+' '+(p.deptNom||'')+'</div></td>'
-      +'<td class="tp-ph">'+(p.phone||'<span style="color:#444">—</span>')+'</td>'
-      +'<td><span class="tp-bdg tp-bdg-'+s+'">'+(SL[s]||s)+'</span></td>'
+      +'<td class="vc-ph">'+(p.phone||'<span style="color:#444">—</span>')+'</td>'
+      +'<td><span class="vc-bdg vc-bdg-'+s+'">'+(SL[s]||s)+'</span></td>'
       +'<td style="color:#a1a1aa;font-size:12px">'+(t.contact||'—')+'</td>'
-      +'<td class="tp-dt">'+ds+'</td>'
-      +'<td><input type="date" value="'+rv+'" class="tp-date-inp" style="color:'+(rv?'#f97316':'#555')+'" onchange="(function(el){var id=''+p.id+'';if(typeof trackingState==='undefined')return;if(!trackingState[id])trackingState[id]={statut:'contacte',notes:'',rappel:'',updatedAt:null};trackingState[id].rappel=el.value;trackingState[id].updatedAt=new Date().toISOString();el.style.color=el.value?'#f97316':'#555';if(typeof saveTracking==='function')saveTracking();})(this)"></td>'
-      +'<td><textarea rows="2" class="tp-note-ta" placeholder="Note..." onblur="(function(el){var id=''+p.id+'';if(typeof trackingState==='undefined')return;if(!trackingState[id])trackingState[id]={statut:'contacte',notes:'',rappel:'',updatedAt:null};trackingState[id].notes=el.value;trackingState[id].updatedAt=new Date().toISOString();if(typeof saveTracking==='function')saveTracking();})(this)">'+nc+'</textarea></td>'
+      +'<td class="vc-dt">'+ds+'</td>'
+      +'<td><input type="date" class="vc-dinp vc-rappel-inp" data-pid="'+p.id+'" value="'+rv+'" style="color:'+rcol+'"></td>'
+      +'<td><textarea rows="2" class="vc-nta vc-note-ta" data-pid="'+p.id+'" placeholder="Note...">'+nc+'</textarea></td>'
       +'</tr>';
   }).join('');
-};
 
-// ── Sync équipe ──────────────────────────────────────────
-function getToken(){ return localStorage.getItem('bp_access_token')||''; }
+  // Event listeners sur les inputs (pas d'inline handlers)
+  tbody.querySelectorAll('.vc-rappel-inp').forEach(function(el){
+    el.addEventListener('change',function(){
+      var id=el.getAttribute('data-pid');
+      if(typeof trackingState==='undefined') return;
+      if(!trackingState[id]) trackingState[id]={statut:'contacte',notes:'',rappel:'',updatedAt:null};
+      trackingState[id].rappel=el.value;
+      trackingState[id].updatedAt=new Date().toISOString();
+      el.style.color=el.value?'#f97316':'#555';
+      if(typeof saveTracking==='function') saveTracking();
+    });
+  });
+  tbody.querySelectorAll('.vc-note-ta').forEach(function(el){
+    el.addEventListener('blur',function(){
+      var id=el.getAttribute('data-pid');
+      if(typeof trackingState==='undefined') return;
+      if(!trackingState[id]) trackingState[id]={statut:'contacte',notes:'',rappel:'',updatedAt:null};
+      trackingState[id].notes=el.value;
+      trackingState[id].updatedAt=new Date().toISOString();
+      if(typeof saveTracking==='function') saveTracking();
+    });
+  });
+}
 
-async function doSyncPull(){
+// Filtres Vue cochées
+document.querySelectorAll('.vc-fb').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    vcFilter=btn.getAttribute('data-s');
+    document.querySelectorAll('.vc-fb').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on');
+    vcRender();
+  });
+});
+document.getElementById('vc-search').addEventListener('input',vcRender);
+
+// === SYNC EQUIPE ===
+function getToken(){return localStorage.getItem('bp_access_token')||'';}
+
+function syncPush(){
+  var token=getToken();
+  if(!token||typeof trackingState==='undefined') return;
+  fetch('/api/prospection',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({state:trackingState})}).catch(function(){});
+}
+
+async function syncPull(){
   var token=getToken(); if(!token) return;
   try{
     var res=await fetch('/api/prospection',{headers:{'Authorization':'Bearer '+token}});
@@ -1202,45 +1219,35 @@ async function doSyncPull(){
   }catch(e){}
 }
 
-async function doSyncPush(){
-  var token=getToken(); if(!token||typeof trackingState==='undefined') return;
-  try{
-    await fetch('/api/prospection',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({state:trackingState})});
-  }catch(e){}
-}
+document.getElementById('vc-sync-btn').addEventListener('click',async function(){
+  var btn=this; btn.textContent='...'; btn.disabled=true;
+  await syncPull(); syncPush(); vcRender();
+  btn.textContent='✅ Sync OK';
+  setTimeout(function(){btn.textContent='🔄 Sync equipe';btn.disabled=false;},2000);
+});
 
-window.doSyncEquipe=async function(){
-  var btn=document.getElementById('tp-sync-btn');
-  if(btn){btn.textContent='⏳ Sync...'; btn.disabled=true;}
-  await doSyncPull();
-  await doSyncPush();
-  doRenderTracked();
-  if(btn){btn.textContent='✅ Synchronisé'; setTimeout(function(){btn.textContent='🔄 Sync équipe';btn.disabled=false;},2000);}
-};
-
-// ── Export ───────────────────────────────────────────────
-window.doExportTableau=function(){
+// === EXPORT ===
+document.getElementById('vc-exp-btn').addEventListener('click',function(){
   var ts=typeof trackingState!=='undefined'?trackingState:{};
   var ph=typeof pharmacies!=='undefined'?pharmacies:[];
-  var search=(document.getElementById('tp-search')||{value:''}).value.toLowerCase().trim();
+  var search=document.getElementById('vc-search').value.toLowerCase().trim();
   var list=ph.filter(function(p){
     var t=ts[p.id];
     if(!t||t.statut==='a_contacter') return false;
-    if(tpFilter!=='all'&&t.statut!==tpFilter) return false;
+    if(vcFilter!=='all'&&t.statut!==vcFilter) return false;
     if(search){var h=((p.name||'')+(p.ville||'')+(p.phone||'')+(p.dept||'')+(t.notes||'')).toLowerCase();if(!h.includes(search)) return false;}
     return true;
   });
   var sc={contacte:'#3b82f6',interesse:'#22c55e',client:'#eab308',a_rappeler:'#f97316',refuse:'#ef4444',injoignable:'#71717a'};
   var now=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   var rows=list.map(function(p,i){
-    var t=ts[p.id]||{};
-    var s=t.statut||'contacte';
+    var t=ts[p.id]||{};var s=t.statut||'contacte';
     var col=sc[s]||'#888'; var lbl=SL[s]||s;
     var ds=t.updatedAt?new Date(t.updatedAt).toLocaleDateString('fr-FR'):'';
-    var nc=(t.notes||'').replace(/\[Lot [^\]]*\]/g,'').replace(/\[Auto-lot [^\]]*\]/g,'').trim();
+    var nc=(t.notes||'').replace(/\[Lot\s[^\]]*\]/g,'').trim();
     return '<tr><td style="text-align:center;color:#888">'+(i+1)+'</td>'
       +'<td><strong>'+p.name+'</strong><br><span style="color:#999;font-size:10px">'+(p.address||'')+'</span></td>'
-      +'<td>'+(p.ville||'')+'<br><span style="color:#999;font-size:10px">'+(p.dept||'')+' – '+(p.deptNom||'')+'</span></td>'
+      +'<td>'+(p.ville||'')+'<br><span style="color:#999;font-size:10px">'+(p.dept||'')+' - '+(p.deptNom||'')+'</span></td>'
       +'<td style="color:#0284c7">'+(p.phone||'')+'</td>'
       +'<td><span style="display:inline-block;padding:2px 8px;border-radius:99px;background:'+col+'22;color:'+col+';border:1px solid '+col+'55;font-size:10px;font-weight:700">'+lbl+'</span></td>'
       +'<td style="color:#666;font-size:11px">'+(t.contact||'')+'</td>'
@@ -1250,31 +1257,28 @@ window.doExportTableau=function(){
       +'<td style="min-width:120px">&nbsp;</td>'
       +'</tr>';
   }).join('');
-  var html='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Prospection</title>'
+  var htdoc='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Prospection</title>'
     +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;padding:16px}'
-    +'h1{font-size:18px;font-weight:700;margin-bottom:4px;color:#0284c7}'
-    +'.meta{display:flex;gap:20px;margin-bottom:14px;padding:8px 12px;background:#f0f9ff;border-left:3px solid #0284c7}'
+    +'h1{font-size:18px;font-weight:700;margin-bottom:8px;color:#0284c7}'
     +'table{width:100%;border-collapse:collapse}'
     +'th{background:#0284c7;color:#fff;padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase}'
     +'td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}'
     +'tr:nth-child(even) td{background:#f9fafb}'
     +'@media print{@page{margin:12mm;size:A4 landscape}}</style></head><body>'
-    +'<div style="margin-bottom:12px"><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">🖨️ Imprimer / PDF</button></div>'
-    +'<h1>💊 Prospection Pharmacies — Butt Premium</h1>'
-    +'<div class="meta"><span>Total : <strong>'+list.length+' pharmacies</strong></span><span>Généré le '+now+'</span></div>'
-    +'<table><thead><tr><th>#</th><th>Pharmacie</th><th>Ville / Dépt</th><th>Téléphone</th><th>Statut</th><th>Contact</th><th>Date</th><th>Notes</th><th>Compte-rendu visite</th><th>Suite à donner</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="margin-bottom:12px"><button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Imprimer / PDF</button></div>'
+    +'<h1>Prospection Pharmacies - Butt Premium</h1>'
+    +'<p style="color:#666;font-size:11px;margin-bottom:12px">'+now+' - '+list.length+' pharmacies</p>'
+    +'<table><thead><tr><th>#</th><th>Pharmacie</th><th>Ville/Dept</th><th>Telephone</th><th>Statut</th><th>Contact</th><th>Date</th><th>Notes</th><th>Compte-rendu</th><th>Suite</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'</body></html>';
   var w=window.open('','_blank','width=1100,height=700,scrollbars=yes');
-  if(w){w.document.write(html);w.document.close();}
-};
-
-// ── Init ─────────────────────────────────────────────────
-window.addEventListener('load', function(){
-  bpInit();
-  doSyncPull();
+  if(w){w.document.write(htdoc);w.document.close();}
 });
 
+// === INIT ===
+window.addEventListener('load',function(){
+  bpInit();
+  syncPull();
+});
 })();
-</script>
-</body>
+</script></body>
 </html>
