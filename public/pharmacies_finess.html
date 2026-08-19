@@ -1205,10 +1205,204 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       +'<div class="meta"><span>Filtre : <strong>'+fl+'</strong></span><span>Total : <strong>'+allTracked.length+' pharmacies</strong></span></div>'
       +'<table><thead><tr><th>#</th><th>Nom de la pharmacie</th><th>Ville / Département</th><th>Téléphone</th><th>Statut</th><th>Contact</th><th>Date contact</th><th>Notes</th><th>Compte-rendu visite</th><th>Suite à donner</th></tr></thead><tbody>'+rows+'</tbody></table>'
       +'<div class="footer"><span>Butt Premium CRM</span><span>'+now+'</span></div>'
-      +'</body></html>';
+      +'
+<script>
+(function(){
+  // ── Sync automatique via API Supabase ─────────────────
+  // Le token est stocké dans localStorage par le CRM (page.tsx)
+  function getToken(){ return localStorage.getItem('bp_access_token')||''; }
+
+  // Pull silencieux : récupère l'état de toute l'équipe
+  async function syncPull(){
+    var token = getToken();
+    if(!token) return;
+    try {
+      var res = await fetch('/api/prospection', {
+        headers:{'Authorization':'Bearer '+token}
+      });
+      if(!res.ok) return;
+      var data = await res.json();
+      if(!data.state || typeof trackingState==='undefined') return;
+      var merged = 0;
+      Object.keys(data.state).forEach(function(id){
+        var remote = data.state[id];
+        var local  = trackingState[id];
+        var rd = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+        var ld = local && local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+        if(!local || rd >= ld){ trackingState[id] = remote; merged++; }
+      });
+      if(merged > 0){
+        if(typeof saveTracking==='function') saveTracking();
+        if(typeof render==='function') render();
+      }
+    } catch(e){ /* silencieux */ }
+  }
+
+  // Push : envoie l'état local vers Supabase
+  async function syncPush(){
+    var token = getToken();
+    if(!token || typeof trackingState==='undefined') return;
+    try {
+      await fetch('/api/prospection', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ state: trackingState })
+      });
+    } catch(e){ /* silencieux */ }
+  }
+
+  // ── Patch de batchPick pour sync auto ─────────────────
+  window.addEventListener('load', function(){
+    // 1. Pull au chargement pour avoir l'état équipe
+    syncPull();
+
+    // 2. Wrapper batchPick pour push automatique après cochage
+    var originalBatchPick = window.batchPick;
+    window.batchPick = async function(){
+      // Pull avant de piocher pour exclure celles de l'équipe
+      await syncPull();
+      // Exécuter le lot
+      await originalBatchPick();
+      // Push après pour partager avec l'équipe
+      await syncPush();
+    };
+
+    // 3. Push automatique quand on change un statut / note / rappel
+    var originalSaveNote = window.saveNote;
+    if(originalSaveNote){
+      window.saveNote = function(el){
+        originalSaveNote(el);
+        syncPush();
+      };
+    }
+    var originalSaveRappel = window.saveRappel;
+    if(originalSaveRappel){
+      window.saveRappel = function(el){
+        originalSaveRappel(el);
+        syncPush();
+      };
+    }
+
+    // 4. Bouton sync manuel visible dans la vue cochées
+    var header = document.querySelector('.tp-actions');
+    if(header){
+      var syncBtn = document.createElement('button');
+      syncBtn.style.cssText = 'padding:8px 14px;border-radius:10px;border:none;background:#1a1a1a;border:1px solid #2a2a2a;color:#a1a1aa;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px';
+      syncBtn.innerHTML = '🔄 Sync équipe';
+      syncBtn.onclick = async function(){
+        syncBtn.textContent = '...';
+        await syncPull();
+        await syncPush();
+        syncBtn.innerHTML = '✅ Synchronisé';
+        setTimeout(function(){ syncBtn.innerHTML = '🔄 Sync équipe'; }, 2000);
+        if(typeof window.renderTracked==='function') window.renderTracked();
+      };
+      header.insertBefore(syncBtn, header.firstChild);
+    }
+  });
+})();
+</script>
+</body></html>';
     var w=window.open('','_blank','width=1100,height=700,scrollbars=yes');
     if(w){w.document.write(html);w.document.close();}
   };
+})();
+</script>
+
+<script>
+(function(){
+  // ── Sync automatique via API Supabase ─────────────────
+  // Le token est stocké dans localStorage par le CRM (page.tsx)
+  function getToken(){ return localStorage.getItem('bp_access_token')||''; }
+
+  // Pull silencieux : récupère l'état de toute l'équipe
+  async function syncPull(){
+    var token = getToken();
+    if(!token) return;
+    try {
+      var res = await fetch('/api/prospection', {
+        headers:{'Authorization':'Bearer '+token}
+      });
+      if(!res.ok) return;
+      var data = await res.json();
+      if(!data.state || typeof trackingState==='undefined') return;
+      var merged = 0;
+      Object.keys(data.state).forEach(function(id){
+        var remote = data.state[id];
+        var local  = trackingState[id];
+        var rd = remote.updatedAt ? new Date(remote.updatedAt).getTime() : 0;
+        var ld = local && local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+        if(!local || rd >= ld){ trackingState[id] = remote; merged++; }
+      });
+      if(merged > 0){
+        if(typeof saveTracking==='function') saveTracking();
+        if(typeof render==='function') render();
+      }
+    } catch(e){ /* silencieux */ }
+  }
+
+  // Push : envoie l'état local vers Supabase
+  async function syncPush(){
+    var token = getToken();
+    if(!token || typeof trackingState==='undefined') return;
+    try {
+      await fetch('/api/prospection', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body: JSON.stringify({ state: trackingState })
+      });
+    } catch(e){ /* silencieux */ }
+  }
+
+  // ── Patch de batchPick pour sync auto ─────────────────
+  window.addEventListener('load', function(){
+    // 1. Pull au chargement pour avoir l'état équipe
+    syncPull();
+
+    // 2. Wrapper batchPick pour push automatique après cochage
+    var originalBatchPick = window.batchPick;
+    window.batchPick = async function(){
+      // Pull avant de piocher pour exclure celles de l'équipe
+      await syncPull();
+      // Exécuter le lot
+      await originalBatchPick();
+      // Push après pour partager avec l'équipe
+      await syncPush();
+    };
+
+    // 3. Push automatique quand on change un statut / note / rappel
+    var originalSaveNote = window.saveNote;
+    if(originalSaveNote){
+      window.saveNote = function(el){
+        originalSaveNote(el);
+        syncPush();
+      };
+    }
+    var originalSaveRappel = window.saveRappel;
+    if(originalSaveRappel){
+      window.saveRappel = function(el){
+        originalSaveRappel(el);
+        syncPush();
+      };
+    }
+
+    // 4. Bouton sync manuel visible dans la vue cochées
+    var header = document.querySelector('.tp-actions');
+    if(header){
+      var syncBtn = document.createElement('button');
+      syncBtn.style.cssText = 'padding:8px 14px;border-radius:10px;border:none;background:#1a1a1a;border:1px solid #2a2a2a;color:#a1a1aa;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px';
+      syncBtn.innerHTML = '🔄 Sync équipe';
+      syncBtn.onclick = async function(){
+        syncBtn.textContent = '...';
+        await syncPull();
+        await syncPush();
+        syncBtn.innerHTML = '✅ Synchronisé';
+        setTimeout(function(){ syncBtn.innerHTML = '🔄 Sync équipe'; }, 2000);
+        if(typeof window.renderTracked==='function') window.renderTracked();
+      };
+      header.insertBefore(syncBtn, header.firstChild);
+    }
+  });
 })();
 </script>
 </body>
