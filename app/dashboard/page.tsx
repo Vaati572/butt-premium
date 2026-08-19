@@ -1126,6 +1126,11 @@ export default function DashboardPage() {
           prof = newProf
         }
         if (prof) setProfile({ ...prof, email: session.user.email })
+        // Stocker le token pour l'iframe prospection (même origine)
+        try {
+          localStorage.setItem("bp_access_token", session.access_token)
+          localStorage.setItem("bp_supabase_url", process.env.NEXT_PUBLIC_SUPABASE_URL || "")
+        } catch {}
         const { data: socs } = await supabase.from("societies").select("*").eq("active", true)
         if (socs?.length) setActiveSociety(socs[0])
       } catch (err) { console.error("init error:", err) }
