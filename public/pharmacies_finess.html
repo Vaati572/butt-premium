@@ -1602,10 +1602,10 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       let merged = 0;
       Object.entries(data.state||{}).forEach(([id, remote]) => {
         const local = trackingState[id];
-        const remoteDate = new Date((remote as any).updatedAt||0).getTime();
-        const localDate  = new Date((local?.updatedAt)||0).getTime();
+        const remoteDate = new Date((remote).updatedAt||0).getTime();
+        const localDate  = new Date(((local&&local.updatedAt)||0)||0).getTime();
         if(!local || remoteDate >= localDate){
-          trackingState[id] = remote as any;
+          trackingState[id] = remote;
           merged++;
         }
       });
@@ -1613,7 +1613,7 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       // Sauvegarder localement
       if(typeof saveTracking==='function') await saveTracking();
       if(typeof render==='function') render();
-      if(document.getElementById('tracked-panel')?.classList.contains('open')) window.renderTracked?.();
+      if(document.getElementById('tracked-panel')?.classList.contains('open')) if(window.renderTracked) window.renderTracked();
 
       setSyncStatus('✅ ' + merged + ' pharmacies récupérées et fusionnées','#86efac');
     } catch(e) {
@@ -1631,9 +1631,9 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       if(data.state && typeof trackingState !== 'undefined'){
         Object.entries(data.state).forEach(([id, remote]) => {
           const local = trackingState[id];
-          const remoteDate = new Date((remote as any).updatedAt||0).getTime();
-          const localDate  = new Date((local?.updatedAt)||0).getTime();
-          if(!local || remoteDate > localDate) trackingState[id] = remote as any;
+          const remoteDate = new Date((remote).updatedAt||0).getTime();
+          const localDate  = new Date(((local&&local.updatedAt)||0)||0).getTime();
+          if(!local || remoteDate > localDate) trackingState[id] = remote;
         });
         if(typeof saveTracking==='function') await saveTracking();
         if(typeof render==='function') render();
@@ -1754,10 +1754,10 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       let merged = 0;
       Object.entries(data.state||{}).forEach(([id, remote]) => {
         const local = trackingState[id];
-        const remoteDate = new Date((remote as any).updatedAt||0).getTime();
-        const localDate  = new Date((local?.updatedAt)||0).getTime();
+        const remoteDate = new Date((remote).updatedAt||0).getTime();
+        const localDate  = new Date(((local&&local.updatedAt)||0)||0).getTime();
         if(!local || remoteDate >= localDate){
-          trackingState[id] = remote as any;
+          trackingState[id] = remote;
           merged++;
         }
       });
@@ -1765,7 +1765,7 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       // Sauvegarder localement
       if(typeof saveTracking==='function') await saveTracking();
       if(typeof render==='function') render();
-      if(document.getElementById('tracked-panel')?.classList.contains('open')) window.renderTracked?.();
+      if(document.getElementById('tracked-panel')?.classList.contains('open')) if(window.renderTracked) window.renderTracked();
 
       setSyncStatus('✅ ' + merged + ' pharmacies récupérées et fusionnées','#86efac');
     } catch(e) {
@@ -1783,9 +1783,9 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{ if(e.t
       if(data.state && typeof trackingState !== 'undefined'){
         Object.entries(data.state).forEach(([id, remote]) => {
           const local = trackingState[id];
-          const remoteDate = new Date((remote as any).updatedAt||0).getTime();
-          const localDate  = new Date((local?.updatedAt)||0).getTime();
-          if(!local || remoteDate > localDate) trackingState[id] = remote as any;
+          const remoteDate = new Date((remote).updatedAt||0).getTime();
+          const localDate  = new Date(((local&&local.updatedAt)||0)||0).getTime();
+          if(!local || remoteDate > localDate) trackingState[id] = remote;
         });
         if(typeof saveTracking==='function') await saveTracking();
         if(typeof render==='function') render();
