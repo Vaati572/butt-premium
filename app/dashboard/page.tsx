@@ -892,9 +892,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
 
         {/* ── 3 boutons d'accès rapide ── */}
         <div className="px-3 py-3 border-t border-zinc-800/60 shrink-0 flex flex-col gap-2">
-          <TatoueurModal/>
           <ProspectionModal/>
-          <FormationModal/>
         </div>
 
         {/* Équipe en ligne */}
@@ -1002,9 +1000,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
             })}
           </nav>
           <div className="border-t border-zinc-800/60 px-3 pt-3 pb-2 shrink-0 flex flex-col gap-2">
-            <TatoueurModal/>
             <ProspectionModal/>
-            <FormationModal/>
           </div>
           <div className="border-t border-zinc-800/60 p-3 shrink-0">
             <div className="flex items-center gap-2 px-2 py-2 rounded-xl" style={{ backgroundColor: "rgba(39,39,42,0.5)", border: "1px solid rgba(63,63,70,0.5)" }}>
@@ -1233,9 +1229,7 @@ function Theme2Layout({
         </nav>
         {/* Boutons accès rapide — Theme 2 */}
         <div className="flex items-center gap-2 px-2 pb-2">
-          <TatoueurModal/>
           <ProspectionModal/>
-          <FormationModal/>
         </div>
       </header>
       <main className="flex-1 overflow-hidden flex flex-col" style={{ backgroundColor: BG }}>
