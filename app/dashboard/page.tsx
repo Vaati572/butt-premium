@@ -1126,10 +1126,12 @@ export default function DashboardPage() {
           prof = newProf
         }
         if (prof) setProfile({ ...prof, email: session.user.email })
-        // Stocker le token pour l'iframe prospection (même origine)
+        // Stocker les infos pour l'iframe prospection (même origine)
         try {
           localStorage.setItem("bp_access_token", session.access_token)
           localStorage.setItem("bp_supabase_url", process.env.NEXT_PUBLIC_SUPABASE_URL || "")
+          localStorage.setItem("bp_anon_key", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "")
+          localStorage.setItem("bp_society_id", prof?.society_id || "")
           localStorage.setItem("bp_profile_name", prof?.prenom ? prof.prenom + " " + prof.nom : prof?.nom || "")
         } catch {}
         const { data: socs } = await supabase.from("societies").select("*").eq("active", true)

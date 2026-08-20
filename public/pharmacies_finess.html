@@ -1204,30 +1204,73 @@ document.querySelectorAll('.vc-fb').forEach(function(btn){
 document.getElementById('vc-search').addEventListener('input',vcRender);
 
 // === SYNC EQUIPE ===
-function getToken(){return localStorage.getItem('bp_access_token')||'';}
+// === SYNC VIA SUPABASE REST (sans API route) ===
+function sbHeaders(){
+  return {
+    'Content-Type':'application/json',
+    'Authorization':'Bearer '+localStorage.getItem('bp_access_token'),
+    'apikey':localStorage.getItem('bp_anon_key'),
+    'Prefer':'return=minimal'
+  };
+}
+function sbUrl(){return localStorage.getItem('bp_supabase_url')||'';}
+function sbSociety(){return localStorage.getItem('bp_society_id')||'';}
 
 function syncPush(){
-  var token=getToken();
-  if(!token||typeof trackingState==='undefined') return;
-  fetch('/api/prospection',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({state:trackingState})}).catch(function(){});
+  var url=sbUrl(); var sid=sbSociety();
+  if(!url||!sid||typeof trackingState==='undefined') return;
+  // Préparer les lignes à upsert
+  var rows=[];
+  Object.keys(trackingState).forEach(function(pid){
+    var t=trackingState[pid];
+    if(!t||t.statut==='a_contacter') return;
+    rows.push({
+      society_id:sid, pharmacy_id:pid,
+      statut:t.statut||'contacte',
+      notes:t.notes||null,
+      rappel:t.rappel||null,
+      contact:t.contact||null,
+      priorite:t.priorite||'moyenne',
+      updated_at:t.updatedAt||new Date().toISOString()
+    });
+  });
+  if(!rows.length) return;
+  fetch(url+'/rest/v1/prospection_finess_state',{
+    method:'POST',
+    headers:Object.assign({},sbHeaders(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),
+    body:JSON.stringify(rows)
+  }).catch(function(e){console.warn('syncPush error',e);});
 }
 
 async function syncPull(){
-  var token=getToken(); if(!token) return;
+  var url=sbUrl(); var sid=sbSociety();
+  if(!url||!sid) return;
   try{
-    var res=await fetch('/api/prospection',{headers:{'Authorization':'Bearer '+token}});
-    if(!res.ok) return;
-    var data=await res.json();
-    if(!data.state||typeof trackingState==='undefined') return;
-    Object.keys(data.state).forEach(function(id){
-      var remote=data.state[id], local=trackingState[id];
-      var rd=remote.updatedAt?new Date(remote.updatedAt).getTime():0;
+    var res=await fetch(url+'/rest/v1/prospection_finess_state?society_id=eq.'+sid+'&select=pharmacy_id,statut,notes,rappel,contact,priorite,updated_at',{
+      headers:sbHeaders()
+    });
+    if(!res.ok){console.warn('syncPull',res.status);return;}
+    var rows=await res.json();
+    if(!rows||!Array.isArray(rows)||typeof trackingState==='undefined') return;
+    rows.forEach(function(row){
+      var id=row.pharmacy_id;
+      var local=trackingState[id];
+      var rd=row.updated_at?new Date(row.updated_at).getTime():0;
       var ld=local&&local.updatedAt?new Date(local.updatedAt).getTime():0;
-      if(!local||rd>ld) trackingState[id]=remote;
+      if(!local||rd>ld){
+        trackingState[id]={
+          statut:row.statut||'contacte',
+          notes:row.notes||'',
+          rappel:row.rappel||'',
+          contact:row.contact||'',
+          priorite:row.priorite||'moyenne',
+          updatedAt:row.updated_at||null
+        };
+      }
     });
     if(typeof saveTracking==='function') await saveTracking();
     if(typeof render==='function') render();
-  }catch(e){}
+  }catch(e){console.warn('syncPull error',e);}
 }
 
 document.getElementById('vc-sync-btn').addEventListener('click',async function(){
