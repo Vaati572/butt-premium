@@ -31,7 +31,6 @@ import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
 import ProspectionModule from "@/components/prospection/ProspectionModule"
-import ProspectionModal from "@/components/formation/ProspectionModal"
 
 const ADMIN_PIN = "18072209"
 
@@ -55,13 +54,15 @@ const PINNED_TABS = [
   { id: "prospection",      label: "Prospection",   icon: "💊" },
 ]
 
+// Les modules d'activité sont maintenant des items normaux (plus de section "Activité")
+const QUICK_ITEMS = [
+  { id: "agenda",     label: "Agenda",           icon: "📅" },
+  { id: "taches",     label: "Liste des tâches", icon: "✅" },
+  { id: "pharmacies", label: "Pharmacies",       icon: "🏥" },
+  { id: "commandes",  label: "Fournisseurs",     icon: "🏭" },
+]
+
 const ALL_NAV = [
-  { section: "Activité", items: [
-    { id: "agenda",     label: "Agenda",           icon: "📅" },
-    { id: "taches",     label: "Liste des tâches", icon: "✅" },
-    { id: "pharmacies", label: "Pharmacies",       icon: "🏥" },
-    { id: "commandes",  label: "Fournisseurs",     icon: "🏭" },
-  ]},
   { section: "Clientèle", items: [
     { id: "clients",     label: "Clients",     icon: "👤" },
     { id: "conventions", label: "Conventions", icon: "🎪" },
@@ -91,7 +92,7 @@ const ALL_NAV = [
   ]},
 ]
 
-const ALL_TABS_FLAT = [...PINNED_TABS, ...ALL_NAV.flatMap(s => s.items)]
+const ALL_TABS_FLAT = [...PINNED_TABS, ...QUICK_ITEMS, ...ALL_NAV.flatMap(s => s.items)]
 
 /* ───────────────────────────────────────────────
    AVATAR
@@ -111,7 +112,7 @@ function UserAvatar({ nom, url, color, size = 32 }: { nom: string; url?: string;
 }
 
 /* ───────────────────────────────────────────────
-   POPUPS (toasts modernes)
+   POPUPS
 ─────────────────────────────────────────────── */
 function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: any) {
   const total = notifs.reduce((s: number, n: any) => s + n.count, 0)
@@ -366,7 +367,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
     })
   }
 
-  // ── Effects (présence, alertes, etc.) ──
+  // ── Effects ──
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("tab")
     if (p) openTab(p)
@@ -550,7 +551,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
   }
 
   /* ════════════════════════════════════════════════
-     LAYOUT PRINCIPAL – DESIGN PROPRE
+     LAYOUT
   ════════════════════════════════════════════════ */
   return (
     <div className="h-screen flex bg-[#09090b] text-white overflow-hidden" style={{ fontSize: settings.font_size === "small" ? 13 : settings.font_size === "large" ? 15 : 14 }}>
@@ -596,7 +597,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </div>
 
         {/* Pinned */}
-        <div className="px-2.5 space-y-0.5 mb-3">
+        <div className="px-2.5 space-y-0.5 mb-1">
           {PINNED_TABS.map(tab => {
             const active = activeTab === tab.id
             return (
@@ -606,6 +607,22 @@ function InnerDashboard({ profile, activeSociety }: any) {
                 }`}>
                 <span className="text-base">{tab.icon}</span>
                 <span className="truncate">{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Quick items (ex-Activité) – même style que le reste, sans titre de section */}
+        <div className="px-2.5 space-y-0.5 mb-3">
+          {QUICK_ITEMS.map(tab => {
+            const active = activeTab === tab.id
+            return (
+              <button key={tab.id} onClick={() => openTab(tab.id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] transition-colors ${
+                  active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+                }`}>
+                <span className="text-[15px] opacity-80">{tab.icon}</span>
+                <span className="truncate flex-1 text-left">{tab.label}</span>
               </button>
             )
           })}
@@ -703,7 +720,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </div>
       </aside>
 
-      {/* Mobile sidebar overlay */}
+      {/* Mobile sidebar */}
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -713,7 +730,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
               <button onClick={() => setSidebarOpen(false)} className="text-zinc-400">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-0.5">
-              {[...PINNED_TABS, ...ALL_NAV.flatMap(s => s.items)].map(tab => (
+              {[...PINNED_TABS, ...QUICK_ITEMS, ...ALL_NAV.flatMap(s => s.items)].map(tab => (
                 <button key={tab.id} onClick={() => { openTab(tab.id); setSidebarOpen(false) }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-sm ${activeTab === tab.id ? "bg-zinc-800 text-white" : "text-zinc-400"}`}>
                   <span>{tab.icon}</span>
@@ -727,13 +744,11 @@ function InnerDashboard({ profile, activeSociety }: any) {
 
       {/* ─── MAIN ─── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="h-12 flex items-center gap-3 px-4 border-b border-zinc-800/80 bg-[#0c0c0e] shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="md:hidden text-zinc-400 hover:text-white">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
           </button>
 
-          {/* Tabs */}
           <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
             {openTabs.map(id => {
               const meta = ALL_TABS_FLAT.find(t => t.id === id)
@@ -759,17 +774,11 @@ function InnerDashboard({ profile, activeSociety }: any) {
               )
             })}
           </div>
-
-          <div className="flex items-center gap-2">
-            <ProspectionModal />
-          </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-hidden relative" style={{ background: BG }}>
           {renderContent()}
 
-          {/* Convention modal */}
           {showConvPopup && activeConvention && (
             <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
               <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
