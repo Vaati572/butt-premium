@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"
+
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-admin"
 
@@ -44,8 +46,6 @@ export async function GET(req: NextRequest) {
       expiry_date: Date.now() + (tokens.expires_in || 3600) * 1000,
       updated_at: new Date().toISOString(),
     }
-    // Google ne renvoie un refresh_token qu'à la première autorisation (ou si prompt=consent) ;
-    // on ne l'écrase que si on en reçoit un nouveau.
     if (tokens.refresh_token) payload.refresh_token = tokens.refresh_token
 
     await supabaseAdmin.from("gmail_tokens").upsert(payload, { onConflict: "profile_id" })
