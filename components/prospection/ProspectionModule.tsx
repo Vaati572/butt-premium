@@ -94,7 +94,16 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
 
   const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>) => {
     setTracking(prev => {
-      const next = { ...prev, [id]: { statut:"a_contacter", notes:"", rappel:"", contact:"", priorite:"moyenne", updatedAt:null, ...prev[id], ...patch, updatedAt: new Date().toISOString() } as TrackingEntry }
+      const existing = prev[id]
+      const base: TrackingEntry = {
+        statut: existing?.statut || "a_contacter",
+        notes: existing?.notes || "",
+        rappel: existing?.rappel || "",
+        contact: existing?.contact || "",
+        priorite: existing?.priorite || "moyenne",
+        updatedAt: new Date().toISOString(),
+      }
+      const next: Record<string, TrackingEntry> = { ...prev, [id]: { ...base, ...patch, updatedAt: new Date().toISOString() } }
       if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
       saveTimer.current = setTimeout(() => saveTracking(next), 800)
       return next
