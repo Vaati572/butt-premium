@@ -129,7 +129,7 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: any) {
   }, [])
   return (
     <div className="fixed bottom-5 right-5 z-[100] w-[340px]">
-      <div className="bg-[#18181b] border border-zinc-700/80 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-[#141416] border border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-xl">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: ACCENT + "22" }}>💬</div>
@@ -155,9 +155,9 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: any) {
         </div>
         <div className="px-4 pb-4 flex gap-2">
           <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>Ouvrir</button>
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-white/5 hover:bg-white/10">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800"><div className="h-full transition-all" style={{ width: `${progress}%`, background: ACCENT }} /></div>
+        <div className="h-0.5 bg-white/5"><div className="h-full transition-all" style={{ width: `${progress}%`, background: ACCENT }} /></div>
       </div>
     </div>
   )
@@ -171,10 +171,10 @@ function StockAlertPopup({ alerts, onGoToStock, onClose }: any) {
   }, [])
   return (
     <div className="fixed bottom-5 left-5 z-[100] w-[300px]">
-      <div className="bg-[#18181b] border border-rose-500/30 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-[#141416] border border-rose-500/25 rounded-2xl shadow-2xl overflow-hidden">
         <div className="px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-500/20 flex items-center justify-center">⚠️</div>
+            <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center">⚠️</div>
             <div>
               <p className="text-sm font-semibold text-white">Stocks critiques</p>
               <p className="text-xs text-zinc-400">{alerts.length} produit{alerts.length > 1 ? "s" : ""}</p>
@@ -192,9 +192,9 @@ function StockAlertPopup({ alerts, onGoToStock, onClose }: any) {
         </div>
         <div className="px-4 pb-4 flex gap-2">
           <button onClick={onGoToStock} className="flex-1 py-2 rounded-xl text-sm font-semibold text-black bg-rose-500 hover:bg-rose-400">Voir le stock</button>
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-zinc-800">Plus tard</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-white/5">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800"><div className="h-full bg-rose-500 transition-all" style={{ width: `${progress}%` }} /></div>
+        <div className="h-0.5 bg-white/5"><div className="h-full bg-rose-500 transition-all" style={{ width: `${progress}%` }} /></div>
       </div>
     </div>
   )
@@ -209,10 +209,10 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: any) {
   const today = new Date().toISOString().slice(0, 10)
   return (
     <div className="fixed top-5 right-5 z-[100] w-[320px]">
-      <div className="bg-[#18181b] border border-amber-500/30 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="bg-[#141416] border border-amber-500/25 rounded-2xl shadow-2xl overflow-hidden">
         <div className="px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center">✅</div>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">✅</div>
             <div>
               <p className="text-sm font-semibold text-white">Tâches à traiter</p>
               <p className="text-xs text-zinc-400">{taches.length} tâche{taches.length > 1 ? "s" : ""}</p>
@@ -235,9 +235,9 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: any) {
         </div>
         <div className="px-4 pb-4 flex gap-2">
           <button onClick={onGoToTaches} className="flex-1 py-2 rounded-xl text-sm font-semibold text-black bg-amber-500 hover:bg-amber-400">Voir les tâches</button>
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-zinc-800">Plus tard</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-white/5">Plus tard</button>
         </div>
-        <div className="h-0.5 bg-zinc-800"><div className="h-full bg-amber-500 transition-all" style={{ width: `${progress}%` }} /></div>
+        <div className="h-0.5 bg-white/5"><div className="h-full bg-amber-500 transition-all" style={{ width: `${progress}%` }} /></div>
       </div>
     </div>
   )
@@ -247,8 +247,8 @@ function AccessDeniedPanel({ tabLabel }: { tabLabel: string }) {
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4 text-3xl">🚫</div>
-        <h2 className="text-lg font-semibold text-white mb-1">Accès non autorisé</h2>
+        <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto mb-4 text-2xl">🚫</div>
+        <h2 className="text-base font-semibold text-white mb-1">Accès non autorisé</h2>
         <p className="text-sm text-zinc-500">Tu n’as pas accès au module « {tabLabel} »</p>
       </div>
     </div>
@@ -275,7 +275,7 @@ function AdminGate({ activeSociety, profile }: any) {
 
   return (
     <div className="flex-1 flex items-center justify-center">
-      <div className="w-80 bg-[#18181b] border border-zinc-800 rounded-2xl p-8 text-center">
+      <div className="w-80 bg-[#141416] border border-white/10 rounded-2xl p-8 text-center">
         <div className="text-3xl mb-3">🔒</div>
         <h2 className="text-lg font-semibold text-white mb-1">Panneau Admin</h2>
         <p className="text-xs text-zinc-500 mb-6">Code PIN administrateur</p>
@@ -291,8 +291,8 @@ function AdminGate({ activeSociety, profile }: any) {
               key={i}
               onClick={() => d === "⌫" ? setPin(p => p.slice(0,-1)) : d ? handle(d) : null}
               className={`h-12 rounded-xl text-base font-medium transition-colors ${
-                d === "⌫" ? "bg-zinc-800 text-zinc-400 hover:bg-zinc-700" :
-                d === "" ? "invisible" : "bg-zinc-800 text-white hover:bg-yellow-500 hover:text-black"
+                d === "⌫" ? "bg-white/5 text-zinc-400 hover:bg-white/10" :
+                d === "" ? "invisible" : "bg-white/5 text-white hover:bg-yellow-500 hover:text-black"
               }`}
             >
               {d}
@@ -304,9 +304,30 @@ function AdminGate({ activeSociety, profile }: any) {
   )
 }
 
-/* ───────────────────────────────────────────────
+function OnboardingPopup({ onDismiss, ACCENT }: { onDismiss: () => void; ACCENT: string }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
+      <div className="bg-[#141416] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-4 text-2xl">✨</div>
+          <h2 className="text-lg font-semibold text-white mb-2">Personnalisez vos onglets</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            Créez des dossiers, rangez les modules et réorganisez la barre latérale comme vous voulez.
+          </p>
+        </div>
+        <div className="px-6 pb-6">
+          <button onClick={onDismiss} className="w-full py-2.5 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
+            Compris
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
    ORGANIZER MODAL
-─────────────────────────────────────────────── */
+═══════════════════════════════════════════ */
 function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   layout: SidebarLayout
   setLayout: (l: SidebarLayout) => void
@@ -321,59 +342,30 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   const [editIcon, setEditIcon] = useState("📁")
   const [editColor, setEditColor] = useState("#eab308")
   const [search, setSearch] = useState("")
-  const [showHidden, setShowHidden] = useState(false)
-
-  const [dragItem, setDragItem] = useState<{
-    type: "module" | "folder"
-    id: string
-    fromFolder?: string
-    index: number
-  } | null>(null)
-
-  const [dropIndicator, setDropIndicator] = useState<{
-    folderId: string | null
-    index: number
-  } | null>(null)
+  const [dragItem, setDragItem] = useState<{ type: "module" | "folder"; id: string; fromFolder?: string; index: number } | null>(null)
+  const [dropIndicator, setDropIndicator] = useState<{ folderId: string | null; index: number } | null>(null)
 
   const save = (next: SidebarLayout) => setLayout(next)
+  const getMeta = (id: string) => ALL_MODULES.find(m => m.id === id)
+  const matchesSearch = (label: string) => !search.trim() || label.toLowerCase().includes(search.toLowerCase())
 
   const createFolder = () => {
     const name = newFolderName.trim()
     if (!name) return
-    const id = `folder_${Date.now()}`
     save({
       ...layout,
-      folders: [...layout.folders, {
-        id,
-        name,
-        collapsed: false,
-        items: [],
-        icon: newFolderIcon,
-        color: newFolderColor
-      }]
+      folders: [...layout.folders, { id: `folder_${Date.now()}`, name, collapsed: false, items: [], icon: newFolderIcon, color: newFolderColor }],
     })
     setNewFolderName("")
     setNewFolderIcon("📁")
     setNewFolderColor("#eab308")
   }
 
-  const startEditFolder = (folder: SidebarFolder) => {
-    setEditingFolder(folder.id)
-    setEditName(folder.name)
-    setEditIcon(folder.icon || "📁")
-    setEditColor(folder.color || "#eab308")
-  }
-
   const saveEditFolder = (id: string) => {
     if (!editName.trim()) return
     save({
       ...layout,
-      folders: layout.folders.map(f => f.id === id ? {
-        ...f,
-        name: editName.trim(),
-        icon: editIcon,
-        color: editColor
-      } : f)
+      folders: layout.folders.map(f => f.id === id ? { ...f, name: editName.trim(), icon: editIcon, color: editColor } : f),
     })
     setEditingFolder(null)
   }
@@ -381,49 +373,21 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   const deleteFolder = (id: string) => {
     const folder = layout.folders.find(f => f.id === id)
     if (!folder) return
-    save({
-      ...layout,
-      folders: layout.folders.filter(f => f.id !== id),
-      unassigned: [...layout.unassigned, ...folder.items]
-    })
+    save({ ...layout, folders: layout.folders.filter(f => f.id !== id), unassigned: [...layout.unassigned, ...folder.items] })
   }
 
   const hideModule = (id: string) => {
-    // Retirer de partout
-    const nextFolders = layout.folders.map(f => ({
-      ...f,
-      items: f.items.filter(i => i !== id)
-    }))
-    const nextUnassigned = layout.unassigned.filter(i => i !== id)
     save({
-      folders: nextFolders,
-      unassigned: nextUnassigned,
-      hidden: [...layout.hidden, id]
+      folders: layout.folders.map(f => ({ ...f, items: f.items.filter(i => i !== id) })),
+      unassigned: layout.unassigned.filter(i => i !== id),
+      hidden: [...layout.hidden, id],
     })
   }
 
   const unhideModule = (id: string) => {
-    save({
-      ...layout,
-      hidden: layout.hidden.filter(i => i !== id),
-      unassigned: [...layout.unassigned, id]
-    })
+    save({ ...layout, hidden: layout.hidden.filter(i => i !== id), unassigned: [...layout.unassigned, id] })
   }
 
-  const resetLayout = () => {
-    if (confirm("Réinitialiser toute l’organisation ?")) {
-      save(DEFAULT_LAYOUT)
-    }
-  }
-
-  const getMeta = (id: string) => ALL_MODULES.find(m => m.id === id)
-
-  const matchesSearch = (label: string) => {
-    if (!search.trim()) return true
-    return label.toLowerCase().includes(search.toLowerCase())
-  }
-
-  // ─── Drag handlers ───
   const onDragStart = (e: React.DragEvent, type: "module" | "folder", id: string, index: number, fromFolder?: string) => {
     setDragItem({ type, id, index, fromFolder })
     e.dataTransfer.effectAllowed = "move"
@@ -437,18 +401,12 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     setDropIndicator(null)
   }
 
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }
-
   const onDragOverItem = (e: React.DragEvent, folderId: string | null, index: number) => {
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = "move"
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const midY = rect.top + rect.height / 2
-    const insertIndex = e.clientY < midY ? index : index + 1
+    const insertIndex = e.clientY < rect.top + rect.height / 2 ? index : index + 1
     setDropIndicator({ folderId, index: insertIndex })
   }
 
@@ -456,7 +414,6 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     e.preventDefault()
     e.stopPropagation()
     if (!dragItem || dragItem.type !== "module" || !dropIndicator) return
-
     const { folderId: targetFolderId, index: targetIndex } = dropIndicator
     const nextFolders = layout.folders.map(f => ({ ...f, items: [...f.items] }))
     let nextUnassigned = [...layout.unassigned]
@@ -469,13 +426,10 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     }
 
     let finalIndex = targetIndex
-    if (dragItem.fromFolder === targetFolderId && dragItem.index < targetIndex) {
-      finalIndex = targetIndex - 1
-    }
+    if (dragItem.fromFolder === targetFolderId && dragItem.index < targetIndex) finalIndex = targetIndex - 1
 
-    if (targetFolderId === null) {
-      nextUnassigned.splice(finalIndex, 0, dragItem.id)
-    } else {
+    if (targetFolderId === null) nextUnassigned.splice(finalIndex, 0, dragItem.id)
+    else {
       const folder = nextFolders.find(f => f.id === targetFolderId)
       if (folder) folder.items.splice(finalIndex, 0, dragItem.id)
     }
@@ -491,8 +445,7 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     if (!dragItem || dragItem.type !== "folder") return
     let finalIndex = targetIndex
     if (dragItem.index < targetIndex) finalIndex = targetIndex - 1
-    const nextFolders = moveInArray([...layout.folders], dragItem.index, finalIndex)
-    save({ ...layout, folders: nextFolders })
+    save({ ...layout, folders: moveInArray([...layout.folders], dragItem.index, finalIndex) })
     setDragItem(null)
     setDropIndicator(null)
   }
@@ -501,342 +454,187 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     e.preventDefault()
     e.stopPropagation()
     if (!dragItem || dragItem.type !== "module") return
-
-    if (dropIndicator && dropIndicator.folderId === targetFolderId) {
-      onDropModule(e)
-      return
-    }
+    if (dropIndicator && dropIndicator.folderId === targetFolderId) { onDropModule(e); return }
 
     const nextFolders = layout.folders.map(f => ({ ...f, items: [...f.items] }))
     let nextUnassigned = [...layout.unassigned]
-
     if (dragItem.fromFolder) {
       const folder = nextFolders.find(f => f.id === dragItem.fromFolder)
       if (folder) folder.items = folder.items.filter(id => id !== dragItem.id)
-    } else {
-      nextUnassigned = nextUnassigned.filter(id => id !== dragItem.id)
-    }
+    } else nextUnassigned = nextUnassigned.filter(id => id !== dragItem.id)
 
     if (targetFolderId === null) nextUnassigned.push(dragItem.id)
     else {
       const folder = nextFolders.find(f => f.id === targetFolderId)
       if (folder) folder.items.push(dragItem.id)
     }
-
     save({ ...layout, folders: nextFolders, unassigned: nextUnassigned })
     setDragItem(null)
     setDropIndicator(null)
   }
 
-  const DropBar = () => (
-    <div className="h-0.5 my-0.5 rounded-full mx-2 transition-all duration-150" style={{ backgroundColor: ACCENT }} />
-  )
+  const DropBar = () => <div className="h-0.5 my-0.5 rounded-full mx-2" style={{ backgroundColor: ACCENT }} />
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
-      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+      <div className="bg-[#141416] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
           <div>
             <h2 className="text-base font-semibold text-white">Organiser la barre latérale</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Glisse • Personnalise • Masque</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Glisse · Personnalise · Masque</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Recherche */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher un module…"
-              className="w-full h-9 bg-zinc-900 border border-zinc-700 rounded-lg pl-9 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un module…"
+              className="w-full h-9 bg-white/[0.03] border border-white/10 rounded-lg pl-9 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-white/20" />
           </div>
 
-          {/* Créer un dossier */}
-          <div className="space-y-2 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+          <div className="space-y-2 p-3 rounded-xl bg-white/[0.02] border border-white/5">
             <p className="text-xs font-medium text-zinc-400">Nouveau dossier</p>
-            <div className="flex gap-2">
-              <input
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && createFolder()}
-                placeholder="Nom du dossier…"
-                className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-              />
-              <button
-                onClick={createFolder}
-                disabled={!newFolderName.trim()}
-                className="px-4 h-9 rounded-lg text-sm font-semibold text-black disabled:opacity-40"
-                style={{ background: ACCENT }}
-              >
-                Créer
-              </button>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1 flex-wrap">
-                {FOLDER_ICONS.map(icon => (
-                  <button
-                    key={icon}
-                    onClick={() => setNewFolderIcon(icon)}
-                    className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition ${
-                      newFolderIcon === icon ? "bg-zinc-700 ring-1 ring-white/30" : "hover:bg-zinc-800"
-                    }`}
-                  >
-                    {icon}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-1.5">
-              {FOLDER_COLORS.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setNewFolderColor(c)}
-                  className={`w-5 h-5 rounded-full transition ${newFolderColor === c ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : ""}`}
-                  style={{ backgroundColor: c }}
-                />
+            <input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} onKeyDown={e => e.key === "Enter" && createFolder()}
+              placeholder="Nom du dossier…" className="w-full h-9 bg-white/[0.03] border border-white/10 rounded-lg px-3 text-sm text-white focus:outline-none" />
+            <div className="flex flex-wrap gap-1">
+              {FOLDER_ICONS.map(ic => (
+                <button key={ic} onClick={() => setNewFolderIcon(ic)} className={`w-7 h-7 rounded-md text-sm ${newFolderIcon === ic ? "bg-white/15" : "hover:bg-white/5"}`}>{ic}</button>
               ))}
             </div>
+            <div className="flex flex-wrap gap-1.5">
+              {FOLDER_COLORS.map(c => (
+                <button key={c} onClick={() => setNewFolderColor(c)} className={`w-5 h-5 rounded-full ${newFolderColor === c ? "ring-2 ring-white ring-offset-1 ring-offset-[#141416]" : ""}`} style={{ background: c }} />
+              ))}
+            </div>
+            <button onClick={createFolder} disabled={!newFolderName.trim()} className="w-full h-9 rounded-lg text-sm font-semibold text-black disabled:opacity-40" style={{ background: ACCENT }}>Créer</button>
           </div>
 
-          {/* Dossiers */}
           {layout.folders.map((folder, folderIndex) => (
-            <div
-              key={folder.id}
-              className="border border-zinc-800 rounded-xl overflow-hidden transition-all duration-200"
-              onDragOver={onDragOver}
-              onDrop={(e) => onDropOnZone(e, folder.id)}
-            >
+            <div key={folder.id} className="border border-white/5 rounded-xl overflow-hidden" onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }} onDrop={e => onDropOnZone(e, folder.id)}>
               <div
                 draggable
-                onDragStart={(e) => onDragStart(e, "folder", folder.id, folderIndex)}
+                onDragStart={e => onDragStart(e, "folder", folder.id, folderIndex)}
                 onDragEnd={onDragEnd}
-                onDragOver={onDragOver}
-                onDrop={(e) => onDropFolder(e, folderIndex)}
-                className={`flex items-center gap-2 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-opacity duration-150 ${
-                  dragItem?.type === "folder" && dragItem.id === folder.id ? "opacity-40" : ""
-                }`}
-                style={{ backgroundColor: (folder.color || "#eab308") + "15" }}
+                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }}
+                onDrop={e => onDropFolder(e, folderIndex)}
+                className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.03] cursor-grab active:cursor-grabbing"
               >
                 <span className="text-zinc-600 text-xs select-none">⠿</span>
-                <span className="text-base">{folder.icon || "📁"}</span>
-
                 {editingFolder === folder.id ? (
                   <div className="flex-1 space-y-2">
-                    <input
-                      autoFocus
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && saveEditFolder(folder.id)}
-                      className="w-full h-7 bg-zinc-800 border border-zinc-600 rounded px-2 text-sm text-white focus:outline-none"
-                      onClick={e => e.stopPropagation()}
-                    />
+                    <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveEditFolder(folder.id)}
+                      className="w-full h-7 bg-zinc-800 border border-zinc-600 rounded px-2 text-sm text-white focus:outline-none" />
                     <div className="flex gap-1 flex-wrap">
-                      {FOLDER_ICONS.map(icon => (
-                        <button key={icon} onClick={() => setEditIcon(icon)}
-                          className={`w-6 h-6 rounded text-sm flex items-center justify-center ${editIcon === icon ? "bg-zinc-600" : "hover:bg-zinc-700"}`}>
-                          {icon}
-                        </button>
-                      ))}
+                      {FOLDER_ICONS.map(ic => <button key={ic} onClick={() => setEditIcon(ic)} className={`w-6 h-6 rounded text-xs ${editIcon === ic ? "bg-white/15" : ""}`}>{ic}</button>)}
                     </div>
-                    <div className="flex gap-1">
-                      {FOLDER_COLORS.map(c => (
-                        <button key={c} onClick={() => setEditColor(c)}
-                          className={`w-4 h-4 rounded-full ${editColor === c ? "ring-1 ring-white" : ""}`}
-                          style={{ backgroundColor: c }} />
-                      ))}
+                    <div className="flex gap-1 flex-wrap">
+                      {FOLDER_COLORS.map(c => <button key={c} onClick={() => setEditColor(c)} className={`w-4 h-4 rounded-full ${editColor === c ? "ring-1 ring-white" : ""}`} style={{ background: c }} />)}
                     </div>
-                    <button onClick={() => saveEditFolder(folder.id)} className="text-xs text-emerald-400">Enregistrer</button>
+                    <button onClick={() => saveEditFolder(folder.id)} className="text-xs text-emerald-400">Sauver</button>
                   </div>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm font-medium text-white select-none flex items-center gap-2">
-                      {folder.name}
-                      <span className="text-[10px] font-normal text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
-                        {folder.items.length}
-                      </span>
-                    </span>
-                    <button onClick={() => startEditFolder(folder)} className="text-xs text-zinc-500 hover:text-white px-1.5">✎</button>
-                    <button onClick={() => deleteFolder(folder.id)} className="text-xs text-rose-400 hover:text-rose-300 px-1.5">✕</button>
+                    <span>{folder.icon || "📁"}</span>
+                    <span className="flex-1 text-sm font-medium text-white select-none" style={{ color: folder.color }}>{folder.name}</span>
+                    <button onClick={() => { setEditingFolder(folder.id); setEditName(folder.name); setEditIcon(folder.icon || "📁"); setEditColor(folder.color || "#eab308") }} className="text-xs text-zinc-500 hover:text-white px-1">✎</button>
+                    <button onClick={() => deleteFolder(folder.id)} className="text-xs text-rose-400 hover:text-rose-300 px-1">✕</button>
                   </>
                 )}
               </div>
-
-              <div className="px-2 py-2 min-h-[48px]">
-                {folder.items.length === 0 && (
-                  <p className="text-xs text-zinc-600 py-3 text-center">Glisse un module ici</p>
-                )}
-
-                {dropIndicator?.folderId === folder.id && dropIndicator.index === 0 && <DropBar />}
-
+              <div className="px-2 py-2 min-h-[40px]">
+                {folder.items.length === 0 && <p className="text-xs text-zinc-600 py-2 text-center">Glisse un module ici</p>}
                 {folder.items.map((tabId, itemIndex) => {
                   const meta = getMeta(tabId)
                   if (!meta || !matchesSearch(meta.label)) return null
-                  const isDragging = dragItem?.type === "module" && dragItem.id === tabId
-
                   return (
-                    <div key={tabId} className="transition-all duration-150">
+                    <div key={tabId}>
+                      {dropIndicator?.folderId === folder.id && dropIndicator.index === itemIndex && <DropBar />}
                       <div
                         draggable
-                        onDragStart={(e) => onDragStart(e, "module", tabId, itemIndex, folder.id)}
+                        onDragStart={e => onDragStart(e, "module", tabId, itemIndex, folder.id)}
                         onDragEnd={onDragEnd}
-                        onDragOver={(e) => onDragOverItem(e, folder.id, itemIndex)}
+                        onDragOver={e => onDragOverItem(e, folder.id, itemIndex)}
                         onDrop={onDropModule}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 ${
-                          isDragging ? "opacity-40 scale-95" : "hover:bg-zinc-800/50"
-                        }`}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing hover:bg-white/[0.04]"
                       >
                         <span className="text-zinc-600 text-xs select-none">⠿</span>
                         <span className="text-sm">{meta.icon}</span>
                         <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
-                        <button
-                          onClick={() => hideModule(tabId)}
-                          className="text-[10px] text-zinc-600 hover:text-rose-400 opacity-0 group-hover:opacity-100"
-                          title="Masquer"
-                        >
-                          👁️
-                        </button>
+                        <button onClick={() => hideModule(tabId)} className="text-[10px] text-zinc-600 hover:text-rose-400">👁</button>
                       </div>
-                      {dropIndicator?.folderId === folder.id && dropIndicator.index === itemIndex + 1 && <DropBar />}
                     </div>
                   )
                 })}
+                {dropIndicator?.folderId === folder.id && dropIndicator.index === folder.items.length && <DropBar />}
               </div>
             </div>
           ))}
 
-          {/* Modules non rangés */}
-          <div onDragOver={onDragOver} onDrop={(e) => onDropOnZone(e, null)}>
-            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
-              Modules non rangés
-            </p>
-            <div className="space-y-0.5 min-h-[48px]">
-              {layout.unassigned.filter(id => {
-                const meta = getMeta(id)
-                return meta && matchesSearch(meta.label)
-              }).length === 0 && (
-                <p className="text-xs text-zinc-600 py-3 text-center">
-                  {search ? "Aucun résultat" : "Tous les modules sont rangés"}
-                </p>
-              )}
-
-              {dropIndicator?.folderId === null && dropIndicator.index === 0 && <DropBar />}
-
+          <div className="rounded-xl" onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move" }} onDrop={e => onDropOnZone(e, null)}>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">Modules non rangés</p>
+            <div className="space-y-0.5 min-h-[40px]">
               {layout.unassigned.map((tabId, index) => {
                 const meta = getMeta(tabId)
                 if (!meta || !matchesSearch(meta.label)) return null
-                const isDragging = dragItem?.type === "module" && dragItem.id === tabId
-
                 return (
-                  <div key={tabId} className="transition-all duration-150 group">
+                  <div key={tabId}>
+                    {dropIndicator?.folderId === null && dropIndicator.index === index && <DropBar />}
                     <div
                       draggable
-                      onDragStart={(e) => onDragStart(e, "module", tabId, index)}
+                      onDragStart={e => onDragStart(e, "module", tabId, index)}
                       onDragEnd={onDragEnd}
-                      onDragOver={(e) => onDragOverItem(e, null, index)}
+                      onDragOver={e => onDragOverItem(e, null, index)}
                       onDrop={onDropModule}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 ${
-                        isDragging ? "opacity-40 scale-95" : "hover:bg-zinc-800/50"
-                      }`}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing hover:bg-white/[0.04]"
                     >
                       <span className="text-zinc-600 text-xs select-none">⠿</span>
                       <span className="text-sm">{meta.icon}</span>
                       <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
-                      <button
-                        onClick={() => hideModule(tabId)}
-                        className="text-[11px] text-zinc-600 hover:text-rose-400"
-                        title="Masquer ce module"
-                      >
-                        👁️
-                      </button>
+                      <button onClick={() => hideModule(tabId)} className="text-[10px] text-zinc-600 hover:text-rose-400">👁</button>
                     </div>
-                    {dropIndicator?.folderId === null && dropIndicator.index === index + 1 && <DropBar />}
+                  </div>
+                )
+              })}
+              {dropIndicator?.folderId === null && dropIndicator.index === layout.unassigned.length && <DropBar />}
+            </div>
+          </div>
+
+          {layout.hidden.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">Masqués</p>
+              {layout.hidden.map(id => {
+                const meta = getMeta(id)
+                if (!meta || !matchesSearch(meta.label)) return null
+                return (
+                  <div key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg opacity-50">
+                    <span className="text-sm">{meta.icon}</span>
+                    <span className="flex-1 text-sm text-zinc-400">{meta.label}</span>
+                    <button onClick={() => unhideModule(id)} className="text-[10px] text-zinc-500 hover:text-white">Restaurer</button>
                   </div>
                 )
               })}
             </div>
-          </div>
-
-          {/* Modules masqués */}
-          {layout.hidden.length > 0 && (
-            <div>
-              <button
-                onClick={() => setShowHidden(p => !p)}
-                className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1 flex items-center gap-2 hover:text-zinc-300"
-              >
-                Modules masqués ({layout.hidden.length})
-                <span className={`transition-transform ${showHidden ? "rotate-90" : ""}`}>›</span>
-              </button>
-              {showHidden && (
-                <div className="space-y-0.5">
-                  {layout.hidden.map(tabId => {
-                    const meta = getMeta(tabId)
-                    if (!meta || !matchesSearch(meta.label)) return null
-                    return (
-                      <div key={tabId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg opacity-60 hover:opacity-100">
-                        <span className="text-sm">{meta.icon}</span>
-                        <span className="flex-1 text-sm text-zinc-400">{meta.label}</span>
-                        <button
-                          onClick={() => unhideModule(tabId)}
-                          className="text-[11px] text-emerald-500 hover:text-emerald-400"
-                        >
-                          Afficher
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-zinc-800 flex items-center justify-between">
-          <button onClick={resetLayout} className="text-xs text-zinc-500 hover:text-rose-400 transition">
-            Réinitialiser
-          </button>
-          <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
-            Terminé
-          </button>
+        <div className="px-5 py-4 border-t border-white/5 flex items-center justify-between">
+          <button onClick={() => confirm("Réinitialiser toute l’organisation ?") && save(DEFAULT_LAYOUT)} className="text-xs text-zinc-500 hover:text-rose-400">Réinitialiser</button>
+          <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>Terminé</button>
         </div>
       </div>
     </div>
   )
 }
 
-function OnboardingPopup({ onDismiss, ACCENT }: { onDismiss: () => void; ACCENT: string }) {
-  return (
-    <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
-      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-        <div className="p-6 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-yellow-500/15 flex items-center justify-center mx-auto mb-4 text-2xl">✨</div>
-          <h2 className="text-lg font-semibold text-white mb-2">Personnalisez vos onglets</h2>
-          <p className="text-sm text-zinc-400 leading-relaxed">
-            Créez des dossiers avec couleurs et icônes, rangez vos modules, masquez ceux que vous n’utilisez pas.
-          </p>
-          <p className="text-sm text-zinc-500 mt-3">
-            Cliquez sur <span className="text-white font-medium">Organiser</span> en bas de la barre latérale.
-          </p>
-        </div>
-        <div className="px-6 pb-6 flex flex-col gap-2">
-          <button onClick={onDismiss} className="w-full py-2.5 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
-            Compris
-          </button>
-          <button onClick={onDismiss} className="w-full py-2 rounded-xl text-sm text-zinc-500 hover:text-zinc-300">
-            Ne plus afficher
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
+/* ═══════════════════════════════════════════
+   INNER DASHBOARD
+═══════════════════════════════════════════ */
 function InnerDashboard({ profile, activeSociety }: any) {
   const { settings } = useUserSettings()
   const router = useRouter()
+  const ACCENT = settings.accent_color || "#eab308"
+  const BG = "#09090b"
 
   const [openTabs, setOpenTabs] = useState<string[]>(["accueil"])
   const [activeTab, setActiveTab] = useState("accueil")
@@ -859,16 +657,12 @@ function InnerDashboard({ profile, activeSociety }: any) {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [globalResults, setGlobalResults] = useState<any[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
-
   const [layout, setLayout] = useState<SidebarLayout>(DEFAULT_LAYOUT)
   const [showOrganizer, setShowOrganizer] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const heartbeatRef = useRef<any>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
-
-  const ACCENT = settings.accent_color || "#eab308"
-  const BG = settings.background || "#09090b"
   const LAYOUT_KEY = `sidebar_layout_${profile?.id || "default"}`
   const ONBOARDING_KEY = `sidebar_onboarding_${profile?.id || "default"}`
 
@@ -877,38 +671,24 @@ function InnerDashboard({ profile, activeSociety }: any) {
       const saved = localStorage.getItem(LAYOUT_KEY)
       if (saved) {
         const parsed = JSON.parse(saved) as SidebarLayout
-        // Compatibilité avec anciennes versions
-        if (!parsed.hidden) parsed.hidden = []
         const allIds = ALL_MODULES.map(m => m.id)
-        const used = new Set([
-          ...parsed.folders.flatMap(f => f.items),
-          ...parsed.unassigned,
-          ...parsed.hidden
-        ])
+        const used = new Set([...(parsed.folders || []).flatMap(f => f.items), ...(parsed.unassigned || []), ...(parsed.hidden || [])])
         const missing = allIds.filter(id => !used.has(id))
-        setLayout({
-          folders: parsed.folders,
-          unassigned: [...parsed.unassigned, ...missing],
-          hidden: parsed.hidden
-        })
+        setLayout({ folders: parsed.folders || [], unassigned: [...(parsed.unassigned || []), ...missing], hidden: parsed.hidden || [] })
       }
     } catch {}
   }, [profile?.id])
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
-    } catch {}
+    try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch {}
   }, [layout])
 
   useEffect(() => {
     if (activeTab === "accueil") {
       const dismissed = localStorage.getItem(ONBOARDING_KEY)
       if (!dismissed) setShowOnboarding(true)
-    } else {
-      setShowOnboarding(false)
     }
-  }, [activeTab, profile?.id])
+  }, [activeTab])
 
   const dismissOnboarding = () => {
     localStorage.setItem(ONBOARDING_KEY, "1")
@@ -924,100 +704,67 @@ function InnerDashboard({ profile, activeSociety }: any) {
     e?.stopPropagation()
     setOpenTabs(prev => {
       const next = prev.filter(t => t !== id)
-      if (next.length === 0) { setActiveTab("vente"); return ["vente"] }
+      if (next.length === 0) return ["accueil"]
       if (activeTab === id) setActiveTab(next[next.length - 1])
       return next
     })
   }
 
   const toggleFolder = (folderId: string) => {
-    setLayout(prev => ({
-      ...prev,
-      folders: prev.folders.map(f => f.id === folderId ? { ...f, collapsed: !f.collapsed } : f)
-    }))
+    setLayout(prev => ({ ...prev, folders: prev.folders.map(f => f.id === folderId ? { ...f, collapsed: !f.collapsed } : f) }))
   }
 
-  // Effects (présence, alertes…)
+  // Presence
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("tab")
-    if (p) openTab(p)
-  }, [])
-
-  useEffect(() => {
-    if (!activeSociety) return
-    const today = new Date().toISOString().split("T")[0]
-    supabase.from("conventions").select("*").eq("society_id", activeSociety.id).lte("date_debut", today).gte("date_fin", today).limit(1).single()
-      .then(({ data }) => { if (data) { setActiveConvention(data); setShowConvPopup(true) } })
-    supabase.from("stock").select("produit_nom,quantite,seuil_alerte,unite").eq("society_id", activeSociety.id)
-      .then(({ data }) => {
-        const a = (data || []).filter((s: any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
-        if (a.length) { setStockAlerts(a); setTimeout(() => setShowStockAlert(true), 2500) }
-      })
-    supabase.from("liste_taches").select("id,titre,priorite,statut,echeance,assigne_id").eq("society_id", activeSociety.id).not("statut", "in", "(termine,annulee)")
-      .then(({ data }) => {
-        const todayS = new Date().toISOString().slice(0, 10)
-        const r = (data || []).filter((t: any) => (t.priorite === "urgente" || t.echeance === todayS || (t.echeance && t.echeance < todayS)) && (!t.assigne_id || t.assigne_id === profile?.id))
-        if (r.length) { setTachesAlerts(r); setTimeout(() => setShowTachesAlert(true), 4000) }
-      })
-  }, [activeSociety])
-
-  useEffect(() => {
-    if (!profile || !activeSociety) return
-    const check = async () => {
-      const { data: convs } = await supabase.from("conversations").select("id,name,type,member_ids").eq("society_id", activeSociety.id).contains("member_ids", [profile.id])
-      if (!convs?.length) return
-      const ids = [...new Set(convs.flatMap((c: any) => c.member_ids || []))]
-      const { data: prows } = await supabase.from("profiles").select("id,nom").in("id", ids)
-      const map: any = {}
-      ;(prows || []).forEach((p: any) => map[p.id] = p.nom)
-      const notifs: UnreadNotif[] = []
-      await Promise.all(convs.map(async (c: any) => {
-        const { data: msgs } = await supabase.from("messages").select("id,sender_nom,sender_id,content,file_name").eq("conversation_id", c.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id).order("created_at", { ascending: false }).limit(15)
-        if (!msgs?.length) return
-        let name = c.name
-        if (c.type === "direct" && !c.name) {
-          const other = (c.member_ids || []).find((id: string) => id !== profile.id)
-          name = other ? map[other] || "Direct" : "Direct"
-        }
-        const by: any = {}
-        msgs.forEach((m: any) => {
-          if (!by[m.sender_id]) by[m.sender_id] = { nom: m.sender_nom, msgs: [] }
-          by[m.sender_id].msgs.push(m)
-        })
-        Object.values(by).forEach(({ nom, msgs }: any) => {
-          notifs.push({ sender_nom: nom, content: msgs[0].content || "", file_name: msgs[0].file_name, conv_name: name, conv_id: c.id, count: msgs.length })
-        })
-      }))
-      if (notifs.length) setTimeout(() => { setUnreadNotifs(notifs); setShowUnreadPopup(true) }, 1000)
+    if (!profile?.id || !activeSociety?.id) return
+    const beat = async () => {
+      await supabase.from("user_presence").upsert({
+        user_id: profile.id, society_id: activeSociety.id, status: myStatus,
+        last_seen: new Date().toISOString(), nom: profile.nom, avatar_url: profile.avatar_url, color: profile.color,
+      }, { onConflict: "user_id" })
     }
-    check()
-  }, [profile, activeSociety])
+    beat()
+    heartbeatRef.current = setInterval(beat, 30000)
+    loadUsers()
+    const ch = supabase.channel("presence-dash").on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, () => loadUsers()).subscribe()
+    return () => { clearInterval(heartbeatRef.current); supabase.removeChannel(ch) }
+  }, [profile?.id, activeSociety?.id, myStatus])
 
+  // Messages unread
   useEffect(() => {
-    if (!profile || !activeSociety) return
-    supabase.from("user_presence").upsert({ user_id: profile.id, society_id: activeSociety.id, status: "online", last_seen: new Date().toISOString() }, { onConflict: "user_id" })
-      .then(() => { setMyStatus("online"); loadUsers() })
-    heartbeatRef.current = setInterval(() => {
-      supabase.from("user_presence").update({ last_seen: new Date().toISOString() }).eq("user_id", profile.id)
-    }, 30000)
-    const ch = supabase.channel(`presence_${activeSociety.id}`).on("postgres_changes", { event: "*", schema: "public", table: "user_presence" }, loadUsers).subscribe()
-    const bye = () => supabase.from("user_presence").update({ status: "offline" }).eq("user_id", profile.id)
-    window.addEventListener("beforeunload", bye)
-    return () => {
-      supabase.removeChannel(ch)
-      window.removeEventListener("beforeunload", bye)
-      clearInterval(heartbeatRef.current)
+    if (!profile?.id || !activeSociety?.id) return
+    const count = async () => {
+      const { count: c } = await supabase.from("messages").select("*", { count: "exact", head: true })
+        .eq("society_id", activeSociety.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
+      setUnreadMessages(c || 0)
     }
-  }, [profile, activeSociety])
-
-  useEffect(() => {
-    if (!profile || !activeSociety) return
-    const count = () => supabase.from("messages").select("*", { count: "exact", head: true }).eq("society_id", activeSociety.id).not("read_by", "cs", `{${profile.id}}`).neq("sender_id", profile.id)
-      .then(({ count: c }) => setUnreadMessages(c || 0))
     count()
-    const ch = supabase.channel(`unread_${profile.id}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, count).subscribe()
+    const ch = supabase.channel("msg-dash").on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, count).subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [profile, activeSociety])
+
+  // Stock + taches alerts
+  useEffect(() => {
+    if (!activeSociety?.id) return
+    supabase.from("stock").select("*").eq("society_id", activeSociety.id).then(({ data }) => {
+      const a = (data || []).filter((s: any) => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte))
+      if (a.length) { setStockAlerts(a); setShowStockAlert(true) }
+    })
+    const today = new Date().toISOString().slice(0, 10)
+    supabase.from("liste_taches").select("*").eq("society_id", activeSociety.id).not("statut", "in", "(termine,annulee)").then(({ data }) => {
+      const a = (data || []).filter((t: any) => t.priorite === "urgente" || (t.echeance && t.echeance <= today))
+      if (a.length) { setTachesAlerts(a); setShowTachesAlert(true) }
+    })
+  }, [activeSociety?.id])
+
+  // Convention active
+  useEffect(() => {
+    if (!activeSociety?.id) return
+    const t = new Date().toISOString().slice(0, 10)
+    supabase.from("conventions").select("*").eq("society_id", activeSociety.id).lte("date_debut", t).gte("date_fin", t).then(({ data }) => {
+      if (data?.[0]) { setActiveConvention(data[0]); setShowConvPopup(true) }
+    })
+  }, [activeSociety?.id])
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -1029,6 +776,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
   }, [])
 
   const loadUsers = async () => {
+    if (!activeSociety?.id) return
     const [{ data: members }, { data: presences }] = await Promise.all([
       supabase.from("profiles").select("id,nom,avatar_url,color").eq("society_id", activeSociety.id),
       supabase.from("user_presence").select("*").eq("society_id", activeSociety.id),
@@ -1079,18 +827,23 @@ function InnerDashboard({ profile, activeSociety }: any) {
 
   const renderTabButton = (tabId: string) => {
     const meta = ALL_MODULES.find(m => m.id === tabId)
-    if (!meta) return null
+    if (!meta || layout.hidden.includes(tabId)) return null
     const active = activeTab === tabId
     const restricted = (settings as any).hidden_tabs?.includes(tabId)
     return (
       <button
         key={tabId}
         onClick={() => openTab(tabId)}
-        className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] transition-colors ${
-          active ? "bg-zinc-800 text-white" : restricted ? "text-zinc-600" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+        className={`w-full flex items-center gap-2.5 px-2.5 h-[34px] rounded-lg text-[13px] transition-all ${
+          active
+            ? "text-white font-medium"
+            : restricted
+              ? "text-zinc-600"
+              : "text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]"
         }`}
+        style={active ? { background: ACCENT + "18", color: ACCENT } : {}}
       >
-        <span className="text-[15px] opacity-80">{meta.icon}</span>
+        <span className="text-[15px] w-5 text-center opacity-90">{meta.icon}</span>
         <span className="truncate flex-1 text-left">{meta.label}</span>
         {tabId === "messages" && unreadMessages > 0 && (
           <span className="text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-black" style={{ background: ACCENT }}>
@@ -1136,7 +889,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
         return (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="text-4xl mb-3">🚧</div>
+              <div className="text-4xl mb-3 opacity-40">🚧</div>
               <p className="text-lg font-semibold text-white">{activeMeta?.label}</p>
               <p className="text-sm text-zinc-500 mt-1">Module en construction</p>
             </div>
@@ -1147,31 +900,35 @@ function InnerDashboard({ profile, activeSociety }: any) {
 
   return (
     <div className="h-screen flex bg-[#09090b] text-white overflow-hidden" style={{ fontSize: settings.font_size === "small" ? 13 : settings.font_size === "large" ? 15 : 14 }}>
-      <aside className="hidden md:flex w-[232px] flex-col border-r border-zinc-800/80 bg-[#0c0c0e]">
-        <div className="h-14 flex items-center px-4 gap-2.5 border-b border-zinc-800/60">
-          <img src="/logo.png" alt="Butt Premium" className="h-7 w-auto" />
+
+      {/* ─── SIDEBAR ─── */}
+      <aside className="hidden md:flex w-[220px] flex-col border-r border-white/[0.06] bg-[#0a0a0b]">
+        {/* Logo */}
+        <div className="h-13 flex items-center px-4 gap-2.5 border-b border-white/[0.06] min-h-[52px]">
+          <img src="/logo.png" alt="Butt Premium" className="h-6 w-auto" />
           {activeSociety && (
-            <span className="text-[11px] text-zinc-500 truncate font-medium">{activeSociety.name}</span>
+            <span className="text-[11px] text-zinc-600 truncate font-medium">{activeSociety.name}</span>
           )}
         </div>
 
+        {/* Search */}
         <div className="px-3 pt-3 pb-2" data-search>
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-600 text-sm">⌕</span>
             <input
               value={globalSearch}
               onChange={e => { setGlobalSearch(e.target.value); runGlobalSearch(e.target.value); setShowGlobalSearch(true) }}
               onFocus={() => setShowGlobalSearch(true)}
               placeholder="Rechercher…"
-              className="w-full h-9 bg-zinc-900/80 border border-zinc-800 rounded-lg pl-8 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 transition"
+              className="w-full h-8 bg-white/[0.03] border border-white/[0.06] rounded-lg pl-8 pr-3 text-[13px] text-white placeholder-zinc-600 focus:outline-none focus:border-white/15 transition"
             />
             {showGlobalSearch && globalSearch.length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-[#18181b] border border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-[#141416] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden max-h-60 overflow-y-auto">
                 {searchLoading ? <p className="text-center text-xs text-zinc-500 py-4">Recherche…</p> :
                  globalResults.length === 0 ? <p className="text-center text-xs text-zinc-600 py-4">Aucun résultat</p> :
                  globalResults.map((r, i) => (
                    <button key={i} onClick={() => { openTab(r.tab); setShowGlobalSearch(false); setGlobalSearch("") }}
-                     className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-zinc-800 text-left">
+                     className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/[0.04] text-left">
                      <span>{r.icon}</span>
                      <div className="min-w-0 flex-1">
                        <p className="text-sm text-white truncate">{r.label}</p>
@@ -1184,53 +941,52 @@ function InnerDashboard({ profile, activeSociety }: any) {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-3">
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-3">
           {layout.folders.map(folder => (
             <div key={folder.id}>
-              <button
-                onClick={() => toggleFolder(folder.id)}
-                className="w-full flex items-center justify-between px-2.5 mb-1 group"
-              >
-                <span className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5 transition"
-                  style={{ color: folder.collapsed ? "#71717a" : (folder.color || "#a1a1aa") }}>
-                  <span>{folder.icon || "📁"}</span>
+              <button onClick={() => toggleFolder(folder.id)} className="w-full flex items-center justify-between px-2.5 mb-0.5 group">
+                <span className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5 transition"
+                  style={{ color: folder.collapsed ? "#52525b" : (folder.color || "#71717a") }}>
+                  <span className="text-xs">{folder.icon || "📁"}</span>
                   {folder.name}
-                  <span className="text-[9px] font-normal opacity-60">({folder.items.length})</span>
+                  <span className="text-[9px] font-normal opacity-50">({folder.items.length})</span>
                 </span>
-                <span className={`text-[10px] text-zinc-600 transition-transform ${folder.collapsed ? "" : "rotate-90"}`}>›</span>
+                <span className={`text-[9px] text-zinc-700 transition-transform ${folder.collapsed ? "" : "rotate-90"}`}>›</span>
               </button>
               {!folder.collapsed && (
-                <div className="space-y-0.5">
+                <div className="space-y-px">
                   {folder.items.map(id => renderTabButton(id))}
                 </div>
               )}
             </div>
           ))}
 
-          {layout.unassigned.length > 0 && (
-            <div className="space-y-0.5">
+          {layout.unassigned.filter(id => !layout.hidden.includes(id)).length > 0 && (
+            <div className="space-y-px">
               {layout.folders.length > 0 && (
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 px-2.5 mb-1">Autres</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-700 px-2.5 mb-0.5">Autres</p>
               )}
               {layout.unassigned.map(id => renderTabButton(id))}
             </div>
           )}
         </nav>
 
-        <div className="border-t border-zinc-800/60 p-2.5 space-y-2">
+        {/* Footer sidebar */}
+        <div className="border-t border-white/[0.06] p-2.5 space-y-2">
           <button
             onClick={() => setShowOrganizer(true)}
-            className="w-full flex items-center justify-center gap-2 h-8 rounded-lg text-[12px] font-medium text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition border border-zinc-800"
+            className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg text-[12px] font-medium text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] transition"
           >
-            <span>⚙️</span> Organiser
+            ⚙️ Organiser
           </button>
 
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
-              className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-800/60 transition">
+              className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] transition">
               <div className="relative">
                 <UserAvatar nom={profile?.nom || "?"} url={profile?.avatar_url} color={profile?.color} size={28} />
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#0c0c0e] ${myCfg.dot}`} />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#0a0a0b] ${myCfg.dot}`} />
               </div>
               <div className="min-w-0 flex-1 text-left">
                 <p className="text-[13px] font-medium text-white truncate">{profile?.nom}</p>
@@ -1239,15 +995,15 @@ function InnerDashboard({ profile, activeSociety }: any) {
             </button>
 
             {showStatusMenu && (
-              <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-[#18181b] border border-zinc-700 rounded-xl shadow-xl overflow-hidden z-50">
+              <div className="absolute bottom-full left-0 right-0 mb-1.5 bg-[#141416] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
                 {(Object.entries(PRESENCE) as any[]).map(([s, cfg]) => (
                   <button key={s} onClick={() => updateStatus(s)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-zinc-800 transition">
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-white/[0.04] transition">
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                     <span className={myStatus === s ? "text-white font-medium" : "text-zinc-400"}>{cfg.label}</span>
                   </button>
                 ))}
-                <div className="border-t border-zinc-800">
+                <div className="border-t border-white/5">
                   <button onClick={logout} className="w-full px-3 py-2.5 text-sm text-rose-400 hover:bg-rose-500/10 text-left">
                     Déconnexion
                   </button>
@@ -1257,15 +1013,15 @@ function InnerDashboard({ profile, activeSociety }: any) {
           </div>
 
           {onlineUsers.length > 0 && (
-            <div className="px-1">
+            <div className="px-1 pt-0.5">
               <p className="text-[10px] text-zinc-600 font-medium mb-1.5">
                 Équipe · {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
               </p>
               <div className="flex -space-x-1.5">
-                {onlineUsers.slice(0, 5).map(u => (
+                {onlineUsers.slice(0, 6).map(u => (
                   <div key={u.id} className="relative" title={u.nom}>
                     <UserAvatar nom={u.nom} url={u.avatar_url} color={u.color} size={22} />
-                    <span className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[#0c0c0e] ${PRESENCE[u.status].dot}`} />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full ring-1 ring-[#0a0a0b] ${PRESENCE[u.status].dot}`} />
                   </div>
                 ))}
               </div>
@@ -1274,30 +1030,32 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </div>
       </aside>
 
+      {/* Mobile sidebar */}
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-64 bg-[#0c0c0e] z-50 flex flex-col md:hidden border-r border-zinc-800">
-            <div className="h-14 flex items-center justify-between px-4 border-b border-zinc-800">
-              <img src="/logo.png" alt="" className="h-7" />
+          <aside className="fixed inset-y-0 left-0 w-64 bg-[#0a0a0b] z-50 flex flex-col md:hidden border-r border-white/[0.06]">
+            <div className="h-13 min-h-[52px] flex items-center justify-between px-4 border-b border-white/[0.06]">
+              <img src="/logo.png" alt="" className="h-6" />
               <button onClick={() => setSidebarOpen(false)} className="text-zinc-400">✕</button>
             </div>
-            <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-0.5">
-              {[...layout.folders.flatMap(f => f.items), ...layout.unassigned].map(id => {
+            <div className="flex-1 overflow-y-auto px-2 py-3 space-y-px">
+              {[...layout.folders.flatMap(f => f.items), ...layout.unassigned].filter(id => !layout.hidden.includes(id)).map(id => {
                 const meta = ALL_MODULES.find(m => m.id === id)
                 if (!meta) return null
                 return (
                   <button key={id} onClick={() => { openTab(id); setSidebarOpen(false) }}
-                    className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-sm ${activeTab === id ? "bg-zinc-800 text-white" : "text-zinc-400"}`}>
+                    className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-sm ${activeTab === id ? "text-white" : "text-zinc-400"}`}
+                    style={activeTab === id ? { background: ACCENT + "18", color: ACCENT } : {}}>
                     <span>{meta.icon}</span>
                     <span>{meta.label}</span>
                   </button>
                 )
               })}
             </div>
-            <div className="p-3 border-t border-zinc-800">
+            <div className="p-3 border-t border-white/[0.06]">
               <button onClick={() => { setShowOrganizer(true); setSidebarOpen(false) }}
-                className="w-full h-9 rounded-lg text-sm text-zinc-400 border border-zinc-700 hover:bg-zinc-800">
+                className="w-full h-9 rounded-lg text-sm text-zinc-400 hover:bg-white/[0.04]">
                 ⚙️ Organiser
               </button>
             </div>
@@ -1305,13 +1063,14 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </>
       )}
 
+      {/* ─── MAIN ─── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-12 flex items-center gap-3 px-4 border-b border-zinc-800/80 bg-[#0c0c0e] shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="md:hidden text-zinc-400 hover:text-white">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        <header className="h-11 flex items-center gap-2 px-3 md:px-4 border-b border-white/[0.06] bg-[#0a0a0b]/90 backdrop-blur-sm shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="md:hidden w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white rounded-lg hover:bg-white/[0.04]">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
           </button>
 
-          <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
+          <div className="flex-1 flex items-center gap-0.5 overflow-x-auto scrollbar-none">
             {openTabs.map(id => {
               const meta = ALL_MODULES.find(t => t.id === id)
               if (!meta) return null
@@ -1320,18 +1079,22 @@ function InnerDashboard({ profile, activeSociety }: any) {
                 <div
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`group flex items-center gap-1.5 h-8 px-3 rounded-lg cursor-pointer text-[13px] transition-colors shrink-0 ${
-                    active ? "bg-zinc-800 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40"
+                  className={`group flex items-center gap-1.5 h-7 px-2.5 rounded-md cursor-pointer text-[12px] transition-all shrink-0 ${
+                    active
+                      ? "bg-white/[0.08] text-white font-medium"
+                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04]"
                   }`}
                 >
-                  <span className="text-sm opacity-80">{meta.icon}</span>
-                  <span className="font-medium">{meta.label}</span>
-                  <button
-                    onClick={e => closeTab(id, e)}
-                    className="ml-1 opacity-0 group-hover:opacity-60 hover:!opacity-100 text-xs w-4 h-4 flex items-center justify-center rounded hover:bg-zinc-700"
-                  >
-                    ✕
-                  </button>
+                  <span className="text-[12px] opacity-80">{meta.icon}</span>
+                  <span>{meta.label}</span>
+                  {openTabs.length > 1 && (
+                    <button
+                      onClick={e => closeTab(id, e)}
+                      className="ml-0.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 text-[10px] w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white/10"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -1343,7 +1106,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
 
           {showConvPopup && activeConvention && (
             <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-              <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+              <div className="bg-[#141416] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
                 <div className="p-6 text-center">
                   <div className="text-4xl mb-3">🎪</div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium mb-3">
@@ -1358,7 +1121,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
                     className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
                     Voir la convention
                   </button>
-                  <button onClick={() => setShowConvPopup(false)} className="px-4 py-2.5 rounded-xl text-sm text-zinc-400 bg-zinc-800">
+                  <button onClick={() => setShowConvPopup(false)} className="px-4 py-2.5 rounded-xl text-sm text-zinc-400 bg-white/5">
                     Continuer
                   </button>
                 </div>
@@ -1369,18 +1132,11 @@ function InnerDashboard({ profile, activeSociety }: any) {
       </div>
 
       {showOrganizer && (
-        <OrganizerModal
-          layout={layout}
-          setLayout={setLayout}
-          onClose={() => setShowOrganizer(false)}
-          ACCENT={ACCENT}
-        />
+        <OrganizerModal layout={layout} setLayout={setLayout} onClose={() => setShowOrganizer(false)} ACCENT={ACCENT} />
       )}
-
       {showOnboarding && activeTab === "accueil" && (
         <OnboardingPopup onDismiss={dismissOnboarding} ACCENT={ACCENT} />
       )}
-
       {showUnreadPopup && unreadNotifs.length > 0 && (
         <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
           onGoToMessages={() => { openTab("messages"); setShowUnreadPopup(false) }}
