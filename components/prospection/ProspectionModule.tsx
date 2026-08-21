@@ -49,7 +49,7 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
   const [lotResults, setLotResults] = useState<Pharmacy[]>([])
   const [lotMode, setLotMode]       = useState<"idle"|"preview"|"picked">("idle")
   const [lotLoading, setLotLoading] = useState(false)
-  const saveTimer = useRef<NodeJS.Timeout>()
+  const saveTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Chargement données pharmacies
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
   const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>) => {
     setTracking(prev => {
       const next = { ...prev, [id]: { statut:"a_contacter", notes:"", rappel:"", contact:"", priorite:"moyenne", updatedAt:null, ...prev[id], ...patch, updatedAt: new Date().toISOString() } as TrackingEntry }
-      if (saveTimer.current) clearTimeout(saveTimer.current)
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
       saveTimer.current = setTimeout(() => saveTracking(next), 800)
       return next
     })
@@ -181,7 +181,15 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
     setTracking(prev => {
       const next = { ...prev }
       picked.forEach(p => {
-        next[p.id] = { statut:"contacte" as const, notes:"", rappel:"", contact: prev[p.id]?.contact || who, priorite:"moyenne", updatedAt:now, ...prev[p.id], statut:"contacte" as const, contact: prev[p.id]?.contact || who, updatedAt:now }
+        const ex = prev[p.id]
+        next[p.id] = {
+          statut: "contacte" as const,
+          notes: ex?.notes || "",
+          rappel: ex?.rappel || "",
+          contact: ex?.contact || who,
+          priorite: ex?.priorite || "moyenne",
+          updatedAt: now,
+        }
       })
       saveTracking(next)
       return next
