@@ -43,11 +43,14 @@ interface SidebarFolder {
   name: string
   collapsed: boolean
   items: string[]
+  color?: string
+  icon?: string
 }
 
 interface SidebarLayout {
   folders: SidebarFolder[]
   unassigned: string[]
+  hidden: string[]
 }
 
 const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: string }> = {
@@ -87,9 +90,13 @@ const ALL_MODULES = [
   { id: "parametres",       label: "Paramètres",      icon: "⚙️" },
 ]
 
+const FOLDER_ICONS = ["📁", "📂", "🗂️", "📋", "📊", "💼", "🎯", "⚡", "🔥", "⭐", "💡", "🛠️"]
+const FOLDER_COLORS = ["#eab308", "#f97316", "#ef4444", "#ec4899", "#a855f7", "#6366f1", "#3b82f6", "#06b6d4", "#10b981", "#84cc16"]
+
 const DEFAULT_LAYOUT: SidebarLayout = {
   folders: [],
   unassigned: ALL_MODULES.map(m => m.id),
+  hidden: [],
 }
 
 function moveInArray<T>(arr: T[], from: number, to: number): T[] {
@@ -298,7 +305,7 @@ function AdminGate({ activeSociety, profile }: any) {
 }
 
 /* ───────────────────────────────────────────────
-   ORGANIZER MODAL – Drag & Drop corrigé
+   ORGANIZER MODAL
 ─────────────────────────────────────────────── */
 function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   layout: SidebarLayout
@@ -307,12 +314,24 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   ACCENT: string
 }) {
   const [newFolderName, setNewFolderName] = useState("")
+  const [newFolderIcon, setNewFolderIcon] = useState("📁")
+  const [newFolderColor, setNewFolderColor] = useState("#eab308")
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
+  const [editIcon, setEditIcon] = useState("📁")
+  const [editColor, setEditColor] = useState("#eab308")
+  const [search, setSearch] = useState("")
+  const [showHidden, setShowHidden] = useState(false)
+
   const [dragItem, setDragItem] = useState<{
     type: "module" | "folder"
     id: string
     fromFolder?: string
+    index: number
+  } | null>(null)
+
+  const [dropIndicator, setDropIndicator] = useState<{
+    folderId: string | null
     index: number
   } | null>(null)
 
@@ -324,16 +343,37 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     const id = `folder_${Date.now()}`
     save({
       ...layout,
-      folders: [...layout.folders, { id, name, collapsed: false, items: [] }]
+      folders: [...layout.folders, {
+        id,
+        name,
+        collapsed: false,
+        items: [],
+        icon: newFolderIcon,
+        color: newFolderColor
+      }]
     })
     setNewFolderName("")
+    setNewFolderIcon("📁")
+    setNewFolderColor("#eab308")
   }
 
-  const renameFolder = (id: string) => {
+  const startEditFolder = (folder: SidebarFolder) => {
+    setEditingFolder(folder.id)
+    setEditName(folder.name)
+    setEditIcon(folder.icon || "📁")
+    setEditColor(folder.color || "#eab308")
+  }
+
+  const saveEditFolder = (id: string) => {
     if (!editName.trim()) return
     save({
       ...layout,
-      folders: layout.folders.map(f => f.id === id ? { ...f, name: editName.trim() } : f)
+      folders: layout.folders.map(f => f.id === id ? {
+        ...f,
+        name: editName.trim(),
+        icon: editIcon,
+        color: editColor
+      } : f)
     })
     setEditingFolder(null)
   }
@@ -342,8 +382,31 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     const folder = layout.folders.find(f => f.id === id)
     if (!folder) return
     save({
+      ...layout,
       folders: layout.folders.filter(f => f.id !== id),
       unassigned: [...layout.unassigned, ...folder.items]
+    })
+  }
+
+  const hideModule = (id: string) => {
+    // Retirer de partout
+    const nextFolders = layout.folders.map(f => ({
+      ...f,
+      items: f.items.filter(i => i !== id)
+    }))
+    const nextUnassigned = layout.unassigned.filter(i => i !== id)
+    save({
+      folders: nextFolders,
+      unassigned: nextUnassigned,
+      hidden: [...layout.hidden, id]
+    })
+  }
+
+  const unhideModule = (id: string) => {
+    save({
+      ...layout,
+      hidden: layout.hidden.filter(i => i !== id),
+      unassigned: [...layout.unassigned, id]
     })
   }
 
@@ -355,24 +418,23 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
 
   const getMeta = (id: string) => ALL_MODULES.find(m => m.id === id)
 
-  const onDragStart = (
-    e: React.DragEvent,
-    type: "module" | "folder",
-    id: string,
-    index: number,
-    fromFolder?: string
-  ) => {
+  const matchesSearch = (label: string) => {
+    if (!search.trim()) return true
+    return label.toLowerCase().includes(search.toLowerCase())
+  }
+
+  // ─── Drag handlers ───
+  const onDragStart = (e: React.DragEvent, type: "module" | "folder", id: string, index: number, fromFolder?: string) => {
     setDragItem({ type, id, index, fromFolder })
     e.dataTransfer.effectAllowed = "move"
     e.dataTransfer.setData("text/plain", id)
-    requestAnimationFrame(() => {
-      (e.target as HTMLElement).style.opacity = "0.4"
-    })
+    requestAnimationFrame(() => { (e.target as HTMLElement).style.opacity = "0.4" })
   }
 
   const onDragEnd = (e: React.DragEvent) => {
     (e.target as HTMLElement).style.opacity = "1"
     setDragItem(null)
+    setDropIndicator(null)
   }
 
   const onDragOver = (e: React.DragEvent) => {
@@ -380,72 +442,70 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     e.dataTransfer.dropEffect = "move"
   }
 
-  const onDropModule = (
-    e: React.DragEvent,
-    targetFolderId: string | null,
-    targetIndex: number
-  ) => {
+  const onDragOverItem = (e: React.DragEvent, folderId: string | null, index: number) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!dragItem || dragItem.type !== "module") return
+    e.dataTransfer.dropEffect = "move"
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const insertIndex = e.clientY < midY ? index : index + 1
+    setDropIndicator({ folderId, index: insertIndex })
+  }
 
+  const onDropModule = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!dragItem || dragItem.type !== "module" || !dropIndicator) return
+
+    const { folderId: targetFolderId, index: targetIndex } = dropIndicator
     const nextFolders = layout.folders.map(f => ({ ...f, items: [...f.items] }))
     let nextUnassigned = [...layout.unassigned]
 
-    // 1. Retirer le module de son emplacement actuel
     if (dragItem.fromFolder) {
       const folder = nextFolders.find(f => f.id === dragItem.fromFolder)
-      if (folder) {
-        folder.items = folder.items.filter(id => id !== dragItem.id)
-      }
+      if (folder) folder.items = folder.items.filter(id => id !== dragItem.id)
     } else {
       nextUnassigned = nextUnassigned.filter(id => id !== dragItem.id)
     }
 
-    // 2. Ajuster l'index si on déplace dans la même liste
     let finalIndex = targetIndex
-    if (dragItem.fromFolder === targetFolderId) {
-      if (dragItem.index < targetIndex) {
-        finalIndex = targetIndex - 1
-      }
+    if (dragItem.fromFolder === targetFolderId && dragItem.index < targetIndex) {
+      finalIndex = targetIndex - 1
     }
 
-    // 3. Insérer à la bonne place
     if (targetFolderId === null) {
       nextUnassigned.splice(finalIndex, 0, dragItem.id)
     } else {
       const folder = nextFolders.find(f => f.id === targetFolderId)
-      if (folder) {
-        folder.items.splice(finalIndex, 0, dragItem.id)
-      }
+      if (folder) folder.items.splice(finalIndex, 0, dragItem.id)
     }
 
-    save({
-      folders: nextFolders,
-      unassigned: nextUnassigned
-    })
+    save({ ...layout, folders: nextFolders, unassigned: nextUnassigned })
     setDragItem(null)
+    setDropIndicator(null)
   }
 
   const onDropFolder = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault()
     e.stopPropagation()
     if (!dragItem || dragItem.type !== "folder") return
-
     let finalIndex = targetIndex
-    if (dragItem.index < targetIndex) {
-      finalIndex = targetIndex - 1
-    }
-
+    if (dragItem.index < targetIndex) finalIndex = targetIndex - 1
     const nextFolders = moveInArray([...layout.folders], dragItem.index, finalIndex)
     save({ ...layout, folders: nextFolders })
     setDragItem(null)
+    setDropIndicator(null)
   }
 
   const onDropOnZone = (e: React.DragEvent, targetFolderId: string | null) => {
     e.preventDefault()
     e.stopPropagation()
     if (!dragItem || dragItem.type !== "module") return
+
+    if (dropIndicator && dropIndicator.folderId === targetFolderId) {
+      onDropModule(e)
+      return
+    }
 
     const nextFolders = layout.folders.map(f => ({ ...f, items: [...f.items] }))
     let nextUnassigned = [...layout.unassigned]
@@ -457,51 +517,96 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
       nextUnassigned = nextUnassigned.filter(id => id !== dragItem.id)
     }
 
-    if (targetFolderId === null) {
-      nextUnassigned.push(dragItem.id)
-    } else {
+    if (targetFolderId === null) nextUnassigned.push(dragItem.id)
+    else {
       const folder = nextFolders.find(f => f.id === targetFolderId)
       if (folder) folder.items.push(dragItem.id)
     }
 
-    save({ folders: nextFolders, unassigned: nextUnassigned })
+    save({ ...layout, folders: nextFolders, unassigned: nextUnassigned })
     setDragItem(null)
+    setDropIndicator(null)
   }
+
+  const DropBar = () => (
+    <div className="h-0.5 my-0.5 rounded-full mx-2 transition-all duration-150" style={{ backgroundColor: ACCENT }} />
+  )
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
-      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
             <h2 className="text-base font-semibold text-white">Organiser la barre latérale</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Glisse les modules et dossiers pour les réordonner</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Glisse • Personnalise • Masque</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          <div className="flex gap-2">
+          {/* Recherche */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
             <input
-              value={newFolderName}
-              onChange={e => setNewFolderName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && createFolder()}
-              placeholder="Nom du nouveau dossier…"
-              className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher un module…"
+              className="w-full h-9 bg-zinc-900 border border-zinc-700 rounded-lg pl-9 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
             />
-            <button
-              onClick={createFolder}
-              disabled={!newFolderName.trim()}
-              className="px-4 h-9 rounded-lg text-sm font-semibold text-black disabled:opacity-40"
-              style={{ background: ACCENT }}
-            >
-              Créer
-            </button>
           </div>
 
+          {/* Créer un dossier */}
+          <div className="space-y-2 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800">
+            <p className="text-xs font-medium text-zinc-400">Nouveau dossier</p>
+            <div className="flex gap-2">
+              <input
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && createFolder()}
+                placeholder="Nom du dossier…"
+                className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              />
+              <button
+                onClick={createFolder}
+                disabled={!newFolderName.trim()}
+                className="px-4 h-9 rounded-lg text-sm font-semibold text-black disabled:opacity-40"
+                style={{ background: ACCENT }}
+              >
+                Créer
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1 flex-wrap">
+                {FOLDER_ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    onClick={() => setNewFolderIcon(icon)}
+                    className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition ${
+                      newFolderIcon === icon ? "bg-zinc-700 ring-1 ring-white/30" : "hover:bg-zinc-800"
+                    }`}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-1.5">
+              {FOLDER_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setNewFolderColor(c)}
+                  className={`w-5 h-5 rounded-full transition ${newFolderColor === c ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-900" : ""}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Dossiers */}
           {layout.folders.map((folder, folderIndex) => (
             <div
               key={folder.id}
-              className="border border-zinc-800 rounded-xl overflow-hidden"
+              className="border border-zinc-800 rounded-xl overflow-hidden transition-all duration-200"
               onDragOver={onDragOver}
               onDrop={(e) => onDropOnZone(e, folder.id)}
             >
@@ -511,60 +616,91 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
                 onDragEnd={onDragEnd}
                 onDragOver={onDragOver}
                 onDrop={(e) => onDropFolder(e, folderIndex)}
-                className={`flex items-center gap-2 px-3 py-2.5 bg-zinc-900/60 cursor-grab active:cursor-grabbing ${
+                className={`flex items-center gap-2 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-opacity duration-150 ${
                   dragItem?.type === "folder" && dragItem.id === folder.id ? "opacity-40" : ""
                 }`}
+                style={{ backgroundColor: (folder.color || "#eab308") + "15" }}
               >
                 <span className="text-zinc-600 text-xs select-none">⠿</span>
+                <span className="text-base">{folder.icon || "📁"}</span>
 
                 {editingFolder === folder.id ? (
-                  <input
-                    autoFocus
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && renameFolder(folder.id)}
-                    onBlur={() => renameFolder(folder.id)}
-                    className="flex-1 h-7 bg-zinc-800 border border-zinc-600 rounded px-2 text-sm text-white focus:outline-none"
-                    onClick={e => e.stopPropagation()}
-                  />
+                  <div className="flex-1 space-y-2">
+                    <input
+                      autoFocus
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && saveEditFolder(folder.id)}
+                      className="w-full h-7 bg-zinc-800 border border-zinc-600 rounded px-2 text-sm text-white focus:outline-none"
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <div className="flex gap-1 flex-wrap">
+                      {FOLDER_ICONS.map(icon => (
+                        <button key={icon} onClick={() => setEditIcon(icon)}
+                          className={`w-6 h-6 rounded text-sm flex items-center justify-center ${editIcon === icon ? "bg-zinc-600" : "hover:bg-zinc-700"}`}>
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      {FOLDER_COLORS.map(c => (
+                        <button key={c} onClick={() => setEditColor(c)}
+                          className={`w-4 h-4 rounded-full ${editColor === c ? "ring-1 ring-white" : ""}`}
+                          style={{ backgroundColor: c }} />
+                      ))}
+                    </div>
+                    <button onClick={() => saveEditFolder(folder.id)} className="text-xs text-emerald-400">Enregistrer</button>
+                  </div>
                 ) : (
-                  <span className="flex-1 text-sm font-medium text-white select-none">{folder.name}</span>
+                  <>
+                    <span className="flex-1 text-sm font-medium text-white select-none flex items-center gap-2">
+                      {folder.name}
+                      <span className="text-[10px] font-normal text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                        {folder.items.length}
+                      </span>
+                    </span>
+                    <button onClick={() => startEditFolder(folder)} className="text-xs text-zinc-500 hover:text-white px-1.5">✎</button>
+                    <button onClick={() => deleteFolder(folder.id)} className="text-xs text-rose-400 hover:text-rose-300 px-1.5">✕</button>
+                  </>
                 )}
-
-                <button
-                  onClick={() => { setEditingFolder(folder.id); setEditName(folder.name) }}
-                  className="text-xs text-zinc-500 hover:text-white px-1.5"
-                >✎</button>
-                <button
-                  onClick={() => deleteFolder(folder.id)}
-                  className="text-xs text-rose-400 hover:text-rose-300 px-1.5"
-                >✕</button>
               </div>
 
               <div className="px-2 py-2 min-h-[48px]">
                 {folder.items.length === 0 && (
                   <p className="text-xs text-zinc-600 py-3 text-center">Glisse un module ici</p>
                 )}
+
+                {dropIndicator?.folderId === folder.id && dropIndicator.index === 0 && <DropBar />}
+
                 {folder.items.map((tabId, itemIndex) => {
                   const meta = getMeta(tabId)
-                  if (!meta) return null
+                  if (!meta || !matchesSearch(meta.label)) return null
                   const isDragging = dragItem?.type === "module" && dragItem.id === tabId
 
                   return (
-                    <div
-                      key={tabId}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, "module", tabId, itemIndex, folder.id)}
-                      onDragEnd={onDragEnd}
-                      onDragOver={onDragOver}
-                      onDrop={(e) => onDropModule(e, folder.id, itemIndex)}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
-                        isDragging ? "opacity-40" : "hover:bg-zinc-800/50"
-                      }`}
-                    >
-                      <span className="text-zinc-600 text-xs select-none">⠿</span>
-                      <span className="text-sm">{meta.icon}</span>
-                      <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
+                    <div key={tabId} className="transition-all duration-150">
+                      <div
+                        draggable
+                        onDragStart={(e) => onDragStart(e, "module", tabId, itemIndex, folder.id)}
+                        onDragEnd={onDragEnd}
+                        onDragOver={(e) => onDragOverItem(e, folder.id, itemIndex)}
+                        onDrop={onDropModule}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 ${
+                          isDragging ? "opacity-40 scale-95" : "hover:bg-zinc-800/50"
+                        }`}
+                      >
+                        <span className="text-zinc-600 text-xs select-none">⠿</span>
+                        <span className="text-sm">{meta.icon}</span>
+                        <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
+                        <button
+                          onClick={() => hideModule(tabId)}
+                          className="text-[10px] text-zinc-600 hover:text-rose-400 opacity-0 group-hover:opacity-100"
+                          title="Masquer"
+                        >
+                          👁️
+                        </button>
+                      </div>
+                      {dropIndicator?.folderId === folder.id && dropIndicator.index === itemIndex + 1 && <DropBar />}
                     </div>
                   )
                 })}
@@ -572,54 +708,97 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
             </div>
           ))}
 
-          <div
-            className="rounded-xl"
-            onDragOver={onDragOver}
-            onDrop={(e) => onDropOnZone(e, null)}
-          >
+          {/* Modules non rangés */}
+          <div onDragOver={onDragOver} onDrop={(e) => onDropOnZone(e, null)}>
             <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
               Modules non rangés
             </p>
             <div className="space-y-0.5 min-h-[48px]">
-              {layout.unassigned.length === 0 && (
-                <p className="text-xs text-zinc-600 py-3 text-center">Tous les modules sont rangés</p>
+              {layout.unassigned.filter(id => {
+                const meta = getMeta(id)
+                return meta && matchesSearch(meta.label)
+              }).length === 0 && (
+                <p className="text-xs text-zinc-600 py-3 text-center">
+                  {search ? "Aucun résultat" : "Tous les modules sont rangés"}
+                </p>
               )}
+
+              {dropIndicator?.folderId === null && dropIndicator.index === 0 && <DropBar />}
+
               {layout.unassigned.map((tabId, index) => {
                 const meta = getMeta(tabId)
-                if (!meta) return null
+                if (!meta || !matchesSearch(meta.label)) return null
                 const isDragging = dragItem?.type === "module" && dragItem.id === tabId
 
                 return (
-                  <div
-                    key={tabId}
-                    draggable
-                    onDragStart={(e) => onDragStart(e, "module", tabId, index)}
-                    onDragEnd={onDragEnd}
-                    onDragOver={onDragOver}
-                    onDrop={(e) => onDropModule(e, null, index)}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
-                      isDragging ? "opacity-40" : "hover:bg-zinc-800/50"
-                    }`}
-                  >
-                    <span className="text-zinc-600 text-xs select-none">⠿</span>
-                    <span className="text-sm">{meta.icon}</span>
-                    <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
+                  <div key={tabId} className="transition-all duration-150 group">
+                    <div
+                      draggable
+                      onDragStart={(e) => onDragStart(e, "module", tabId, index)}
+                      onDragEnd={onDragEnd}
+                      onDragOver={(e) => onDragOverItem(e, null, index)}
+                      onDrop={onDropModule}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 ${
+                        isDragging ? "opacity-40 scale-95" : "hover:bg-zinc-800/50"
+                      }`}
+                    >
+                      <span className="text-zinc-600 text-xs select-none">⠿</span>
+                      <span className="text-sm">{meta.icon}</span>
+                      <span className="flex-1 text-sm text-zinc-300 select-none">{meta.label}</span>
+                      <button
+                        onClick={() => hideModule(tabId)}
+                        className="text-[11px] text-zinc-600 hover:text-rose-400"
+                        title="Masquer ce module"
+                      >
+                        👁️
+                      </button>
+                    </div>
+                    {dropIndicator?.folderId === null && dropIndicator.index === index + 1 && <DropBar />}
                   </div>
                 )
               })}
             </div>
           </div>
+
+          {/* Modules masqués */}
+          {layout.hidden.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowHidden(p => !p)}
+                className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1 flex items-center gap-2 hover:text-zinc-300"
+              >
+                Modules masqués ({layout.hidden.length})
+                <span className={`transition-transform ${showHidden ? "rotate-90" : ""}`}>›</span>
+              </button>
+              {showHidden && (
+                <div className="space-y-0.5">
+                  {layout.hidden.map(tabId => {
+                    const meta = getMeta(tabId)
+                    if (!meta || !matchesSearch(meta.label)) return null
+                    return (
+                      <div key={tabId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg opacity-60 hover:opacity-100">
+                        <span className="text-sm">{meta.icon}</span>
+                        <span className="flex-1 text-sm text-zinc-400">{meta.label}</span>
+                        <button
+                          onClick={() => unhideModule(tabId)}
+                          className="text-[11px] text-emerald-500 hover:text-emerald-400"
+                        >
+                          Afficher
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-zinc-800 flex items-center justify-between">
           <button onClick={resetLayout} className="text-xs text-zinc-500 hover:text-rose-400 transition">
             Réinitialiser
           </button>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl text-sm font-semibold text-black"
-            style={{ background: ACCENT }}
-          >
+          <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
             Terminé
           </button>
         </div>
@@ -636,10 +815,10 @@ function OnboardingPopup({ onDismiss, ACCENT }: { onDismiss: () => void; ACCENT:
           <div className="w-14 h-14 rounded-2xl bg-yellow-500/15 flex items-center justify-center mx-auto mb-4 text-2xl">✨</div>
           <h2 className="text-lg font-semibold text-white mb-2">Personnalisez vos onglets</h2>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            Vous pouvez créer vos propres dossiers, y ranger les modules et les réordonner en les glissant.
+            Créez des dossiers avec couleurs et icônes, rangez vos modules, masquez ceux que vous n’utilisez pas.
           </p>
           <p className="text-sm text-zinc-500 mt-3">
-            Cliquez sur le bouton <span className="text-white font-medium">Organiser</span> en bas de la barre latérale.
+            Cliquez sur <span className="text-white font-medium">Organiser</span> en bas de la barre latérale.
           </p>
         </div>
         <div className="px-6 pb-6 flex flex-col gap-2">
@@ -698,12 +877,19 @@ function InnerDashboard({ profile, activeSociety }: any) {
       const saved = localStorage.getItem(LAYOUT_KEY)
       if (saved) {
         const parsed = JSON.parse(saved) as SidebarLayout
+        // Compatibilité avec anciennes versions
+        if (!parsed.hidden) parsed.hidden = []
         const allIds = ALL_MODULES.map(m => m.id)
-        const used = new Set([...parsed.folders.flatMap(f => f.items), ...parsed.unassigned])
+        const used = new Set([
+          ...parsed.folders.flatMap(f => f.items),
+          ...parsed.unassigned,
+          ...parsed.hidden
+        ])
         const missing = allIds.filter(id => !used.has(id))
         setLayout({
           folders: parsed.folders,
-          unassigned: [...parsed.unassigned, ...missing]
+          unassigned: [...parsed.unassigned, ...missing],
+          hidden: parsed.hidden
         })
       }
     } catch {}
@@ -751,6 +937,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
     }))
   }
 
+  // Effects (présence, alertes…)
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("tab")
     if (p) openTab(p)
@@ -1004,8 +1191,11 @@ function InnerDashboard({ profile, activeSociety }: any) {
                 onClick={() => toggleFolder(folder.id)}
                 className="w-full flex items-center justify-between px-2.5 mb-1 group"
               >
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 group-hover:text-zinc-300 transition">
+                <span className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1.5 transition"
+                  style={{ color: folder.collapsed ? "#71717a" : (folder.color || "#a1a1aa") }}>
+                  <span>{folder.icon || "📁"}</span>
                   {folder.name}
+                  <span className="text-[9px] font-normal opacity-60">({folder.items.length})</span>
                 </span>
                 <span className={`text-[10px] text-zinc-600 transition-transform ${folder.collapsed ? "" : "rotate-90"}`}>›</span>
               </button>
