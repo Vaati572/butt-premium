@@ -93,6 +93,16 @@ const DEFAULT_LAYOUT: SidebarLayout = {
 }
 
 /* ───────────────────────────────────────────────
+   HELPERS
+─────────────────────────────────────────────── */
+function moveInArray<T>(arr: T[], from: number, to: number): T[] {
+  const next = [...arr]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
+/* ───────────────────────────────────────────────
    AVATAR
 ─────────────────────────────────────────────── */
 function UserAvatar({ nom, url, color, size = 32 }: { nom: string; url?: string; color?: string; size?: number }) {
@@ -110,7 +120,7 @@ function UserAvatar({ nom, url, color, size = 32 }: { nom: string; url?: string;
 }
 
 /* ───────────────────────────────────────────────
-   POPUPS
+   POPUPS (inchangés)
 ─────────────────────────────────────────────── */
 function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: any) {
   const total = notifs.reduce((s: number, n: any) => s + n.count, 0)
@@ -212,7 +222,7 @@ function TachesAlertPopup({ taches, onGoToTaches, onClose }: any) {
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white">✕</button>
         </div>
-        <div className="px-4 pb-3 space-y-2 max-h-32 overflow-y-auto">
+        <div className="px-4 py-3 space-y-2 max-h-32 overflow-y-auto">
           {taches.slice(0, 4).map((t: any, i: number) => (
             <div key={i} className="flex items-center justify-between gap-2 text-sm">
               <span className="text-zinc-300 truncate">{t.titre}</span>
@@ -297,7 +307,7 @@ function AdminGate({ activeSociety, profile }: any) {
 }
 
 /* ───────────────────────────────────────────────
-   ORGANIZER MODAL
+   ORGANIZER MODAL (avec réordonnancement)
 ─────────────────────────────────────────────── */
 function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   layout: SidebarLayout
@@ -309,9 +319,7 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
   const [editingFolder, setEditingFolder] = useState<string | null>(null)
   const [editName, setEditName] = useState("")
 
-  const save = (next: SidebarLayout) => {
-    setLayout(next)
-  }
+  const save = (next: SidebarLayout) => setLayout(next)
 
   const createFolder = () => {
     const name = newFolderName.trim()
@@ -360,6 +368,34 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
     })
   }
 
+  // Réordonnancement
+  const moveUnassigned = (from: number, to: number) => {
+    if (to < 0 || to >= layout.unassigned.length) return
+    save({ ...layout, unassigned: moveInArray(layout.unassigned, from, to) })
+  }
+
+  const moveInFolder = (folderId: string, from: number, to: number) => {
+    const folder = layout.folders.find(f => f.id === folderId)
+    if (!folder || to < 0 || to >= folder.items.length) return
+    save({
+      ...layout,
+      folders: layout.folders.map(f =>
+        f.id === folderId ? { ...f, items: moveInArray(f.items, from, to) } : f
+      )
+    })
+  }
+
+  const moveFolder = (from: number, to: number) => {
+    if (to < 0 || to >= layout.folders.length) return
+    save({ ...layout, folders: moveInArray(layout.folders, from, to) })
+  }
+
+  const resetLayout = () => {
+    if (confirm("Réinitialiser toute l’organisation ?")) {
+      save(DEFAULT_LAYOUT)
+    }
+  }
+
   const getMeta = (id: string) => ALL_MODULES.find(m => m.id === id)
 
   return (
@@ -368,7 +404,7 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
           <div>
             <h2 className="text-base font-semibold text-white">Organiser la barre latérale</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Créez des dossiers et rangez vos modules</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Créez des dossiers, rangez et réordonnez vos modules</p>
           </div>
           <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg">✕</button>
         </div>
@@ -394,9 +430,23 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
           </div>
 
           {/* Dossiers existants */}
-          {layout.folders.map(folder => (
+          {layout.folders.map((folder, folderIndex) => (
             <div key={folder.id} className="border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-900/60">
+              <div className="flex items-center gap-1.5 px-3 py-2.5 bg-zinc-900/60">
+                {/* Flèches dossier */}
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => moveFolder(folderIndex, folderIndex - 1)}
+                    disabled={folderIndex === 0}
+                    className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none px-0.5"
+                  >▲</button>
+                  <button
+                    onClick={() => moveFolder(folderIndex, folderIndex + 1)}
+                    disabled={folderIndex === layout.folders.length - 1}
+                    className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none px-0.5"
+                  >▼</button>
+                </div>
+
                 {editingFolder === folder.id ? (
                   <input
                     autoFocus
@@ -412,15 +462,28 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
                 <button onClick={() => { setEditingFolder(folder.id); setEditName(folder.name) }} className="text-xs text-zinc-500 hover:text-white px-1.5">✎</button>
                 <button onClick={() => deleteFolder(folder.id)} className="text-xs text-rose-400 hover:text-rose-300 px-1.5">✕</button>
               </div>
+
               <div className="px-3 py-2 space-y-1">
                 {folder.items.length === 0 && (
                   <p className="text-xs text-zinc-600 py-1">Aucun module</p>
                 )}
-                {folder.items.map(tabId => {
+                {folder.items.map((tabId, itemIndex) => {
                   const meta = getMeta(tabId)
                   if (!meta) return null
                   return (
-                    <div key={tabId} className="flex items-center gap-2 py-1">
+                    <div key={tabId} className="flex items-center gap-1.5 py-1">
+                      <div className="flex flex-col">
+                        <button
+                          onClick={() => moveInFolder(folder.id, itemIndex, itemIndex - 1)}
+                          disabled={itemIndex === 0}
+                          className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none"
+                        >▲</button>
+                        <button
+                          onClick={() => moveInFolder(folder.id, itemIndex, itemIndex + 1)}
+                          disabled={itemIndex === folder.items.length - 1}
+                          className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none"
+                        >▼</button>
+                      </div>
                       <span className="text-sm">{meta.icon}</span>
                       <span className="flex-1 text-sm text-zinc-300">{meta.label}</span>
                       <button onClick={() => removeFromFolder(folder.id, tabId)} className="text-[11px] text-zinc-500 hover:text-rose-400">Retirer</button>
@@ -438,11 +501,23 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
               {layout.unassigned.length === 0 && (
                 <p className="text-xs text-zinc-600">Tous les modules sont rangés</p>
               )}
-              {layout.unassigned.map(tabId => {
+              {layout.unassigned.map((tabId, index) => {
                 const meta = getMeta(tabId)
                 if (!meta) return null
                 return (
-                  <div key={tabId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                  <div key={tabId} className="flex items-center gap-1.5 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => moveUnassigned(index, index - 1)}
+                        disabled={index === 0}
+                        className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none"
+                      >▲</button>
+                      <button
+                        onClick={() => moveUnassigned(index, index + 1)}
+                        disabled={index === layout.unassigned.length - 1}
+                        className="text-[10px] text-zinc-500 hover:text-white disabled:opacity-30 leading-none"
+                      >▼</button>
+                    </div>
                     <span className="text-sm">{meta.icon}</span>
                     <span className="flex-1 text-sm text-zinc-300">{meta.label}</span>
                     {layout.folders.length > 0 && (
@@ -467,7 +542,10 @@ function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-zinc-800 flex justify-end">
+        <div className="px-5 py-4 border-t border-zinc-800 flex items-center justify-between">
+          <button onClick={resetLayout} className="text-xs text-zinc-500 hover:text-rose-400 transition">
+            Réinitialiser
+          </button>
           <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
             Terminé
           </button>
@@ -490,10 +568,10 @@ function OnboardingPopup({ onDismiss, ACCENT }: { onDismiss: () => void; ACCENT:
           </div>
           <h2 className="text-lg font-semibold text-white mb-2">Personnalisez vos onglets</h2>
           <p className="text-sm text-zinc-400 leading-relaxed">
-            Vous pouvez maintenant créer vos propres dossiers et organiser les modules de la barre latérale comme vous le souhaitez.
+            Vous pouvez créer vos propres dossiers, y ranger les modules et les réordonner comme vous le souhaitez.
           </p>
           <p className="text-sm text-zinc-500 mt-3">
-            Cliquez sur le bouton <span className="text-white font-medium">Organiser</span> en bas de la barre latérale pour commencer.
+            Cliquez sur le bouton <span className="text-white font-medium">Organiser</span> en bas de la barre latérale.
           </p>
         </div>
         <div className="px-6 pb-6 flex flex-col gap-2">
@@ -545,7 +623,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
   const [globalResults, setGlobalResults] = useState<any[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
 
-  // Sidebar layout (personnalisable)
   const [layout, setLayout] = useState<SidebarLayout>(DEFAULT_LAYOUT)
   const [showOrganizer, setShowOrganizer] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -558,13 +635,11 @@ function InnerDashboard({ profile, activeSociety }: any) {
   const LAYOUT_KEY = `sidebar_layout_${profile?.id || "default"}`
   const ONBOARDING_KEY = `sidebar_onboarding_${profile?.id || "default"}`
 
-  // Charger le layout + onboarding
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAYOUT_KEY)
       if (saved) {
         const parsed = JSON.parse(saved) as SidebarLayout
-        // S'assurer que les nouveaux modules apparaissent dans unassigned
         const allIds = ALL_MODULES.map(m => m.id)
         const used = new Set([...parsed.folders.flatMap(f => f.items), ...parsed.unassigned])
         const missing = allIds.filter(id => !used.has(id))
@@ -618,7 +693,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
     }))
   }
 
-  // ── Effects (présence, alertes…) ──
+  // Effects (présence, alertes…) – inchangés
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("tab")
     if (p) openTab(p)
@@ -829,9 +904,8 @@ function InnerDashboard({ profile, activeSociety }: any) {
   return (
     <div className="h-screen flex bg-[#09090b] text-white overflow-hidden" style={{ fontSize: settings.font_size === "small" ? 13 : settings.font_size === "large" ? 15 : 14 }}>
 
-      {/* ─── SIDEBAR ─── */}
+      {/* SIDEBAR */}
       <aside className="hidden md:flex w-[232px] flex-col border-r border-zinc-800/80 bg-[#0c0c0e]">
-        {/* Logo */}
         <div className="h-14 flex items-center px-4 gap-2.5 border-b border-zinc-800/60">
           <img src="/logo.png" alt="Butt Premium" className="h-7 w-auto" />
           {activeSociety && (
@@ -839,7 +913,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
           )}
         </div>
 
-        {/* Search */}
         <div className="px-3 pt-3 pb-2" data-search>
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
@@ -869,9 +942,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
           </div>
         </div>
 
-        {/* Navigation dynamique */}
         <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-3">
-          {/* Dossiers personnalisés */}
           {layout.folders.map(folder => (
             <div key={folder.id}>
               <button
@@ -891,7 +962,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
             </div>
           ))}
 
-          {/* Modules non assignés (liste plate) */}
           {layout.unassigned.length > 0 && (
             <div className="space-y-0.5">
               {layout.folders.length > 0 && (
@@ -902,7 +972,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
           )}
         </nav>
 
-        {/* Bouton Organiser + User */}
         <div className="border-t border-zinc-800/60 p-2.5 space-y-2">
           <button
             onClick={() => setShowOrganizer(true)}
@@ -960,7 +1029,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </div>
       </aside>
 
-      {/* Mobile sidebar */}
+      {/* Mobile */}
       {sidebarOpen && (
         <>
           <div className="fixed inset-0 bg-black/60 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -992,7 +1061,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </>
       )}
 
-      {/* ─── MAIN ─── */}
+      {/* MAIN */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-12 flex items-center gap-3 px-4 border-b border-zinc-800/80 bg-[#0c0c0e] shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="md:hidden text-zinc-400 hover:text-white">
@@ -1056,7 +1125,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
         </main>
       </div>
 
-      {/* Organizer Modal */}
       {showOrganizer && (
         <OrganizerModal
           layout={layout}
@@ -1066,12 +1134,10 @@ function InnerDashboard({ profile, activeSociety }: any) {
         />
       )}
 
-      {/* Onboarding Popup (Accueil) */}
       {showOnboarding && activeTab === "accueil" && (
         <OnboardingPopup onDismiss={dismissOnboarding} ACCENT={ACCENT} />
       )}
 
-      {/* Toasts */}
       {showUnreadPopup && unreadNotifs.length > 0 && (
         <UnreadMessagesPopup notifs={unreadNotifs} ACCENT={ACCENT}
           onGoToMessages={() => { openTab("messages"); setShowUnreadPopup(false) }}
@@ -1091,9 +1157,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
   )
 }
 
-/* ───────────────────────────────────────────────
-   ROOT
-─────────────────────────────────────────────── */
 export default function DashboardPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
