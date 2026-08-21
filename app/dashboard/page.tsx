@@ -30,7 +30,7 @@ import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
-import LaunchScreen from "@/components/launch/LaunchScreen"
+
 import ProspectionModule from "@/components/prospection/ProspectionModule"
 import ProspectionModal from "@/components/formation/ProspectionModal"
 
@@ -595,7 +595,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
   if (APP_THEME === "2") return (
     <>
       <Theme2Layout activeSociety={activeSociety} profile={profile} activeTab={activeTab} openTab={openTab} openTabs={openTabs} closeTab={closeTab} visibleNav={visibleNav} renderContent={renderContent} ACCENT={ACCENT} BG={BG} BG_GRADIENT={BG_GRADIENT} baseFontSize={baseFontSize} cardRadius={cardRadius} unreadMessages={unreadMessages} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onlineUsers={onlineUsers} onlineCount={onlineCount} myStatus={myStatus} showStatusMenu={showStatusMenu} setShowStatusMenu={setShowStatusMenu} statusMenuRef={statusMenuRef} logout={logout} showConvPopup={showConvPopup} setShowConvPopup={setShowConvPopup} activeConvention={activeConvention} />
-      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}{showLaunch && <LaunchScreen profile={profile} activeSociety={activeSociety} topTabs={topTabs} onClose={closeLaunch}/>}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
     </>
   )
 
@@ -628,6 +628,12 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
             )}
           </div>
         </div>
+
+        {/* ── 5 boutons pinned toujours visibles ── */}
+        <div className="px-3 pt-3 pb-2 border-b border-zinc-800/60 shrink-0 space-y-1.5">
+          {PINNED_TABS.map(tab => renderPrimaryNavItem({ ...tab, restricted: false }))}
+        </div>
+
         <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1">
           {visibleNav.map(({ section, items }) => {
             const isActivite = section === "Activité"; const isCollapsed = collapsedSections.has(section)
@@ -694,6 +700,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
         <aside className="fixed top-0 left-0 h-full w-72 z-50 flex flex-col border-r border-zinc-800/60 md:hidden overflow-y-auto" style={{ backgroundColor: "#0d0d0d" }}>
           <button onClick={() => setSidebarOpen(false)} className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white">✕</button>
           <div className="px-4 pt-4 pb-3 border-b border-zinc-800/60"><img src="/logo.png" alt="Butt Premium" className="h-8 w-auto" /></div>
+          {/* Pinned mobile */}
+          <div className="px-3 pt-3 pb-2 border-b border-zinc-800/60 shrink-0 space-y-1.5">
+            {PINNED_TABS.map(tab => renderPrimaryNavItem({ ...tab, restricted: false }))}
+          </div>
           <nav className="flex-1 overflow-y-auto py-3 px-2.5 space-y-1">
             {visibleNav.map(({ section, items }) => {
               const isActivite = section === "Activité"; const isCollapsed = collapsedSections.has(section)
@@ -772,7 +782,7 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
           )}
         </main>
       </div>
-      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}{showLaunch && <LaunchScreen profile={profile} activeSociety={activeSociety} topTabs={topTabs} onClose={closeLaunch}/>}
+      {unreadPopup}{stockAlertPopup}{tachesAlertPopup}
     </div>
   )
 }
