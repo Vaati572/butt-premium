@@ -47,20 +47,20 @@ const PRIORITES = [
 ]
 
 const PAGE = 40
-const EMPTY_TRACK: TrackingEntry = {
+const EMPTY: TrackingEntry = {
   statut: "a_contacter", notes: "", rappel: "", contact: "", priorite: "moyenne", updatedAt: null,
 }
 
 export default function ProspectionModule({ activeSociety, profile }: { activeSociety: any; profile: any }) {
   const { settings } = useUserSettings()
   const ACCENT = settings.accent_color || "#eab308"
+  const societyId = activeSociety?.id
 
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
   const [tracking, setTracking] = useState<Record<string, TrackingEntry>>({})
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
-  const [syncMsg, setSyncMsg] = useState("")
-  const [saveMsg, setSaveMsg] = useState("")
+  const [statusMsg, setStatusMsg] = useState("") // "Enregistré" | erreur
 
   const [search, setSearch] = useState("")
   const [fRegion, setFRegion] = useState("")
@@ -85,30 +85,39 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
   const [lotMode, setLotMode] = useState<"idle" | "preview" | "picked">("idle")
   const [lotLoading, setLotLoading] = useState(false)
 
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const trackingRef = useRef(tracking)
-  trackingRef.current = tracking
+  const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  const flash = (msg: string, ms = 2000) => {
+    setStatusMsg(msg)
+    setTimeout(() => setStatusMsg(""), ms)
+  }
 
   useEffect(() => {
     fetch("/pharmacies_data.json")
       .then(r => r.json())
-      .then(setPharmacies)
+      .then((data) => {
+        // normalise les ids en string
+        setPharmacies((data || []).map((p: any) => ({ ...p, id: String(p.id) })))
+      })
       .catch(console.error)
   }, [])
 
   const loadTracking = useCallback(async () => {
-    if (!activeSociety?.id) return
+    if (!societyId) return
     setLoading(true)
     try {
       const { data, error } = await supabase
         .from("prospection_finess_state")
         .select("pharmacy_id,statut,notes,rappel,contact,priorite,updated_at")
-        .eq("society_id", activeSociety.id)
-      if (error) console.error("loadTracking", error)
+        .eq("society_id", societyId)
+      if (error) {
+        console.error("loadTracking", error)
+        flash("Erreur chargement: " + error.message, 4000)
+      }
       if (data) {
         const map: Record<string, TrackingEntry> = {}
         data.forEach((r: any) => {
-          map[r.pharmacy_id] = {
+          map[String(r.pharmacy_id)] = {
             statut: r.statut || "a_contacter",
             notes: r.notes || "",
             rappel: r.rappel || "",
@@ -122,149 +131,161 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
     } finally {
       setLoading(false)
     }
-  }, [activeSociety?.id])
+  }, [societyId])
 
   useEffect(() => {
     if (pharmacies.length > 0) loadTracking()
   }, [pharmacies.length, loadTracking])
 
-  /** Sauvegarde immédiate d’une entrée (ou de plusieurs) */
-  const persistEntries = useCallback(async (entries: Record<string, TrackingEntry>) => {
-    if (!activeSociety?.id) return false
-    const rows = Object.entries(entries).map(([pharmacy_id, v]) => ({
-      society_id: activeSociety.id,
-      pharmacy_id,
-      statut: v.statut,
-      notes: v.notes || null,
-      rappel: v.rappel || null,
-      contact: v.contact || null,
-      priorite: v.priorite || "moyenne",
-      updated_at: v.updatedAt || new Date().toISOString(),
-    }))
-    if (rows.length === 0) return true
-    const { error } = await supabase
-      .from("prospection_finess_state")
-      .upsert(rows, { onConflict: "society_id,pharmacy_id" })
-    if (error) {
-      console.error("persistEntries", error)
-      setSaveMsg("Erreur sauvegarde")
-      setTimeout(() => setSaveMsg(""), 2500)
+  /**
+   * SAUVEGARDE ROBUSTE : update si existe, sinon insert
+   * (évite les problèmes d'onConflict / contrainte unique)
+   */
+  const saveOne = useCallback(async (pharmacyId: string, entry: TrackingEntry): Promise<boolean> => {
+    if (!societyId) {
+      flash("Pas de société active", 3000)
       return false
     }
-    setSaveMsg("Enregistré")
-    setTimeout(() => setSaveMsg(""), 1500)
-    return true
-  }, [activeSociety?.id])
+    const pid = String(pharmacyId)
+    const row = {
+      society_id: societyId,
+      pharmacy_id: pid,
+      statut: entry.statut,
+      notes: entry.notes || null,
+      rappel: entry.rappel || null,
+      contact: entry.contact || null,
+      priorite: entry.priorite || "moyenne",
+      updated_at: entry.updatedAt || new Date().toISOString(),
+    }
 
-  /** Mise à jour d’une pharmacie + sauvegarde déboucée */
-  const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>) => {
+    // 1) existe déjà ?
+    const { data: existing, error: selErr } = await supabase
+      .from("prospection_finess_state")
+      .select("pharmacy_id")
+      .eq("society_id", societyId)
+      .eq("pharmacy_id", pid)
+      .maybeSingle()
+
+    if (selErr) {
+      console.error("select", selErr)
+      flash("Erreur: " + selErr.message, 4000)
+      return false
+    }
+
+    if (existing) {
+      const { error } = await supabase
+        .from("prospection_finess_state")
+        .update({
+          statut: row.statut,
+          notes: row.notes,
+          rappel: row.rappel,
+          contact: row.contact,
+          priorite: row.priorite,
+          updated_at: row.updated_at,
+        })
+        .eq("society_id", societyId)
+        .eq("pharmacy_id", pid)
+      if (error) {
+        console.error("update", error)
+        flash("Erreur save: " + error.message, 4000)
+        return false
+      }
+    } else {
+      const { error } = await supabase
+        .from("prospection_finess_state")
+        .insert(row)
+      if (error) {
+        // fallback upsert au cas où
+        const { error: upErr } = await supabase
+          .from("prospection_finess_state")
+          .upsert(row, { onConflict: "society_id,pharmacy_id" })
+        if (upErr) {
+          console.error("insert/upsert", error, upErr)
+          flash("Erreur save: " + (upErr.message || error.message), 4000)
+          return false
+        }
+      }
+    }
+    flash("✓ Enregistré")
+    return true
+  }, [societyId])
+
+  const saveMany = useCallback(async (entries: Record<string, TrackingEntry>) => {
+    let ok = 0
+    for (const [id, entry] of Object.entries(entries)) {
+      if (await saveOne(id, entry)) ok++
+    }
+    if (ok > 1) flash(`✓ ${ok} enregistrées`)
+  }, [saveOne])
+
+  /** Applique un patch en local + sauvegarde immédiate (sauf notes → debounce) */
+  const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>, debounceNotes = false) => {
+    const pid = String(id)
     setTracking(prev => {
-      const existing = prev[id] || { ...EMPTY_TRACK }
+      const base = prev[pid] || { ...EMPTY }
       const nextEntry: TrackingEntry = {
-        ...existing,
+        ...base,
         ...patch,
         updatedAt: new Date().toISOString(),
       }
-      const next = { ...prev, [id]: nextEntry }
+      const next = { ...prev, [pid]: nextEntry }
 
-      if (saveTimer.current) clearTimeout(saveTimer.current)
-      saveTimer.current = setTimeout(() => {
-        persistEntries({ [id]: nextEntry })
-      }, 400)
-
+      if (debounceNotes && "notes" in patch && Object.keys(patch).length === 1) {
+        if (notesTimers.current[pid]) clearTimeout(notesTimers.current[pid])
+        notesTimers.current[pid] = setTimeout(() => { saveOne(pid, nextEntry) }, 600)
+      } else {
+        // statut, priorité, rappel, contact → save immédiat
+        saveOne(pid, nextEntry)
+      }
       return next
     })
-  }, [persistEntries])
+  }, [saveOne])
 
-  /** Mise à jour en masse + sauvegarde immédiate */
   const bulkUpdate = useCallback(async (ids: string[], patch: Partial<TrackingEntry>) => {
-    if (ids.length === 0) return
+    if (!ids.length) return
     const now = new Date().toISOString()
     const toSave: Record<string, TrackingEntry> = {}
     setTracking(prev => {
       const next = { ...prev }
       ids.forEach(id => {
-        const existing = prev[id] || { ...EMPTY_TRACK }
-        const entry = { ...existing, ...patch, updatedAt: now }
-        next[id] = entry
-        toSave[id] = entry
+        const pid = String(id)
+        const entry = { ...(prev[pid] || EMPTY), ...patch, updatedAt: now }
+        next[pid] = entry
+        toSave[pid] = entry
       })
       return next
     })
-    await persistEntries(toSave)
-  }, [persistEntries])
+    await saveMany(toSave)
+  }, [saveMany])
 
-  /** Réinitialiser le suivi (repasser à a_contacter + clear) */
   const bulkReset = useCallback(async (ids: string[]) => {
-    if (ids.length === 0) return
+    if (!ids.length || !societyId) return
     if (!confirm(`Réinitialiser le suivi de ${ids.length} pharmacie(s) ?`)) return
-    const now = new Date().toISOString()
-    const toSave: Record<string, TrackingEntry> = {}
     setTracking(prev => {
       const next = { ...prev }
-      ids.forEach(id => {
-        const entry: TrackingEntry = { ...EMPTY_TRACK, updatedAt: now }
-        next[id] = entry
-        toSave[id] = entry
-      })
+      ids.forEach(id => { delete next[String(id)] })
       return next
     })
-    // On upsert quand même pour garder l’historique serveur cohérent
-    await persistEntries(toSave)
-    // Option : supprimer de la table
-    if (activeSociety?.id) {
-      await supabase
-        .from("prospection_finess_state")
-        .delete()
-        .eq("society_id", activeSociety.id)
-        .in("pharmacy_id", ids)
-    }
+    const { error } = await supabase
+      .from("prospection_finess_state")
+      .delete()
+      .eq("society_id", societyId)
+      .in("pharmacy_id", ids.map(String))
+    if (error) flash("Erreur: " + error.message, 4000)
+    else flash("✓ Réinitialisé")
     setChecked(new Set())
-  }, [activeSociety?.id, persistEntries])
+  }, [societyId])
 
   const syncTeam = useCallback(async () => {
-    if (!activeSociety?.id) return
+    if (!societyId) return
     setSyncing(true)
-    setSyncMsg("")
     try {
-      // Flush pending local saves first
-      if (saveTimer.current) {
-        clearTimeout(saveTimer.current)
-        await persistEntries(trackingRef.current)
-      }
-      const { data } = await supabase
-        .from("prospection_finess_state")
-        .select("pharmacy_id,statut,notes,rappel,contact,priorite,updated_at")
-        .eq("society_id", activeSociety.id)
-      if (data) {
-        setTracking(prev => {
-          const next = { ...prev }
-          data.forEach((r: any) => {
-            const local = prev[r.pharmacy_id]
-            const rd = new Date(r.updated_at || 0).getTime()
-            const ld = new Date(local?.updatedAt || 0).getTime()
-            if (!local || rd >= ld) {
-              next[r.pharmacy_id] = {
-                statut: r.statut || "a_contacter",
-                notes: r.notes || "",
-                rappel: r.rappel || "",
-                contact: r.contact || "",
-                priorite: r.priorite || "moyenne",
-                updatedAt: r.updated_at,
-              }
-            }
-          })
-          return next
-        })
-        setSyncMsg(`${data.length} synchro`)
-      }
-    } catch {
-      setSyncMsg("Erreur sync")
+      await loadTracking()
+      flash("✓ Synchronisé")
     } finally {
       setSyncing(false)
-      setTimeout(() => setSyncMsg(""), 2500)
     }
-  }, [activeSociety?.id, persistEntries])
+  }, [societyId, loadTracking])
 
   const regions = useMemo(() => [...new Set(pharmacies.map(p => p.region).filter(Boolean))].sort(), [pharmacies])
   const depts = useMemo(() => {
@@ -281,21 +302,15 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
   }, [pharmacies, fRegion, fDept])
 
   const today = new Date().toISOString().slice(0, 10)
-
-  const getTrack = useCallback((id: string): TrackingEntry =>
-    tracking[id] || EMPTY_TRACK
-  , [tracking])
+  const getTrack = useCallback((id: string) => tracking[String(id)] || EMPTY, [tracking])
 
   const stats = useMemo(() => {
     const s: Record<string, number> = {}
     STATUTS.forEach(st => { s[st.id] = 0 })
-    let aContacter = 0
     pharmacies.forEach(p => {
-      const st = tracking[p.id]?.statut || "a_contacter"
+      const st = tracking[String(p.id)]?.statut || "a_contacter"
       s[st] = (s[st] || 0) + 1
-      if (st === "a_contacter") aContacter++
     })
-    s.a_contacter = aContacter
     const rappelDue = Object.values(tracking).filter(t => t.rappel && t.rappel <= today && t.statut === "a_rappeler").length
     return { ...s, rappelDue, total: pharmacies.length }
   }, [pharmacies, tracking, today])
@@ -317,59 +332,51 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
       }
       return true
     })
-  }, [pharmacies, tracking, fRegion, fDept, fVille, fPhone, fStatut, fPriorite, fRappel, search, today, getTrack])
+  }, [pharmacies, getTrack, fRegion, fDept, fVille, fPhone, fStatut, fPriorite, fRappel, search, today])
 
   const paginated = useMemo(() => filtered.slice(0, page * PAGE), [filtered, page])
+  const checkedArr = useMemo(() => Array.from(checked), [checked])
 
   const toggleCheck = (id: string) => {
+    const pid = String(id)
     setChecked(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(pid)) next.delete(pid)
+      else next.add(pid)
       return next
     })
   }
 
   const toggleCheckAllVisible = () => {
-    const ids = paginated.map(p => p.id)
-    const allChecked = ids.every(id => checked.has(id))
+    const ids = paginated.map(p => String(p.id))
+    const all = ids.every(id => checked.has(id))
     setChecked(prev => {
       const next = new Set(prev)
-      if (allChecked) ids.forEach(id => next.delete(id))
+      if (all) ids.forEach(id => next.delete(id))
       else ids.forEach(id => next.add(id))
       return next
     })
   }
 
-  const checkedArr = useMemo(() => Array.from(checked), [checked])
-
-  // Lot
   const getLot = useCallback(() => {
     return pharmacies.filter(p => {
       if (lotDept && p.dept !== lotDept) return false
       if (lotRegion && p.region !== lotRegion) return false
       if (lotVille && !(p.ville || "").toLowerCase().includes(lotVille.toLowerCase())) return false
       if (lotPhone && !p.phone) return false
-      const t = tracking[p.id]
+      const t = tracking[String(p.id)]
       return !t || t.statut === "a_contacter"
     }).slice(0, lotQty)
   }, [pharmacies, tracking, lotDept, lotRegion, lotVille, lotPhone, lotQty])
 
-  const previewLot = () => {
-    setLotResults(getLot())
-    setLotMode("preview")
-  }
+  const previewLot = () => { setLotResults(getLot()); setLotMode("preview") }
 
   const confirmLot = async () => {
     setLotLoading(true)
     const picked = lotMode === "preview" ? lotResults : getLot()
-    if (!picked.length) {
-      setLotMode("idle")
-      setLotLoading(false)
-      return
-    }
+    if (!picked.length) { setLotMode("idle"); setLotLoading(false); return }
     const who = [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.email || ""
-    await bulkUpdate(picked.map(p => p.id), { statut: "contacte", contact: who })
+    await bulkUpdate(picked.map(p => String(p.id)), { statut: "contacte", contact: who })
     setLotResults(picked)
     setLotMode("picked")
     setLotLoading(false)
@@ -400,7 +407,6 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
 
   return (
     <div className="h-full flex bg-[#0a0a0a] overflow-hidden">
-      {/* LISTE */}
       <div className={`flex-1 flex flex-col min-w-0 ${selected ? "hidden lg:flex" : ""}`}>
         <div className="shrink-0 border-b border-zinc-800/70 px-5 py-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -408,9 +414,12 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
               <h1 className="text-xl font-bold text-white">Prospection</h1>
               <p className="text-xs text-zinc-500 mt-0.5">
                 {filtered.length.toLocaleString("fr-FR")} pharmacie{filtered.length > 1 ? "s" : ""}
-                {filtered.length !== pharmacies.length && ` / ${pharmacies.length.toLocaleString("fr-FR")}`}
-                {saveMsg && <span className="ml-2 text-emerald-400">· {saveMsg}</span>}
-                {syncMsg && <span className="ml-2 text-zinc-400">· {syncMsg}</span>}
+                {!societyId && <span className="text-rose-400 ml-2">· Pas de société !</span>}
+                {statusMsg && (
+                  <span className={`ml-2 ${statusMsg.startsWith("Erreur") || statusMsg.startsWith("Pas") ? "text-rose-400" : "text-emerald-400"}`}>
+                    · {statusMsg}
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -419,35 +428,24 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
                 {syncing ? "…" : "↻ Sync"}
               </button>
               <button onClick={exportCSV}
-                className="h-8 px-3 rounded-lg text-xs text-zinc-400 border border-zinc-800 hover:text-white hover:bg-zinc-800">
-                ↓ CSV
-              </button>
+                className="h-8 px-3 rounded-lg text-xs text-zinc-400 border border-zinc-800 hover:text-white hover:bg-zinc-800">↓ CSV</button>
               <button onClick={() => setShowLot(true)}
-                className="h-8 px-3 rounded-lg text-xs font-semibold text-black"
-                style={{ background: ACCENT }}>
-                Lot
-              </button>
+                className="h-8 px-3 rounded-lg text-xs font-semibold text-black" style={{ background: ACCENT }}>Lot</button>
             </div>
           </div>
 
-          {/* Pipeline */}
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
             {STATUTS.map(st => (
-              <button
-                key={st.id}
+              <button key={st.id}
                 onClick={() => { setFStatut(fStatut === st.id ? "all" : st.id); setPage(1) }}
-                className={`rounded-xl border p-2 text-left transition ${
-                  fStatut === st.id ? "ring-1 ring-white/20" : "border-zinc-800/80 bg-zinc-900/50 hover:border-zinc-700"
-                }`}
-                style={fStatut === st.id ? { background: st.color + "22", borderColor: st.color + "55" } : {}}
-              >
+                className={`rounded-xl border p-2 text-left transition ${fStatut === st.id ? "ring-1 ring-white/20" : "border-zinc-800/80 bg-zinc-900/50"}`}
+                style={fStatut === st.id ? { background: st.color + "22", borderColor: st.color + "55" } : {}}>
                 <p className="text-[10px] text-zinc-500 truncate">{st.label}</p>
                 <p className="text-sm font-bold" style={{ color: st.color }}>{(stats as any)[st.id] || 0}</p>
               </button>
             ))}
           </div>
 
-          {/* Filtres */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[140px] max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
@@ -476,10 +474,10 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
               {PRIORITES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
             <button onClick={() => { setFPhone(p => !p); setPage(1) }}
-              className={`h-9 px-2.5 rounded-lg text-xs border transition ${fPhone ? "text-black border-transparent" : "text-zinc-500 border-zinc-800"}`}
+              className={`h-9 px-2.5 rounded-lg text-xs border ${fPhone ? "text-black border-transparent" : "text-zinc-500 border-zinc-800"}`}
               style={fPhone ? { background: ACCENT } : {}}>📞 Tél</button>
             <button onClick={() => { setFRappel(p => !p); setPage(1) }}
-              className={`h-9 px-2.5 rounded-lg text-xs border transition ${fRappel ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "text-zinc-500 border-zinc-800"}`}>
+              className={`h-9 px-2.5 rounded-lg text-xs border ${fRappel ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "text-zinc-500 border-zinc-800"}`}>
               🔔 Rappels {stats.rappelDue > 0 ? `(${stats.rappelDue})` : ""}
             </button>
             {(search || fRegion || fDept || fVille || fStatut !== "all" || fPriorite !== "all" || fPhone || fRappel) && (
@@ -488,59 +486,29 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
           </div>
         </div>
 
-        {/* Barre actions bulk */}
         {checked.size > 0 && (
           <div className="shrink-0 px-5 py-2.5 bg-zinc-900/90 border-b border-zinc-800 flex flex-wrap items-center gap-2">
             <span className="text-xs text-zinc-400 font-medium">{checked.size} sélectionnée{checked.size > 1 ? "s" : ""}</span>
-            <select
-              defaultValue=""
-              onChange={e => {
-                if (e.target.value) {
-                  bulkUpdate(checkedArr, { statut: e.target.value as TrackingEntry["statut"] })
-                  e.target.value = ""
-                }
-              }}
-              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white"
-            >
+            <select defaultValue="" onChange={e => { if (e.target.value) { bulkUpdate(checkedArr, { statut: e.target.value as any }); e.target.value = "" } }}
+              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white">
               <option value="">Statut…</option>
               {STATUTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
-            <select
-              defaultValue=""
-              onChange={e => {
-                if (e.target.value) {
-                  bulkUpdate(checkedArr, { priorite: e.target.value })
-                  e.target.value = ""
-                }
-              }}
-              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white"
-            >
+            <select defaultValue="" onChange={e => { if (e.target.value) { bulkUpdate(checkedArr, { priorite: e.target.value }); e.target.value = "" } }}
+              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white">
               <option value="">Priorité…</option>
               {PRIORITES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
-            <button
-              onClick={() => bulkUpdate(checkedArr, {
-                statut: "contacte",
-                contact: [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.email || "",
-              })}
-              className="h-8 px-2.5 rounded-lg text-xs font-medium text-black"
-              style={{ background: ACCENT }}
-            >
-              → Contacté
-            </button>
-            <button
-              onClick={() => bulkReset(checkedArr)}
-              className="h-8 px-2.5 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10"
-            >
-              Réinitialiser
-            </button>
-            <button onClick={() => setChecked(new Set())} className="h-8 px-2 text-xs text-zinc-500 hover:text-white ml-auto">
-              Tout désélectionner
-            </button>
+            <button onClick={() => bulkUpdate(checkedArr, {
+              statut: "contacte",
+              contact: [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.email || "",
+            })} className="h-8 px-2.5 rounded-lg text-xs font-medium text-black" style={{ background: ACCENT }}>→ Contacté</button>
+            <button onClick={() => bulkReset(checkedArr)}
+              className="h-8 px-2.5 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10">Réinitialiser</button>
+            <button onClick={() => setChecked(new Set())} className="h-8 px-2 text-xs text-zinc-500 hover:text-white ml-auto">Désélectionner</button>
           </div>
         )}
 
-        {/* Liste */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-20">
@@ -551,12 +519,10 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
           ) : (
             <>
               <div className="sticky top-0 z-10 bg-[#0a0a0a]/95 backdrop-blur-sm px-5 py-1.5 border-b border-zinc-800/50 flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={paginated.length > 0 && paginated.every(p => checked.has(p.id))}
+                <input type="checkbox"
+                  checked={paginated.length > 0 && paginated.every(p => checked.has(String(p.id)))}
                   onChange={toggleCheckAllVisible}
-                  className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer"
-                />
+                  className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer" />
                 <span className="text-[11px] text-zinc-600">Tout sélectionner (page)</span>
               </div>
               <div className="divide-y divide-zinc-800/40">
@@ -564,23 +530,13 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
                   const t = getTrack(p.id)
                   const st = STATUTS.find(s => s.id === t.statut) || STATUTS[0]
                   const active = selected?.id === p.id
-                  const isChecked = checked.has(p.id)
+                  const isChecked = checked.has(String(p.id))
                   const rappelDue = t.rappel && t.rappel <= today
-
                   return (
-                    <div
-                      key={p.id}
-                      className={`flex items-center gap-2.5 px-5 py-2.5 transition ${
-                        active ? "bg-zinc-900" : isChecked ? "bg-zinc-900/40" : "hover:bg-zinc-900/50"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleCheck(p.id)}
+                    <div key={p.id} className={`flex items-center gap-2.5 px-5 py-2.5 transition ${active ? "bg-zinc-900" : isChecked ? "bg-zinc-900/40" : "hover:bg-zinc-900/50"}`}>
+                      <input type="checkbox" checked={isChecked} onChange={() => toggleCheck(p.id)}
                         onClick={e => e.stopPropagation()}
-                        className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer shrink-0"
-                      />
+                        className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer shrink-0" />
                       <button onClick={() => setSelected(p)} className="flex-1 flex items-center gap-3 text-left min-w-0">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} />
                         <div className="flex-1 min-w-0">
@@ -588,19 +544,13 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
                             <p className="text-sm font-medium text-white truncate">{p.name}</p>
                             {rappelDue && <span className="text-[10px] text-orange-400">🔔</span>}
                             {t.priorite === "urgente" && <span className="text-[10px] text-rose-400 font-bold">!</span>}
-                            {t.priorite === "haute" && <span className="text-[10px] text-amber-400">↑</span>}
                           </div>
                           <p className="text-[11px] text-zinc-500 truncate">
-                            {p.ville}{p.cp ? ` (${p.cp})` : ""} · {p.dept}
-                            {p.phone ? ` · ${p.phone}` : ""}
+                            {p.ville}{p.cp ? ` (${p.cp})` : ""} · {p.dept}{p.phone ? ` · ${p.phone}` : ""}
                           </p>
                         </div>
-                        <span
-                          className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0"
-                          style={{ color: st.color, background: st.color + "22" }}
-                        >
-                          {st.label}
-                        </span>
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0"
+                          style={{ color: st.color, background: st.color + "22" }}>{st.label}</span>
                       </button>
                     </div>
                   )
@@ -608,7 +558,6 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
               </div>
             </>
           )}
-
           {paginated.length < filtered.length && (
             <div className="p-4 text-center">
               <button onClick={() => setPage(p => p + 1)}
@@ -620,53 +569,36 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
         </div>
       </div>
 
-      {/* DETAIL */}
       {selected && selTrack && (
         <div className="w-full lg:w-[400px] xl:w-[440px] border-l border-zinc-800 bg-[#0c0c0e] flex flex-col shrink-0 h-full">
           <div className="px-5 py-4 border-b border-zinc-800 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="text-base font-bold text-white leading-snug">{selected.name}</h2>
-              <p className="text-xs text-zinc-500 mt-1">
-                {selected.address && `${selected.address}, `}{selected.cp} {selected.ville}
-              </p>
+              <p className="text-xs text-zinc-500 mt-1">{selected.address && `${selected.address}, `}{selected.cp} {selected.ville}</p>
             </div>
             <button onClick={() => setSelected(null)} className="text-zinc-500 hover:text-white shrink-0">✕</button>
           </div>
-
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             <div className="flex flex-wrap gap-2">
               {selected.phone && (
-                <a href={`tel:${selected.phone}`}
-                  className="h-9 px-3 rounded-xl text-xs font-semibold text-black flex items-center gap-1.5"
-                  style={{ background: ACCENT }}>
+                <a href={`tel:${selected.phone}`} className="h-9 px-3 rounded-xl text-xs font-semibold text-black flex items-center gap-1.5" style={{ background: ACCENT }}>
                   📞 {selected.phone}
                 </a>
               )}
               {selected.lat && selected.lon && (
-                <a href={`https://www.google.com/maps?q=${selected.lat},${selected.lon}`}
-                  target="_blank" rel="noreferrer"
-                  className="h-9 px-3 rounded-xl text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 hover:text-white flex items-center">
-                  🗺️ Maps
-                </a>
+                <a href={`https://www.google.com/maps?q=${selected.lat},${selected.lon}`} target="_blank" rel="noreferrer"
+                  className="h-9 px-3 rounded-xl text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 hover:text-white flex items-center">🗺️ Maps</a>
               )}
             </div>
-
             {selected.hours && <p className="text-xs text-zinc-500">🕐 {selected.hours}</p>}
 
             <div>
               <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Statut</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {STATUTS.map(st => (
-                  <button
-                    key={st.id}
-                    onClick={() => updateEntry(selected.id, { statut: st.id })}
-                    className={`h-9 rounded-lg text-xs font-medium border transition ${
-                      selTrack.statut === st.id ? "text-black border-transparent" : "text-zinc-400 border-zinc-800 hover:border-zinc-600"
-                    }`}
-                    style={selTrack.statut === st.id ? { background: st.color } : {}}
-                  >
-                    {st.label}
-                  </button>
+                  <button key={st.id} onClick={() => updateEntry(selected.id, { statut: st.id })}
+                    className={`h-9 rounded-lg text-xs font-medium border transition ${selTrack.statut === st.id ? "text-black border-transparent" : "text-zinc-400 border-zinc-800 hover:border-zinc-600"}`}
+                    style={selTrack.statut === st.id ? { background: st.color } : {}}>{st.label}</button>
                 ))}
               </div>
             </div>
@@ -675,15 +607,8 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
               <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Priorité</p>
               <div className="flex gap-1.5">
                 {PRIORITES.map(pr => (
-                  <button
-                    key={pr.id}
-                    onClick={() => updateEntry(selected.id, { priorite: pr.id })}
-                    className={`flex-1 h-8 rounded-lg text-xs border transition ${
-                      selTrack.priorite === pr.id
-                        ? "border-zinc-500 bg-zinc-800 text-white"
-                        : "border-zinc-800 text-zinc-500 hover:text-zinc-300"
-                    }`}
-                  >
+                  <button key={pr.id} onClick={() => updateEntry(selected.id, { priorite: pr.id })}
+                    className={`flex-1 h-8 rounded-lg text-xs border transition ${selTrack.priorite === pr.id ? "border-zinc-500 bg-zinc-800 text-white" : "border-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>
                     {pr.label}
                   </button>
                 ))}
@@ -693,58 +618,38 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] text-zinc-500 mb-1">Contacté par</p>
-                <input
-                  value={selTrack.contact}
+                <input value={selTrack.contact}
                   onChange={e => updateEntry(selected.id, { contact: e.target.value })}
-                  placeholder="Nom…"
-                  className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none"
-                />
+                  placeholder="Nom…" className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none" />
               </div>
               <div>
                 <p className="text-[11px] text-zinc-500 mb-1">Rappel le</p>
-                <input
-                  type="date"
-                  value={selTrack.rappel || ""}
+                <input type="date" value={selTrack.rappel || ""}
                   onChange={e => updateEntry(selected.id, { rappel: e.target.value })}
-                  className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none"
-                />
+                  className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none" />
               </div>
             </div>
 
             <div>
               <p className="text-[11px] text-zinc-500 mb-1">Notes</p>
-              <textarea
-                value={selTrack.notes}
-                onChange={e => updateEntry(selected.id, { notes: e.target.value })}
-                rows={5}
-                placeholder="Compte-rendu d’appel…"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed"
-              />
+              <textarea value={selTrack.notes}
+                onChange={e => updateEntry(selected.id, { notes: e.target.value }, true)}
+                rows={5} placeholder="Compte-rendu d’appel…"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed" />
             </div>
 
             {selTrack.updatedAt && (
-              <p className="text-[10px] text-zinc-600">
-                MAJ {new Date(selTrack.updatedAt).toLocaleString("fr-FR")}
-                {saveMsg && <span className="text-emerald-400 ml-2">{saveMsg}</span>}
-              </p>
+              <p className="text-[10px] text-zinc-600">MAJ {new Date(selTrack.updatedAt).toLocaleString("fr-FR")}</p>
             )}
 
-            <button
-              onClick={() => {
-                if (confirm("Réinitialiser le suivi de cette pharmacie ?")) {
-                  bulkReset([selected.id])
-                  setSelected(null)
-                }
-              }}
-              className="w-full h-9 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10"
-            >
+            <button onClick={() => { if (confirm("Réinitialiser le suivi ?")) { bulkReset([String(selected.id)]); setSelected(null) } }}
+              className="w-full h-9 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10">
               Réinitialiser le suivi
             </button>
           </div>
         </div>
       )}
 
-      {/* LOT MODAL */}
       {showLot && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
@@ -784,8 +689,7 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
                     </div>
                     <div>
                       <label className="text-[11px] text-zinc-500">Quantité</label>
-                      <input type="number" min={5} max={100} value={lotQty}
-                        onChange={e => setLotQty(Number(e.target.value) || 30)}
+                      <input type="number" min={5} max={100} value={lotQty} onChange={e => setLotQty(Number(e.target.value) || 30)}
                         className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-xs text-white" />
                     </div>
                   </div>
@@ -797,9 +701,8 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
                     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 max-h-48 overflow-y-auto space-y-1">
                       <p className="text-xs text-zinc-500 mb-2">{lotResults.length} trouvée(s)</p>
                       {lotResults.map(p => (
-                        <p key={p.id} className="text-xs text-zinc-300 truncate">{p.name} — {p.ville} {p.phone ? `· ${p.phone}` : ""}</p>
+                        <p key={p.id} className="text-xs text-zinc-300 truncate">{p.name} — {p.ville}</p>
                       ))}
-                      {lotResults.length === 0 && <p className="text-xs text-zinc-600">Aucune disponible</p>}
                     </div>
                   )}
                 </>
@@ -813,12 +716,10 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
             <div className="px-5 py-4 border-t border-zinc-800 flex gap-2">
               {lotMode === "picked" ? (
                 <button onClick={() => { setShowLot(false); setLotMode("idle"); setLotResults([]); setFStatut("contacte") }}
-                  className="flex-1 h-10 rounded-xl text-sm font-bold text-black" style={{ background: ACCENT }}>
-                  Voir les contactées
-                </button>
+                  className="flex-1 h-10 rounded-xl text-sm font-bold text-black" style={{ background: ACCENT }}>Voir les contactées</button>
               ) : (
                 <>
-                  <button onClick={previewLot} className="flex-1 h-10 rounded-xl text-sm text-zinc-300 bg-zinc-800 hover:bg-zinc-700">Prévisualiser</button>
+                  <button onClick={previewLot} className="flex-1 h-10 rounded-xl text-sm text-zinc-300 bg-zinc-800">Prévisualiser</button>
                   <button onClick={confirmLot} disabled={lotLoading || (lotMode === "preview" && lotResults.length === 0)}
                     className="flex-1 h-10 rounded-xl text-sm font-bold text-black disabled:opacity-40" style={{ background: ACCENT }}>
                     {lotLoading ? "…" : "Prendre le lot"}
