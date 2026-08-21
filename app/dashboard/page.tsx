@@ -38,6 +38,18 @@ type PresenceStatus = "online" | "busy" | "away" | "meeting" | "offline"
 interface OnlineUser { id: string; nom: string; avatar_url?: string; color?: string; status: PresenceStatus }
 interface UnreadNotif { sender_nom: string; content: string; file_name?: string | null; conv_name: string; conv_id: string; count: number }
 
+interface SidebarFolder {
+  id: string
+  name: string
+  collapsed: boolean
+  items: string[]
+}
+
+interface SidebarLayout {
+  folders: SidebarFolder[]
+  unassigned: string[]
+}
+
 const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: string }> = {
   online:  { label: "En ligne",   color: "text-emerald-400", dot: "bg-emerald-400" },
   busy:    { label: "Occupé",     color: "text-rose-400",    dot: "bg-rose-400" },
@@ -46,53 +58,39 @@ const PRESENCE: Record<PresenceStatus, { label: string; color: string; dot: stri
   offline: { label: "Hors ligne", color: "text-zinc-500",    dot: "bg-zinc-600" },
 }
 
-const PINNED_TABS = [
-  { id: "vente",            label: "Vente",         icon: "🛒" },
-  { id: "social_prospects", label: "Instagram",     icon: "📱" },
-  { id: "suivi",            label: "Suivi clients", icon: "📋" },
-  { id: "stocks",           label: "Stock",         icon: "📦" },
-  { id: "prospection",      label: "Prospection",   icon: "💊" },
+const ALL_MODULES = [
+  { id: "vente",            label: "Vente",           icon: "🛒" },
+  { id: "social_prospects", label: "Instagram",       icon: "📱" },
+  { id: "suivi",            label: "Suivi clients",   icon: "📋" },
+  { id: "stocks",           label: "Stock",           icon: "📦" },
+  { id: "prospection",      label: "Prospection",     icon: "💊" },
+  { id: "agenda",           label: "Agenda",          icon: "📅" },
+  { id: "taches",           label: "Liste des tâches",icon: "✅" },
+  { id: "pharmacies",       label: "Pharmacies",      icon: "🏥" },
+  { id: "commandes",        label: "Fournisseurs",    icon: "🏭" },
+  { id: "clients",          label: "Clients",         icon: "👤" },
+  { id: "conventions",      label: "Conventions",     icon: "🎪" },
+  { id: "stats",            label: "Statistiques",    icon: "📊" },
+  { id: "historique",       label: "Historique",      icon: "🕓" },
+  { id: "depenses",         label: "Dépenses",        icon: "💸" },
+  { id: "facturesdevis",    label: "Factures & Devis",icon: "📄" },
+  { id: "contrats",         label: "Contrats",        icon: "📑" },
+  { id: "messages",         label: "Messages",        icon: "💬" },
+  { id: "notes",            label: "Notes",           icon: "📝" },
+  { id: "documents",        label: "Documents",       icon: "📁" },
+  { id: "prospects",        label: "Prospects",       icon: "🎯" },
+  { id: "tournees",         label: "Tournées",        icon: "🛣️" },
+  { id: "map",              label: "Carte",           icon: "🗺️" },
+  { id: "ia",               label: "IA",              icon: "🤖" },
+  { id: "accueil",          label: "Accueil",         icon: "🏠" },
+  { id: "admin",            label: "Admin",           icon: "🔒" },
+  { id: "parametres",       label: "Paramètres",      icon: "⚙️" },
 ]
 
-// Les modules d'activité sont maintenant des items normaux (plus de section "Activité")
-const QUICK_ITEMS = [
-  { id: "agenda",     label: "Agenda",           icon: "📅" },
-  { id: "taches",     label: "Liste des tâches", icon: "✅" },
-  { id: "pharmacies", label: "Pharmacies",       icon: "🏥" },
-  { id: "commandes",  label: "Fournisseurs",     icon: "🏭" },
-]
-
-const ALL_NAV = [
-  { section: "Clientèle", items: [
-    { id: "clients",     label: "Clients",     icon: "👤" },
-    { id: "conventions", label: "Conventions", icon: "🎪" },
-  ]},
-  { section: "Finances", items: [
-    { id: "stats",         label: "Statistiques",     icon: "📊" },
-    { id: "historique",    label: "Historique",       icon: "🕓" },
-    { id: "depenses",      label: "Dépenses",         icon: "💸" },
-    { id: "facturesdevis", label: "Factures & Devis", icon: "📄" },
-    { id: "contrats",      label: "Contrats",         icon: "📑" },
-  ]},
-  { section: "Communication", items: [
-    { id: "messages",  label: "Messages",  icon: "💬" },
-    { id: "notes",     label: "Notes",     icon: "📝" },
-    { id: "documents", label: "Documents", icon: "📁" },
-  ]},
-  { section: "Démarchage", items: [
-    { id: "prospects", label: "Prospects", icon: "🎯" },
-    { id: "tournees",  label: "Tournées",  icon: "🛣️" },
-    { id: "map",       label: "Carte",     icon: "🗺️" },
-    { id: "ia",        label: "IA",        icon: "🤖" },
-  ]},
-  { section: "Système", items: [
-    { id: "accueil",    label: "Accueil",    icon: "🏠" },
-    { id: "admin",      label: "Admin",      icon: "🔒" },
-    { id: "parametres", label: "Paramètres", icon: "⚙️" },
-  ]},
-]
-
-const ALL_TABS_FLAT = [...PINNED_TABS, ...QUICK_ITEMS, ...ALL_NAV.flatMap(s => s.items)]
+const DEFAULT_LAYOUT: SidebarLayout = {
+  folders: [],
+  unassigned: ALL_MODULES.map(m => m.id),
+}
 
 /* ───────────────────────────────────────────────
    AVATAR
@@ -148,12 +146,8 @@ function UnreadMessagesPopup({ notifs, onGoToMessages, onClose, ACCENT }: any) {
           ))}
         </div>
         <div className="px-4 pb-4 flex gap-2">
-          <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
-            Ouvrir
-          </button>
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-zinc-800 hover:bg-zinc-700">
-            Plus tard
-          </button>
+          <button onClick={onGoToMessages} className="flex-1 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>Ouvrir</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-zinc-400 bg-zinc-800 hover:bg-zinc-700">Plus tard</button>
         </div>
         <div className="h-0.5 bg-zinc-800"><div className="h-full transition-all" style={{ width: `${progress}%`, background: ACCENT }} /></div>
       </div>
@@ -303,6 +297,226 @@ function AdminGate({ activeSociety, profile }: any) {
 }
 
 /* ───────────────────────────────────────────────
+   ORGANIZER MODAL
+─────────────────────────────────────────────── */
+function OrganizerModal({ layout, setLayout, onClose, ACCENT }: {
+  layout: SidebarLayout
+  setLayout: (l: SidebarLayout) => void
+  onClose: () => void
+  ACCENT: string
+}) {
+  const [newFolderName, setNewFolderName] = useState("")
+  const [editingFolder, setEditingFolder] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+
+  const save = (next: SidebarLayout) => {
+    setLayout(next)
+  }
+
+  const createFolder = () => {
+    const name = newFolderName.trim()
+    if (!name) return
+    const id = `folder_${Date.now()}`
+    save({
+      ...layout,
+      folders: [...layout.folders, { id, name, collapsed: false, items: [] }]
+    })
+    setNewFolderName("")
+  }
+
+  const renameFolder = (id: string) => {
+    if (!editName.trim()) return
+    save({
+      ...layout,
+      folders: layout.folders.map(f => f.id === id ? { ...f, name: editName.trim() } : f)
+    })
+    setEditingFolder(null)
+  }
+
+  const deleteFolder = (id: string) => {
+    const folder = layout.folders.find(f => f.id === id)
+    if (!folder) return
+    save({
+      folders: layout.folders.filter(f => f.id !== id),
+      unassigned: [...layout.unassigned, ...folder.items]
+    })
+  }
+
+  const addToFolder = (folderId: string, tabId: string) => {
+    save({
+      folders: layout.folders.map(f =>
+        f.id === folderId ? { ...f, items: [...f.items, tabId] } : f
+      ),
+      unassigned: layout.unassigned.filter(id => id !== tabId)
+    })
+  }
+
+  const removeFromFolder = (folderId: string, tabId: string) => {
+    save({
+      folders: layout.folders.map(f =>
+        f.id === folderId ? { ...f, items: f.items.filter(id => id !== tabId) } : f
+      ),
+      unassigned: [...layout.unassigned, tabId]
+    })
+  }
+
+  const getMeta = (id: string) => ALL_MODULES.find(m => m.id === id)
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4">
+      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div>
+            <h2 className="text-base font-semibold text-white">Organiser la barre latérale</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">Créez des dossiers et rangez vos modules</p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white text-lg">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Créer un dossier */}
+          <div className="flex gap-2">
+            <input
+              value={newFolderName}
+              onChange={e => setNewFolderName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && createFolder()}
+              placeholder="Nom du nouveau dossier…"
+              className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+            />
+            <button
+              onClick={createFolder}
+              disabled={!newFolderName.trim()}
+              className="px-4 h-9 rounded-lg text-sm font-semibold text-black disabled:opacity-40"
+              style={{ background: ACCENT }}
+            >
+              Créer
+            </button>
+          </div>
+
+          {/* Dossiers existants */}
+          {layout.folders.map(folder => (
+            <div key={folder.id} className="border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-zinc-900/60">
+                {editingFolder === folder.id ? (
+                  <input
+                    autoFocus
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && renameFolder(folder.id)}
+                    onBlur={() => renameFolder(folder.id)}
+                    className="flex-1 h-7 bg-zinc-800 border border-zinc-600 rounded px-2 text-sm text-white focus:outline-none"
+                  />
+                ) : (
+                  <span className="flex-1 text-sm font-medium text-white">{folder.name}</span>
+                )}
+                <button onClick={() => { setEditingFolder(folder.id); setEditName(folder.name) }} className="text-xs text-zinc-500 hover:text-white px-1.5">✎</button>
+                <button onClick={() => deleteFolder(folder.id)} className="text-xs text-rose-400 hover:text-rose-300 px-1.5">✕</button>
+              </div>
+              <div className="px-3 py-2 space-y-1">
+                {folder.items.length === 0 && (
+                  <p className="text-xs text-zinc-600 py-1">Aucun module</p>
+                )}
+                {folder.items.map(tabId => {
+                  const meta = getMeta(tabId)
+                  if (!meta) return null
+                  return (
+                    <div key={tabId} className="flex items-center gap-2 py-1">
+                      <span className="text-sm">{meta.icon}</span>
+                      <span className="flex-1 text-sm text-zinc-300">{meta.label}</span>
+                      <button onClick={() => removeFromFolder(folder.id, tabId)} className="text-[11px] text-zinc-500 hover:text-rose-400">Retirer</button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Modules non assignés */}
+          <div>
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Modules non rangés</p>
+            <div className="space-y-1">
+              {layout.unassigned.length === 0 && (
+                <p className="text-xs text-zinc-600">Tous les modules sont rangés</p>
+              )}
+              {layout.unassigned.map(tabId => {
+                const meta = getMeta(tabId)
+                if (!meta) return null
+                return (
+                  <div key={tabId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
+                    <span className="text-sm">{meta.icon}</span>
+                    <span className="flex-1 text-sm text-zinc-300">{meta.label}</span>
+                    {layout.folders.length > 0 && (
+                      <select
+                        onChange={e => {
+                          if (e.target.value) addToFolder(e.target.value, tabId)
+                          e.target.value = ""
+                        }}
+                        className="text-[11px] bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-zinc-400 focus:outline-none"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Ajouter à…</option>
+                        {layout.folders.map(f => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-zinc-800 flex justify-end">
+          <button onClick={onClose} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
+            Terminé
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ───────────────────────────────────────────────
+   ONBOARDING POPUP
+─────────────────────────────────────────────── */
+function OnboardingPopup({ onDismiss, ACCENT }: { onDismiss: () => void; ACCENT: string }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[150] flex items-center justify-center p-4">
+      <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-yellow-500/15 flex items-center justify-center mx-auto mb-4 text-2xl">
+            ✨
+          </div>
+          <h2 className="text-lg font-semibold text-white mb-2">Personnalisez vos onglets</h2>
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            Vous pouvez maintenant créer vos propres dossiers et organiser les modules de la barre latérale comme vous le souhaitez.
+          </p>
+          <p className="text-sm text-zinc-500 mt-3">
+            Cliquez sur le bouton <span className="text-white font-medium">Organiser</span> en bas de la barre latérale pour commencer.
+          </p>
+        </div>
+        <div className="px-6 pb-6 flex flex-col gap-2">
+          <button
+            onClick={onDismiss}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-black"
+            style={{ background: ACCENT }}
+          >
+            Compris
+          </button>
+          <button
+            onClick={onDismiss}
+            className="w-full py-2 rounded-xl text-sm text-zinc-500 hover:text-zinc-300"
+          >
+            Ne plus afficher
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ───────────────────────────────────────────────
    INNER DASHBOARD
 ─────────────────────────────────────────────── */
 function InnerDashboard({ profile, activeSociety }: any) {
@@ -330,18 +544,57 @@ function InnerDashboard({ profile, activeSociety }: any) {
   const [showGlobalSearch, setShowGlobalSearch] = useState(false)
   const [globalResults, setGlobalResults] = useState<any[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    try {
-      const s = localStorage.getItem(`nav_collapsed_${profile?.id}`)
-      return s ? new Set(JSON.parse(s)) : new Set(ALL_NAV.map(n => n.section))
-    } catch { return new Set(ALL_NAV.map(n => n.section)) }
-  })
+
+  // Sidebar layout (personnalisable)
+  const [layout, setLayout] = useState<SidebarLayout>(DEFAULT_LAYOUT)
+  const [showOrganizer, setShowOrganizer] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const heartbeatRef = useRef<any>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
 
   const ACCENT = settings.accent_color || "#eab308"
   const BG = settings.background || "#09090b"
+  const LAYOUT_KEY = `sidebar_layout_${profile?.id || "default"}`
+  const ONBOARDING_KEY = `sidebar_onboarding_${profile?.id || "default"}`
+
+  // Charger le layout + onboarding
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LAYOUT_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as SidebarLayout
+        // S'assurer que les nouveaux modules apparaissent dans unassigned
+        const allIds = ALL_MODULES.map(m => m.id)
+        const used = new Set([...parsed.folders.flatMap(f => f.items), ...parsed.unassigned])
+        const missing = allIds.filter(id => !used.has(id))
+        setLayout({
+          folders: parsed.folders,
+          unassigned: [...parsed.unassigned, ...missing]
+        })
+      }
+    } catch {}
+  }, [profile?.id])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout))
+    } catch {}
+  }, [layout])
+
+  useEffect(() => {
+    if (activeTab === "accueil") {
+      const dismissed = localStorage.getItem(ONBOARDING_KEY)
+      if (!dismissed) setShowOnboarding(true)
+    } else {
+      setShowOnboarding(false)
+    }
+  }, [activeTab, profile?.id])
+
+  const dismissOnboarding = () => {
+    localStorage.setItem(ONBOARDING_KEY, "1")
+    setShowOnboarding(false)
+  }
 
   const openTab = (id: string) => {
     setOpenTabs(prev => prev.includes(id) ? prev : [...prev, id])
@@ -358,16 +611,14 @@ function InnerDashboard({ profile, activeSociety }: any) {
     })
   }
 
-  const toggleSection = (section: string) => {
-    setCollapsed(prev => {
-      const n = new Set(prev)
-      n.has(section) ? n.delete(section) : n.add(section)
-      localStorage.setItem(`nav_collapsed_${profile?.id}`, JSON.stringify([...n]))
-      return n
-    })
+  const toggleFolder = (folderId: string) => {
+    setLayout(prev => ({
+      ...prev,
+      folders: prev.folders.map(f => f.id === folderId ? { ...f, collapsed: !f.collapsed } : f)
+    }))
   }
 
-  // ── Effects ──
+  // ── Effects (présence, alertes…) ──
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("tab")
     if (p) openTab(p)
@@ -503,9 +754,34 @@ function InnerDashboard({ profile, activeSociety }: any) {
   }
 
   const isRestricted = (settings as any).hidden_tabs?.includes(activeTab)
-  const activeMeta = ALL_TABS_FLAT.find(t => t.id === activeTab)
+  const activeMeta = ALL_MODULES.find(t => t.id === activeTab)
   const onlineCount = onlineUsers.filter(u => u.status !== "offline").length
   const myCfg = PRESENCE[myStatus]
+
+  const renderTabButton = (tabId: string) => {
+    const meta = ALL_MODULES.find(m => m.id === tabId)
+    if (!meta) return null
+    const active = activeTab === tabId
+    const restricted = (settings as any).hidden_tabs?.includes(tabId)
+    return (
+      <button
+        key={tabId}
+        onClick={() => openTab(tabId)}
+        className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] transition-colors ${
+          active ? "bg-zinc-800 text-white" : restricted ? "text-zinc-600" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
+        }`}
+      >
+        <span className="text-[15px] opacity-80">{meta.icon}</span>
+        <span className="truncate flex-1 text-left">{meta.label}</span>
+        {tabId === "messages" && unreadMessages > 0 && (
+          <span className="text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-black" style={{ background: ACCENT }}>
+            {unreadMessages > 9 ? "9+" : unreadMessages}
+          </span>
+        )}
+        {restricted && <span className="text-[10px]">🔒</span>}
+      </button>
+    )
+  }
 
   const renderContent = () => {
     if (isRestricted) return <AccessDeniedPanel tabLabel={activeMeta?.label || activeTab} />
@@ -550,9 +826,6 @@ function InnerDashboard({ profile, activeSociety }: any) {
     }
   }
 
-  /* ════════════════════════════════════════════════
-     LAYOUT
-  ════════════════════════════════════════════════ */
   return (
     <div className="h-screen flex bg-[#09090b] text-white overflow-hidden" style={{ fontSize: settings.font_size === "small" ? 13 : settings.font_size === "large" ? 15 : 14 }}>
 
@@ -596,81 +869,48 @@ function InnerDashboard({ profile, activeSociety }: any) {
           </div>
         </div>
 
-        {/* Pinned */}
-        <div className="px-2.5 space-y-0.5 mb-1">
-          {PINNED_TABS.map(tab => {
-            const active = activeTab === tab.id
-            return (
-              <button key={tab.id} onClick={() => openTab(tab.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-[13px] font-medium transition-colors ${
-                  active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
-                }`}>
-                <span className="text-base">{tab.icon}</span>
-                <span className="truncate">{tab.label}</span>
+        {/* Navigation dynamique */}
+        <nav className="flex-1 overflow-y-auto px-2.5 py-2 space-y-3">
+          {/* Dossiers personnalisés */}
+          {layout.folders.map(folder => (
+            <div key={folder.id}>
+              <button
+                onClick={() => toggleFolder(folder.id)}
+                className="w-full flex items-center justify-between px-2.5 mb-1 group"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 group-hover:text-zinc-300 transition">
+                  {folder.name}
+                </span>
+                <span className={`text-[10px] text-zinc-600 transition-transform ${folder.collapsed ? "" : "rotate-90"}`}>›</span>
               </button>
-            )
-          })}
-        </div>
+              {!folder.collapsed && (
+                <div className="space-y-0.5">
+                  {folder.items.map(id => renderTabButton(id))}
+                </div>
+              )}
+            </div>
+          ))}
 
-        {/* Quick items (ex-Activité) – même style que le reste, sans titre de section */}
-        <div className="px-2.5 space-y-0.5 mb-3">
-          {QUICK_ITEMS.map(tab => {
-            const active = activeTab === tab.id
-            return (
-              <button key={tab.id} onClick={() => openTab(tab.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] transition-colors ${
-                  active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                }`}>
-                <span className="text-[15px] opacity-80">{tab.icon}</span>
-                <span className="truncate flex-1 text-left">{tab.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Sections */}
-        <nav className="flex-1 overflow-y-auto px-2.5 space-y-4 pb-4">
-          {ALL_NAV.map(({ section, items }) => {
-            const isOpen = !collapsed.has(section)
-            return (
-              <div key={section}>
-                <button onClick={() => toggleSection(section)}
-                  className="w-full flex items-center justify-between px-2.5 mb-1 group">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 group-hover:text-zinc-400 transition">
-                    {section}
-                  </span>
-                  <span className={`text-[10px] text-zinc-600 transition-transform ${isOpen ? "rotate-90" : ""}`}>›</span>
-                </button>
-                {isOpen && (
-                  <div className="space-y-0.5">
-                    {items.map(tab => {
-                      const active = activeTab === tab.id
-                      const restricted = (settings as any).hidden_tabs?.includes(tab.id)
-                      return (
-                        <button key={tab.id} onClick={() => openTab(tab.id)}
-                          className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-[13px] transition-colors ${
-                            active ? "bg-zinc-800 text-white" : restricted ? "text-zinc-600" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
-                          }`}>
-                          <span className="text-[15px] opacity-80">{tab.icon}</span>
-                          <span className="truncate flex-1 text-left">{tab.label}</span>
-                          {tab.id === "messages" && unreadMessages > 0 && (
-                            <span className="text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-black" style={{ background: ACCENT }}>
-                              {unreadMessages > 9 ? "9+" : unreadMessages}
-                            </span>
-                          )}
-                          {restricted && <span className="text-[10px]">🔒</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          })}
+          {/* Modules non assignés (liste plate) */}
+          {layout.unassigned.length > 0 && (
+            <div className="space-y-0.5">
+              {layout.folders.length > 0 && (
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600 px-2.5 mb-1">Autres</p>
+              )}
+              {layout.unassigned.map(id => renderTabButton(id))}
+            </div>
+          )}
         </nav>
 
-        {/* Bottom user */}
-        <div className="border-t border-zinc-800/60 p-2.5">
+        {/* Bouton Organiser + User */}
+        <div className="border-t border-zinc-800/60 p-2.5 space-y-2">
+          <button
+            onClick={() => setShowOrganizer(true)}
+            className="w-full flex items-center justify-center gap-2 h-8 rounded-lg text-[12px] font-medium text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition border border-zinc-800"
+          >
+            <span>⚙️</span> Organiser
+          </button>
+
           <div className="relative" ref={statusMenuRef}>
             <button onClick={() => setShowStatusMenu(p => !p)}
               className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-800/60 transition">
@@ -703,7 +943,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
           </div>
 
           {onlineUsers.length > 0 && (
-            <div className="mt-2 px-1">
+            <div className="px-1">
               <p className="text-[10px] text-zinc-600 font-medium mb-1.5">
                 Équipe · {onlineCount > 0 ? `${onlineCount} en ligne` : "hors ligne"}
               </p>
@@ -730,13 +970,23 @@ function InnerDashboard({ profile, activeSociety }: any) {
               <button onClick={() => setSidebarOpen(false)} className="text-zinc-400">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-0.5">
-              {[...PINNED_TABS, ...QUICK_ITEMS, ...ALL_NAV.flatMap(s => s.items)].map(tab => (
-                <button key={tab.id} onClick={() => { openTab(tab.id); setSidebarOpen(false) }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-sm ${activeTab === tab.id ? "bg-zinc-800 text-white" : "text-zinc-400"}`}>
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
+              {[...layout.folders.flatMap(f => f.items), ...layout.unassigned].map(id => {
+                const meta = ALL_MODULES.find(m => m.id === id)
+                if (!meta) return null
+                return (
+                  <button key={id} onClick={() => { openTab(id); setSidebarOpen(false) }}
+                    className={`w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-sm ${activeTab === id ? "bg-zinc-800 text-white" : "text-zinc-400"}`}>
+                    <span>{meta.icon}</span>
+                    <span>{meta.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="p-3 border-t border-zinc-800">
+              <button onClick={() => { setShowOrganizer(true); setSidebarOpen(false) }}
+                className="w-full h-9 rounded-lg text-sm text-zinc-400 border border-zinc-700 hover:bg-zinc-800">
+                ⚙️ Organiser
+              </button>
             </div>
           </aside>
         </>
@@ -751,7 +1001,7 @@ function InnerDashboard({ profile, activeSociety }: any) {
 
           <div className="flex-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
             {openTabs.map(id => {
-              const meta = ALL_TABS_FLAT.find(t => t.id === id)
+              const meta = ALL_MODULES.find(t => t.id === id)
               if (!meta) return null
               const active = activeTab === id
               return (
@@ -805,6 +1055,21 @@ function InnerDashboard({ profile, activeSociety }: any) {
           )}
         </main>
       </div>
+
+      {/* Organizer Modal */}
+      {showOrganizer && (
+        <OrganizerModal
+          layout={layout}
+          setLayout={setLayout}
+          onClose={() => setShowOrganizer(false)}
+          ACCENT={ACCENT}
+        />
+      )}
+
+      {/* Onboarding Popup (Accueil) */}
+      {showOnboarding && activeTab === "accueil" && (
+        <OnboardingPopup onDismiss={dismissOnboarding} ACCENT={ACCENT} />
+      )}
 
       {/* Toasts */}
       {showUnreadPopup && unreadNotifs.length > 0 && (
