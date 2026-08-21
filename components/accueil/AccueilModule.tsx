@@ -34,6 +34,19 @@ const formatEuro = (n: number) =>
 const formatEuroDec = (n: number) =>
   isNaN(n) ? "—" : n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
 
+function timeAgo(dateStr: string | null) {
+  if (!dateStr) return "Hors ligne"
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 2) return "En ligne"
+  if (mins < 60) return `En ligne il y a ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `Il y a ${hours}h`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return "Hier"
+  return `Il y a ${days}j`
+}
+
 const DEFAULT_SETTINGS = {
   showKpis: true,
   showObjectifs: true,
@@ -47,6 +60,9 @@ const DEFAULT_SETTINGS = {
   showStock: true,
   showMemo: true,
   showRaccourcis: true,
+  showComparaison: true,
+  showClassement: true,
+  showFeed: true,
   objectifJour: 150,
   objectifMois: 3000,
   urssafRate: 0.22,
@@ -54,6 +70,14 @@ const DEFAULT_SETTINGS = {
 }
 
 type AccueilSettings = typeof DEFAULT_SETTINGS
+
+const STATUS_DOT: Record<string, string> = {
+  online: "bg-emerald-400",
+  busy: "bg-rose-400",
+  away: "bg-amber-400",
+  meeting: "bg-violet-400",
+  offline: "bg-zinc-600",
+}
 
 /* ───────────────────────────────────────────────
    COMPOSANT PRINCIPAL
@@ -68,7 +92,9 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
 
   // Data
   const [ventesToday, setVentesToday] = useState<any[]>([])
+  const [ventesYesterday, setVentesYesterday] = useState<any[]>([])
   const [ventesWeek, setVentesWeek] = useState<any[]>([])
+  const [ventesLastWeek, setVentesLastWeek] = useState<any[]>([])
   const [ventesMonth, setVentesMonth] = useState<any[]>([])
   const [ventes7j, setVentes7j] = useState<any[]>([])
   const [stock, setStock] = useState<any[]>([])
@@ -79,6 +105,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const [clients, setClients] = useState<any[]>([])
   const [prospects, setProspects] = useState<any[]>([])
   const [team, setTeam] = useState<any[]>([])
+  const [presence, setPresence] = useState<any[]>([])
   const [memo, setMemo] = useState("")
   const [editMemo, setEditMemo] = useState(false)
   const [memoInput, setMemoInput] = useState("")
@@ -86,7 +113,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const SETTINGS_KEY = `accueil_settings_${profile?.id || "default"}`
   const MEMO_KEY = `accueil_memo_${profile?.id || "default"}`
 
-  // Charger settings + memo
   useEffect(() => {
     try {
       const s = localStorage.getItem(SETTINGS_KEY)
@@ -101,20 +127,24 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)) } catch {}
   }
 
-  // ─── Chargement des données ───
   const load = useCallback(async () => {
     if (!activeSociety?.id) return
     setLoading(true)
 
     const t = today()
+    const yesterday = daysAgo(1)
     const w = startOfWeek()
+    const lastWeekStart = daysAgo(14)
+    const lastWeekEnd = daysAgo(7)
     const m = startOfMonth()
     const d7 = daysAgo(7)
 
     try {
       const [
         { data: vToday },
+        { data: vYest },
         { data: vWeek },
+        { data: vLastWeek },
         { data: vMonth },
         { data: v7 },
         { data: stk },
@@ -124,16 +154,25 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
         { data: cli },
         { data: pro },
         { data: members },
+        { data: pres },
         { count: msgCount },
       ] = await Promise.all([
         supabase.from("ventes").select("*, vente_items(*)")
           .eq("society_id", activeSociety.id)
           .gte("created_at", t + "T00:00:00")
           .order("created_at", { ascending: false }),
+        supabase.from("ventes").select("total_ttc")
+          .eq("society_id", activeSociety.id)
+          .gte("created_at", yesterday + "T00:00:00")
+          .lt("created_at", t + "T00:00:00"),
         supabase.from("ventes").select("total_ttc, created_at, profile_id")
           .eq("society_id", activeSociety.id)
           .gte("created_at", w),
-        supabase.from("ventes").select("total_ttc, total_ht, created_at, profile_id, vente_items(*)")
+        supabase.from("ventes").select("total_ttc")
+          .eq("society_id", activeSociety.id)
+          .gte("created_at", lastWeekStart)
+          .lt("created_at", lastWeekEnd),
+        supabase.from("ventes").select("total_ttc, total_ht, created_at, profile_id, vente_items(*), client_nom")
           .eq("society_id", activeSociety.id)
           .gte("created_at", m),
         supabase.from("ventes").select("total_ttc, created_at")
@@ -164,6 +203,8 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           .limit(20),
         supabase.from("profiles").select("id, nom, avatar_url, color")
           .eq("society_id", activeSociety.id),
+        supabase.from("user_presence").select("*")
+          .eq("society_id", activeSociety.id),
         supabase.from("messages").select("*", { count: "exact", head: true })
           .eq("society_id", activeSociety.id)
           .not("read_by", "cs", `{${profile.id}}`)
@@ -171,7 +212,9 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
       ])
 
       setVentesToday(vToday || [])
+      setVentesYesterday(vYest || [])
       setVentesWeek(vWeek || [])
+      setVentesLastWeek(vLastWeek || [])
       setVentesMonth(vMonth || [])
       setVentes7j(v7 || [])
       setStock(stk || [])
@@ -181,6 +224,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
       setClients(cli || [])
       setProspects(pro || [])
       setTeam(members || [])
+      setPresence(pres || [])
       setMessagesUnread(msgCount || 0)
     } catch (e) {
       console.error("Accueil load error", e)
@@ -193,11 +237,12 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
 
   // ─── Calculs ───
   const caToday = useMemo(() => ventesToday.reduce((s, v) => s + Number(v.total_ttc || 0), 0), [ventesToday])
+  const caYesterday = useMemo(() => ventesYesterday.reduce((s, v) => s + Number(v.total_ttc || 0), 0), [ventesYesterday])
   const caWeek = useMemo(() => ventesWeek.reduce((s, v) => s + Number(v.total_ttc || 0), 0), [ventesWeek])
+  const caLastWeek = useMemo(() => ventesLastWeek.reduce((s, v) => s + Number(v.total_ttc || 0), 0), [ventesLastWeek])
   const caMonth = useMemo(() => ventesMonth.reduce((s, v) => s + Number(v.total_ttc || 0), 0), [ventesMonth])
-  const netUrssaf = caToday * (1 - accueilSettings.urssafRate)
-  const netMonth = caMonth * (1 - accueilSettings.urssafRate)
 
+  const netUrssaf = caToday * (1 - accueilSettings.urssafRate)
   const margeToday = useMemo(() => {
     return ventesToday.reduce((s, v) => {
       const items = v.vente_items || []
@@ -214,6 +259,9 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const progressJour = Math.min(100, (caToday / (accueilSettings.objectifJour || 1)) * 100)
   const resteMois = Math.max(0, accueilSettings.objectifMois - caMonth)
   const resteJour = Math.max(0, accueilSettings.objectifJour - caToday)
+
+  const deltaJour = caYesterday > 0 ? ((caToday - caYesterday) / caYesterday) * 100 : (caToday > 0 ? 100 : 0)
+  const deltaSemaine = caLastWeek > 0 ? ((caWeek - caLastWeek) / caLastWeek) * 100 : (caWeek > 0 ? 100 : 0)
 
   const stockAlerts = useMemo(() =>
     stock.filter(s => s.quantite < 0 || (s.seuil_alerte > 0 && s.quantite <= s.seuil_alerte)),
@@ -245,17 +293,54 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
     return Object.values(map).sort((a, b) => b.ca - a.ca).slice(0, 6)
   }, [ventesMonth])
 
-  // CA par membre aujourd'hui
-  const teamCA = useMemo(() => {
-    const map: Record<string, number> = {}
-    ventesToday.forEach(v => {
-      const id = v.profile_id || v.created_by
-      if (id) map[id] = (map[id] || 0) + Number(v.total_ttc || 0)
+  // Équipe avec présence
+  const teamWithPresence = useMemo(() => {
+    return team.map(m => {
+      const p = presence.find((x: any) => x.user_id === m.id)
+      const mins = p ? (Date.now() - new Date(p.last_seen).getTime()) / 60000 : 999
+      const status = !p || mins > 2 ? "offline" : (p.status || "online")
+      return {
+        ...m,
+        status,
+        last_seen: p?.last_seen || null,
+        caToday: ventesToday
+          .filter(v => (v.profile_id || v.created_by) === m.id)
+          .reduce((s, v) => s + Number(v.total_ttc || 0), 0),
+        caMonth: ventesMonth
+          .filter(v => (v.profile_id || v.created_by) === m.id)
+          .reduce((s, v) => s + Number(v.total_ttc || 0), 0),
+      }
+    }).sort((a, b) => {
+      const order: any = { online: 0, meeting: 1, busy: 2, away: 3, offline: 4 }
+      return (order[a.status] ?? 5) - (order[b.status] ?? 5)
     })
-    return team
-      .map(m => ({ ...m, ca: map[m.id] || 0 }))
-      .sort((a, b) => b.ca - a.ca)
-  }, [team, ventesToday])
+  }, [team, presence, ventesToday, ventesMonth])
+
+  // Classement mensuel
+  const classementMensuel = useMemo(() => {
+    return [...teamWithPresence]
+      .sort((a, b) => b.caMonth - a.caMonth)
+      .filter(m => m.caMonth > 0 || m.id === profile?.id)
+  }, [teamWithPresence, profile?.id])
+
+  // Feed d'activité (dernières ventes)
+  const activityFeed = useMemo(() => {
+    return ventesMonth
+      .slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 12)
+      .map(v => {
+        const member = team.find(m => m.id === (v.profile_id || v.created_by))
+        return {
+          id: v.id,
+          type: "vente",
+          nom: member?.nom || "Quelqu'un",
+          client: v.client_nom || "Client",
+          montant: Number(v.total_ttc || 0),
+          date: v.created_at,
+        }
+      })
+  }, [ventesMonth, team])
 
   // Graph 7 jours
   const graph7j = useMemo(() => {
@@ -276,13 +361,14 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
   const maxGraph = Math.max(...graph7j.map(d => d.ca), 1)
 
   const prospectsChauds = useMemo(() =>
-    prospects.filter(p => ["chaud", "interesse", "rdv", "négociation", "négociation"].includes((p.statut || "").toLowerCase())).slice(0, 5),
+    prospects.filter(p =>
+      ["chaud", "interesse", "intéressé", "rdv", "négociation", "negociation"].includes((p.statut || "").toLowerCase())
+    ).slice(0, 5),
   [prospects])
 
   const todayLabel = new Date().toLocaleDateString("fr-FR", {
     weekday: "long", day: "numeric", month: "long", year: "numeric"
   })
-
   const heure = new Date().getHours()
   const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir"
 
@@ -300,7 +386,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
     <div className="flex-1 overflow-y-auto bg-[#0a0a0a]">
       <div className={`p-5 max-w-7xl mx-auto space-y-5 ${S.dense ? "space-y-4" : "space-y-6"}`}>
 
-        {/* ─── HEADER ─── */}
+        {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-white">
@@ -324,7 +410,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           </div>
         </div>
 
-        {/* ─── KPI PRINCIPAUX ─── */}
+        {/* KPI */}
         {S.showKpis && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
             {[
@@ -346,7 +432,37 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           </div>
         )}
 
-        {/* ─── OBJECTIFS ─── */}
+        {/* COMPARAISON */}
+        {S.showComparaison && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-zinc-500 mb-1">Vs hier</p>
+                <p className="text-sm text-zinc-400">
+                  Hier : <span className="text-white font-medium">{formatEuroDec(caYesterday)}</span>
+                </p>
+              </div>
+              <div className={`text-right ${deltaJour >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                <p className="text-xl font-bold">{deltaJour >= 0 ? "+" : ""}{deltaJour.toFixed(0)}%</p>
+                <p className="text-[11px]">{deltaJour >= 0 ? "en hausse" : "en baisse"}</p>
+              </div>
+            </div>
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-zinc-500 mb-1">Vs semaine dernière</p>
+                <p className="text-sm text-zinc-400">
+                  S-1 : <span className="text-white font-medium">{formatEuro(caLastWeek)}</span>
+                </p>
+              </div>
+              <div className={`text-right ${deltaSemaine >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                <p className="text-xl font-bold">{deltaSemaine >= 0 ? "+" : ""}{deltaSemaine.toFixed(0)}%</p>
+                <p className="text-[11px]">{deltaSemaine >= 0 ? "en hausse" : "en baisse"}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* OBJECTIFS */}
         {S.showObjectifs && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
@@ -376,10 +492,9 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           </div>
         )}
 
-        {/* ─── ALERTES ─── */}
+        {/* ALERTES */}
         {S.showAlertes && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Stocks critiques */}
             <div className={`rounded-xl border p-4 ${stockAlerts.length ? "bg-rose-500/5 border-rose-500/30" : "bg-zinc-900/80 border-zinc-800"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">⚠️</span>
@@ -400,7 +515,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               )}
             </div>
 
-            {/* Tâches */}
             <div className={`rounded-xl border p-4 ${tachesUrgentes.length ? "bg-amber-500/5 border-amber-500/30" : "bg-zinc-900/80 border-zinc-800"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">✅</span>
@@ -425,7 +539,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               )}
             </div>
 
-            {/* Messages */}
             <div className={`rounded-xl border p-4 ${messagesUnread > 0 ? "bg-blue-500/5 border-blue-500/30" : "bg-zinc-900/80 border-zinc-800"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">💬</span>
@@ -437,7 +550,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               <p className="text-xs text-zinc-500 mt-1">{messagesUnread > 0 ? "non lus" : "Tout est lu"}</p>
             </div>
 
-            {/* Conventions */}
             <div className={`rounded-xl border p-4 ${conventions.length ? "bg-violet-500/5 border-violet-500/30" : "bg-zinc-900/80 border-zinc-800"}`}>
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">🎪</span>
@@ -456,7 +568,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           </div>
         )}
 
-        {/* ─── GRAPHIQUE 7 JOURS + VENTES DU JOUR ─── */}
+        {/* GRAPH + VENTES DU JOUR */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
           {S.showGraph7j && (
             <div className="lg:col-span-2 bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
@@ -490,12 +602,12 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               ) : (
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {ventesToday.slice(0, 8).map((v, i) => {
-                    const heure = v.created_at ? new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""
+                    const heureV = v.created_at ? new Date(v.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : ""
                     return (
                       <div key={i} className="flex items-center justify-between gap-3 py-1.5 px-2 rounded-lg hover:bg-zinc-800/50">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm text-white truncate">{v.client_nom || "Client"}</p>
-                          <p className="text-[11px] text-zinc-500">{heure}</p>
+                          <p className="text-[11px] text-zinc-500">{heureV}</p>
                         </div>
                         <p className="text-sm font-semibold" style={{ color: ACCENT }}>{formatEuroDec(Number(v.total_ttc))}</p>
                       </div>
@@ -507,7 +619,99 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           )}
         </div>
 
-        {/* ─── TOP PRODUITS + ÉQUIPE + AGENDA ─── */}
+        {/* ÉQUIPE + CLASSEMENT + FEED */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* ÉQUIPE avec présence */}
+          {S.showEquipe && (
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
+              <p className="text-sm font-semibold text-white mb-3">Équipe</p>
+              <div className="space-y-2.5 max-h-64 overflow-y-auto">
+                {teamWithPresence.map(m => (
+                  <div key={m.id} className="flex items-center gap-2.5">
+                    <div className="relative shrink-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-black overflow-hidden"
+                        style={{ background: m.avatar_url ? undefined : (m.color || ACCENT) }}
+                      >
+                        {m.avatar_url
+                          ? <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />
+                          : (m.nom || "?")[0]
+                        }
+                      </div>
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-zinc-900 ${STATUS_DOT[m.status] || STATUS_DOT.offline}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-white truncate font-medium">{m.nom}</p>
+                      <p className="text-[11px] text-zinc-500">{timeAgo(m.last_seen)}</p>
+                    </div>
+                    <p className="text-xs font-medium" style={{ color: m.caToday > 0 ? ACCENT : "#52525b" }}>
+                      {formatEuro(m.caToday)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CLASSEMENT MENSUEL */}
+          {S.showClassement && (
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
+              <p className="text-sm font-semibold text-white mb-3">Classement du mois</p>
+              {classementMensuel.length === 0 ? (
+                <p className="text-xs text-zinc-600">Pas encore de ventes</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {classementMensuel.slice(0, 8).map((m, i) => (
+                    <div key={m.id} className="flex items-center gap-2.5">
+                      <span className={`text-xs font-bold w-5 ${i === 0 ? "text-yellow-400" : i === 1 ? "text-zinc-300" : i === 2 ? "text-amber-600" : "text-zinc-600"}`}>
+                        {i + 1}
+                      </span>
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-black shrink-0"
+                        style={{ background: m.color || ACCENT }}
+                      >
+                        {(m.nom || "?")[0]}
+                      </div>
+                      <p className="flex-1 text-sm text-zinc-300 truncate">{m.nom}</p>
+                      <p className="text-sm font-semibold" style={{ color: ACCENT }}>{formatEuro(m.caMonth)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FEED D'ACTIVITÉ */}
+          {S.showFeed && (
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
+              <p className="text-sm font-semibold text-white mb-3">Activité récente</p>
+              {activityFeed.length === 0 ? (
+                <p className="text-xs text-zinc-600">Aucune activité</p>
+              ) : (
+                <div className="space-y-2.5 max-h-64 overflow-y-auto">
+                  {activityFeed.map((a, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: ACCENT }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-zinc-300">
+                          <span className="font-medium text-white">{a.nom}</span>
+                          {" "}a vendu{" "}
+                          <span className="font-medium" style={{ color: ACCENT }}>{formatEuroDec(a.montant)}</span>
+                          {" "}à {a.client}
+                        </p>
+                        <p className="text-[10px] text-zinc-600 mt-0.5">
+                          {new Date(a.date).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* TOP PRODUITS + AGENDA + STOCK */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {S.showTopProduits && (
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
@@ -523,32 +727,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
                         <p className="text-sm text-zinc-200 truncate">{p.nom}</p>
                         <p className="text-[11px] text-zinc-500">{p.qty} u. · {formatEuro(p.ca)}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {S.showEquipe && (
-            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
-              <p className="text-sm font-semibold text-white mb-3">Équipe · CA du jour</p>
-              {teamCA.length === 0 ? (
-                <p className="text-xs text-zinc-600">Aucun membre</p>
-              ) : (
-                <div className="space-y-2">
-                  {teamCA.slice(0, 6).map((m, i) => (
-                    <div key={m.id} className="flex items-center gap-2">
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-black shrink-0"
-                        style={{ background: m.color || ACCENT }}
-                      >
-                        {(m.nom || "?")[0]}
-                      </div>
-                      <p className="flex-1 text-sm text-zinc-300 truncate">{m.nom}</p>
-                      <p className="text-sm font-medium" style={{ color: m.ca > 0 ? ACCENT : "#52525b" }}>
-                        {formatEuro(m.ca)}
-                      </p>
                     </div>
                   ))}
                 </div>
@@ -575,45 +753,6 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               )}
             </div>
           )}
-        </div>
-
-        {/* ─── CLIENTS + PROSPECTS + STOCK ─── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {S.showClientsProspects && (
-            <>
-              <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
-                <p className="text-sm font-semibold text-white mb-3">Nouveaux clients (mois)</p>
-                {clients.length === 0 ? (
-                  <p className="text-xs text-zinc-600">Aucun nouveau client</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {clients.slice(0, 5).map((c, i) => (
-                      <p key={i} className="text-sm text-zinc-300 truncate">
-                        {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
-                      </p>
-                    ))}
-                    {clients.length > 5 && <p className="text-[11px] text-zinc-500">+{clients.length - 5} autres</p>}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
-                <p className="text-sm font-semibold text-white mb-3">Prospects à suivre</p>
-                {prospectsChauds.length === 0 ? (
-                  <p className="text-xs text-zinc-600">Aucun prospect chaud</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {prospectsChauds.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-zinc-300 truncate">{p.entreprise || p.nom}</p>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 shrink-0">{p.statut}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
 
           {S.showStock && (
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
@@ -638,18 +777,49 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           )}
         </div>
 
-        {/* ─── MÉMO + RACCOURCIS ─── */}
+        {/* CLIENTS + PROSPECTS */}
+        {S.showClientsProspects && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
+              <p className="text-sm font-semibold text-white mb-3">Nouveaux clients (mois)</p>
+              {clients.length === 0 ? (
+                <p className="text-xs text-zinc-600">Aucun nouveau client</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {clients.slice(0, 5).map((c, i) => (
+                    <p key={i} className="text-sm text-zinc-300 truncate">
+                      {c.prenom ? `${c.prenom} ${c.nom}` : c.nom}
+                    </p>
+                  ))}
+                  {clients.length > 5 && <p className="text-[11px] text-zinc-500">+{clients.length - 5} autres</p>}
+                </div>
+              )}
+            </div>
+            <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
+              <p className="text-sm font-semibold text-white mb-3">Prospects à suivre</p>
+              {prospectsChauds.length === 0 ? (
+                <p className="text-xs text-zinc-600">Aucun prospect chaud</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {prospectsChauds.map((p, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-zinc-300 truncate">{p.entreprise || p.nom}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 shrink-0">{p.statut}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* MÉMO + RACCOURCIS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {S.showMemo && (
             <div className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold text-white">Mémo personnel</p>
-                <button
-                  onClick={() => { setEditMemo(true); setMemoInput(memo) }}
-                  className="text-xs text-zinc-500 hover:text-white"
-                >
-                  ✎
-                </button>
+                <button onClick={() => { setEditMemo(true); setMemoInput(memo) }} className="text-xs text-zinc-500 hover:text-white">✎</button>
               </div>
               {editMemo ? (
                 <div className="space-y-2">
@@ -672,9 +842,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
                     >
                       Sauver
                     </button>
-                    <button onClick={() => setEditMemo(false)} className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 bg-zinc-800">
-                      Annuler
-                    </button>
+                    <button onClick={() => setEditMemo(false)} className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 bg-zinc-800">Annuler</button>
                   </div>
                 </div>
               ) : memo ? (
@@ -697,10 +865,7 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
                   { id: "prospection", icon: "💊", label: "Prospection" },
                   { id: "messages", icon: "💬", label: "Messages" },
                 ].map(r => (
-                  <div
-                    key={r.id}
-                    className="flex flex-col items-center gap-1 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition cursor-default"
-                  >
+                  <div key={r.id} className="flex flex-col items-center gap-1 py-2.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition cursor-default">
                     <span className="text-lg">{r.icon}</span>
                     <span className="text-[11px] text-zinc-400">{r.label}</span>
                   </div>
@@ -710,13 +875,12 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
           )}
         </div>
 
-        {/* Petit footer */}
         <p className="text-center text-[11px] text-zinc-700 pb-4">
           Dernière mise à jour · {new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
 
-      {/* ─── MODAL PERSONNALISATION ─── */}
+      {/* MODAL PERSONNALISATION */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
           <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl">
@@ -724,19 +888,21 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
               <h2 className="text-base font-semibold text-white">Personnaliser mon Accueil</h2>
               <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-white">✕</button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
               <div>
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Blocs visibles</p>
                 <div className="space-y-1.5">
                   {[
                     { key: "showKpis", label: "KPI principaux" },
+                    { key: "showComparaison", label: "Comparaison vs hier / semaine" },
                     { key: "showObjectifs", label: "Objectifs" },
                     { key: "showAlertes", label: "Alertes" },
                     { key: "showGraph7j", label: "Graphique 7 jours" },
                     { key: "showVentesJour", label: "Ventes du jour" },
+                    { key: "showEquipe", label: "Équipe (présence)" },
+                    { key: "showClassement", label: "Classement mensuel" },
+                    { key: "showFeed", label: "Feed d'activité" },
                     { key: "showTopProduits", label: "Top produits" },
-                    { key: "showEquipe", label: "Équipe" },
                     { key: "showAgenda", label: "Agenda" },
                     { key: "showClientsProspects", label: "Clients & Prospects" },
                     { key: "showStock", label: "Stock global" },
@@ -755,66 +921,39 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
                   ))}
                 </div>
               </div>
-
               <div>
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Objectifs</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] text-zinc-500">Objectif jour (€)</label>
-                    <input
-                      type="number"
-                      value={S.objectifJour}
-                      onChange={e => saveSettings({ ...S, objectifJour: Number(e.target.value) || 0 })}
-                      className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white focus:outline-none"
-                    />
+                    <input type="number" value={S.objectifJour} onChange={e => saveSettings({ ...S, objectifJour: Number(e.target.value) || 0 })}
+                      className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white focus:outline-none" />
                   </div>
                   <div>
                     <label className="text-[11px] text-zinc-500">Objectif mois (€)</label>
-                    <input
-                      type="number"
-                      value={S.objectifMois}
-                      onChange={e => saveSettings({ ...S, objectifMois: Number(e.target.value) || 0 })}
-                      className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white focus:outline-none"
-                    />
+                    <input type="number" value={S.objectifMois} onChange={e => saveSettings({ ...S, objectifMois: Number(e.target.value) || 0 })}
+                      className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white focus:outline-none" />
                   </div>
                 </div>
               </div>
-
               <div>
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">URSSAF</p>
                 <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="0.4"
-                    step="0.01"
-                    value={S.urssafRate}
-                    onChange={e => saveSettings({ ...S, urssafRate: Number(e.target.value) })}
-                    className="flex-1"
-                  />
+                  <input type="range" min="0" max="0.4" step="0.01" value={S.urssafRate}
+                    onChange={e => saveSettings({ ...S, urssafRate: Number(e.target.value) })} className="flex-1" />
                   <span className="text-sm text-white w-12">{(S.urssafRate * 100).toFixed(0)}%</span>
                 </div>
               </div>
-
               <div>
                 <label className="flex items-center justify-between py-1.5 cursor-pointer">
                   <span className="text-sm text-zinc-300">Mode dense</span>
-                  <input
-                    type="checkbox"
-                    checked={S.dense}
-                    onChange={e => saveSettings({ ...S, dense: e.target.checked })}
-                    className="w-4 h-4 rounded accent-yellow-500"
-                  />
+                  <input type="checkbox" checked={S.dense} onChange={e => saveSettings({ ...S, dense: e.target.checked })}
+                    className="w-4 h-4 rounded accent-yellow-500" />
                 </label>
               </div>
             </div>
-
             <div className="px-5 py-4 border-t border-zinc-800 flex justify-end">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="px-5 py-2 rounded-xl text-sm font-semibold text-black"
-                style={{ background: ACCENT }}
-              >
+              <button onClick={() => setShowSettings(false)} className="px-5 py-2 rounded-xl text-sm font-semibold text-black" style={{ background: ACCENT }}>
                 Terminé
               </button>
             </div>
@@ -823,4 +962,4 @@ export default function AccueilModule({ activeSociety, profile }: Props) {
       )}
     </div>
   )
-}
+} 
