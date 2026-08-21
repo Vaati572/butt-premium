@@ -1,5 +1,6 @@
 const TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+export const dynamic = "force-dynamic"
 export async function refreshAccessToken(refreshToken: string) {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
