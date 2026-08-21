@@ -30,7 +30,6 @@ import FacturesDevisModule from "@/components/facturesdevis/FacturesDevisModule"
 import SuiviModule from "@/components/suivi/SuiviModule"
 import SocialProspectsModule from "@/components/social/SocialProspectsModule"
 import TachesModule from "@/components/taches/TachesModule"
-import MailModule from "@/components/mail/MailModule"
 import LaunchScreen from "@/components/launch/LaunchScreen"
 import ProspectionModule from "@/components/prospection/ProspectionModule"
 import FormationModal from "@/components/formation/FormationModal"
@@ -85,7 +84,6 @@ const ALL_NAV = [
   ]},
   { section: "Communication", items: [
     { id: "messages",     label: "Messages",     icon: "💬" },
-    { id: "mail",         label: "Boîte mail",   icon: "📧" },
     { id: "notes",        label: "Notes",        icon: "📝" },
     { id: "documents",    label: "Documents",    icon: "📁" },
   ]},
@@ -362,7 +360,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     if (tabId) openTab(tabId)
   }
 
-  // Ouvre l'onglet indiqué dans l'URL au chargement (ex: retour du flux OAuth Gmail ?tab=mail)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const tab = params.get("tab")
@@ -585,12 +582,10 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
     if (!q.trim() || q.length < 2) { setGlobalResults([]); return }
     setSearchLoading(true)
     const [{ data: clients }, { data: prospects }, { data: ventes }] = await Promise.all([
-      supabase.from("clients").select("id,nom,telephone,email").eq("society_id", activeSociety.id).ilike("nom", `%${q}%`).limit(5),
       supabase.from("prospects").select("id,nom,entreprise,ville").eq("society_id", activeSociety.id).ilike("nom", `%${q}%`).limit(5),
       supabase.from("ventes").select("id,client_nom,total_ttc,created_at").eq("society_id", activeSociety.id).ilike("client_nom", `%${q}%`).order("created_at", { ascending: false }).limit(5),
     ])
     const results: any[] = [
-      ...(clients||[]).map((c:any) => ({ type:"client",   icon:"👤", label:c.nom,                  sub:c.telephone||c.email||"", tab:"clients"    })),
       ...(prospects||[]).map((p:any) => ({ type:"prospect", icon:"🎯", label:p.entreprise||p.nom, sub:p.ville||"",              tab:"prospects"  })),
       ...(ventes||[]).map((v:any) => ({ type:"vente",     icon:"🛒", label:v.client_nom||"Vente", sub:Number(v.total_ttc).toFixed(2)+"€", tab:"historique" })),
     ]
@@ -649,7 +644,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "parametres":        return <ParametresModule      activeSociety={activeSociety} profile={profile} />
       case "agenda":            return <AgendaModule          activeSociety={activeSociety} profile={profile} />
       case "taches":            return <TachesModule          activeSociety={activeSociety} profile={profile} />
-      case "mail":              return <MailModule            activeSociety={activeSociety} profile={profile} />
       case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       default: return (
@@ -1115,13 +1109,10 @@ export default function DashboardPage() {
         if (!session) { router.push("/"); return }
         let { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
         if (!prof) {
-          const nom = session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Utilisateur"
           const { data: soc } = await supabase.from("societies").select("id").limit(1).single()
-          await supabase.from("profiles").insert({ id: session.user.id, nom, email: session.user.email, society_id: soc?.id, role: "vendeur", is_active: true })
           const { data: newProf } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
           prof = newProf
         }
-        if (prof) setProfile({ ...prof, email: session.user.email })
         // Stocker les infos pour l'iframe prospection (même origine)
         try {
           localStorage.setItem("bp_access_token", session.access_token)
