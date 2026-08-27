@@ -41,9 +41,9 @@ interface Action {
 /* ── CONFIG STATUTS ── */
 const STATUTS: Record<string, { label: string; emoji: string; color: string; bg: string; border: string; next?: string }> = {
   a_contacter:     { label: "À contacter",       emoji: "🎯", color: "text-zinc-300",   bg: "bg-zinc-800",        border: "border-zinc-700",        next: "contacte"       },
-  contacte:        { label: "Contacté",           emoji: "📤", color: "text-blue-400",   bg: "bg-blue-500/10",     border: "border-blue-500/30",     next: "sans_reponse"   },
-  sans_reponse:    { label: "Sans réponse",       emoji: "🔇", color: "text-zinc-400",   bg: "bg-zinc-700/30",    border: "border-zinc-600/50",     next: "en_attente"     },
-  en_attente:      { label: "En attente",         emoji: "⏳", color: "text-yellow-400", bg: "bg-yellow-500/10",   border: "border-yellow-500/30",   next: "repondu"        },
+  contacte:        { label: "Contacté",           emoji: "📤", color: "text-blue-400",   bg: "bg-blue-500/10",     border: "border-blue-500/30",     next: "en_attente"     },
+  en_attente:      { label: "En attente",         emoji: "⏳", color: "text-yellow-400", bg: "bg-yellow-500/10",   border: "border-yellow-500/30",   next: "sans_reponse"   },
+  sans_reponse:    { label: "Sans réponse",       emoji: "🔇", color: "text-zinc-400",   bg: "bg-zinc-700/30",    border: "border-zinc-600/50",     next: "repondu"        },
   repondu:         { label: "A répondu",          emoji: "💬", color: "text-cyan-400",   bg: "bg-cyan-500/10",     border: "border-cyan-500/30",     next: "visio_planifiee"},
   visio_planifiee: { label: "Visio planifiée",    emoji: "📅", color: "text-purple-400", bg: "bg-purple-500/10",   border: "border-purple-500/30",   next: "visio_faite"    },
   visio_faite:     { label: "Visio faite",        emoji: "🎥", color: "text-indigo-400", bg: "bg-indigo-500/10",   border: "border-indigo-500/30",   next: "proposition"    },
@@ -53,7 +53,7 @@ const STATUTS: Record<string, { label: string; emoji: string; color: string; bg:
   perdu:           { label: "Perdu",              emoji: "❌", color: "text-red-400",    bg: "bg-red-500/10",      border: "border-red-500/30"                               },
 }
 
-const STATUTS_ORDER = ["a_contacter","contacte","sans_reponse","en_attente","repondu","visio_planifiee","visio_faite","proposition","negociation","gagne","perdu"]
+const STATUTS_ORDER = ["a_contacter","contacte","en_attente","sans_reponse","repondu","visio_planifiee","visio_faite","proposition","negociation","gagne","perdu"]
 
 /* ── CONFIG RÉSEAUX ── */
 const RESEAUX: Record<string, { label: string; emoji: string; color: string }> = {
