@@ -16,7 +16,7 @@ export default function EspacePersoModule({ activeSociety, profile, targetIds, t
   const [targetProfile, setTargetProfile] = useState<any>(null)
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
-  const isOwner = targetIds.includes(profile?.id)
+  const isOwner = true // Tout le monde peut modifier
 
   // Data
   const [notes, setNotes]           = useState("")
@@ -50,7 +50,10 @@ export default function EspacePersoModule({ activeSociety, profile, targetIds, t
     const tp = profiles?.[0] || null
     setTargetProfile(tp || null)
 
-    if (!tp) { setLoading(false); return }
+    if (!tp) {
+      // Profil non trouvé mais on continue quand même avec un profil minimal
+      setTargetProfile({ id: targetIds[0], nom: targetNom, prenom: "", avatar_url: null, color: null })
+    }
 
     // Charger l'espace perso
     let { data: espace } = await supabase.from("espace_perso")
