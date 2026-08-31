@@ -43,13 +43,11 @@ export default function EspacePersoModule({ activeSociety, profile, targetEmail,
     if (!sid) return
     setLoading(true)
 
-    // Trouver le profil cible par email
-    const { data: profiles } = await supabase.from("profiles")
+    // Trouver le profil cible par email (sans filtre société car l'email est unique)
+    const { data: tp } = await supabase.from("profiles")
       .select("id,nom,prenom,avatar_url,color,email")
-      .eq("society_id", sid)
-    const tp = profiles?.find(p =>
-      p.email?.toLowerCase() === targetEmail.toLowerCase()
-    )
+      .eq("email", targetEmail)
+      .single()
     setTargetProfile(tp || null)
 
     if (!tp) { setLoading(false); return }
