@@ -47,21 +47,17 @@ export default function EspacePersoModule({ activeSociety, profile, targetIds, t
     const { data: profiles } = await supabase.from("profiles")
       .select("id,nom,prenom,avatar_url,color,email")
       .in("id", targetIds)
-    const tp = profiles?.[0] || null
-    setTargetProfile(tp || null)
-
-    if (!tp) {
-      // Profil non trouvé mais on continue quand même avec un profil minimal
-      setTargetProfile({ id: targetIds[0], nom: targetNom, prenom: "", avatar_url: null, color: null })
-    }
+    const profileId = tp?.id || targetIds[0]
+    const profileNom = tp?.prenom || tp?.nom || targetNom
+    setTargetProfile(tp || { id: targetIds[0], nom: targetNom, prenom: "", avatar_url: null, color: null })
 
     // Charger l'espace perso
     let { data: espace } = await supabase.from("espace_perso")
-      .select("*").eq("profile_id", tp.id).eq("society_id", sid).single()
+      .select("*").eq("profile_id", profileId).eq("society_id", sid).single()
 
     if (!espace) {
       const { data: created } = await supabase.from("espace_perso").insert({
-        society_id: sid, profile_id: tp.id, profile_nom: tp.prenom || tp.nom,
+        society_id: sid, profile_id: profileId, profile_nom: profileNom,
         notes: "", todo: [], objectifs: [], postits: []
       }).select().single()
       espace = created
@@ -82,7 +78,7 @@ export default function EspacePersoModule({ activeSociety, profile, targetIds, t
     const { data: ventesData } = await supabase.from("ventes")
       .select("total_ttc,created_at")
       .eq("society_id", sid)
-      .eq("created_by", tp.id)
+      .eq("created_by", profileId)
       .gte("created_at", monthStart)
     const ventes = ventesData || []
     const ventesJour = ventes.filter(v => v.created_at?.slice(0,10) === today)
