@@ -33,7 +33,6 @@ import TachesModule from "@/components/taches/TachesModule"
 
 import ProspectionModule from "@/components/prospection/ProspectionModule"
 import WidgetIAModule from "@/components/ia/WidgetIAModule"
-import EspacePersoModule from "@/components/perso/EspacePersoModule"
 import ProspectionModal from "@/components/formation/ProspectionModal"
 
 const ADMIN_PIN = "18072209"
@@ -84,10 +83,6 @@ const ALL_NAV = [
     { id: "map",        label: "Map",        icon: "🗺️" },
     { id: "ia",         label: "IA",         icon: "🤖" },
     { id: "studio_ia",  label: "Studio IA",  icon: "✨" },
-  ]},
-  { section: "Perso", items: [
-    { id: "espace_yohan", label: "Yohan", icon: "⭐" },
-    { id: "espace_rudy",  label: "Rudy",  icon: "⭐" },
   ]},
   { section: "Système", items: [
     { id: "accueil",    label: "Accueil",    icon: "🏠" },
@@ -544,8 +539,6 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       case "studio_ia":         return <WidgetIAModule        activeSociety={activeSociety} profile={profile} />
-      case "espace_yohan":      return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetIds={["6b9f47c6-ec0f-4607-a820-622e005b1683","e85eef70-cb61-4058-a1a6-00c3cd88ec32"]} targetNom="Yohan" />
-      case "espace_rudy":       return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetIds={["091c9458-d535-4e3c-93fd-c63f032dcd1d"]} targetNom="Rudy" />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
