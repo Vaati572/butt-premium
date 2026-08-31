@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
 import { Save, Plus, Trash2, Check, Lock, Edit3, Target, StickyNote, ListTodo, TrendingUp, Star } from "lucide-react"
 
-interface Props { activeSociety: any; profile: any; targetEmail: string; targetNom: string }
+interface Props { activeSociety: any; profile: any; targetIds: string[]; targetNom: string }
 
 interface TodoItem { id: string; text: string; done: boolean; created_at: string }
 interface Objectif { id: string; label: string; valeur_cible: number; valeur_actuelle: number; unite: string; color: string }
@@ -12,11 +12,11 @@ interface PostIt  { id: string; text: string; color: string; created_at: string 
 
 const POSTIT_COLORS = ["#fef08a","#bbf7d0","#bfdbfe","#fecaca","#e9d5ff","#fed7aa"]
 
-export default function EspacePersoModule({ activeSociety, profile, targetEmail, targetNom }: Props) {
+export default function EspacePersoModule({ activeSociety, profile, targetIds, targetNom }: Props) {
   const [targetProfile, setTargetProfile] = useState<any>(null)
   const [loading, setLoading]       = useState(true)
   const [saving, setSaving]         = useState(false)
-  const isOwner = profile?.email?.toLowerCase() === targetEmail.toLowerCase()
+  const isOwner = targetIds.includes(profile?.id)
 
   // Data
   const [notes, setNotes]           = useState("")
@@ -43,11 +43,11 @@ export default function EspacePersoModule({ activeSociety, profile, targetEmail,
     if (!sid) return
     setLoading(true)
 
-    // Trouver le profil cible par email (sans filtre société car l'email est unique)
-    const { data: tp } = await supabase.from("profiles")
+    // Trouver le profil cible par UUID
+    const { data: profiles } = await supabase.from("profiles")
       .select("id,nom,prenom,avatar_url,color,email")
-      .eq("email", targetEmail)
-      .single()
+      .in("id", targetIds)
+    const tp = profiles?.[0] || null
     setTargetProfile(tp || null)
 
     if (!tp) { setLoading(false); return }
