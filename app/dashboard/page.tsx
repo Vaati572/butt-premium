@@ -544,8 +544,8 @@ function InnerDashboard({ profile, activeSociety }: { profile: any; activeSociet
       case "admin":             return <AdminGate             activeSociety={activeSociety} profile={profile} />
       case "ia":                return <IAModule              activeSociety={activeSociety} profile={profile} />
       case "studio_ia":         return <WidgetIAModule        activeSociety={activeSociety} profile={profile} />
-      case "espace_yohan":      return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetNom="Yohan" />
-      case "espace_rudy":       return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetNom="Rudy" />
+      case "espace_yohan":      return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetEmail="yohan.droesch57@gmail.com" targetNom="Yohan" />
+      case "espace_rudy":       return <EspacePersoModule     activeSociety={activeSociety} profile={profile} targetEmail="butt.tattoo18@gmail.com"    targetNom="Rudy" />
       default: return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
