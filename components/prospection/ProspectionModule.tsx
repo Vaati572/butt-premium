@@ -2,731 +2,675 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
-import { useUserSettings } from "@/lib/UserSettingsContext"
+import { Search, RefreshCw, Download, CheckCircle, Target, X } from "lucide-react"
 
 interface Pharmacy {
-  id: string
-  name: string
-  address: string
-  ville: string
-  cp: string
-  dept: string
-  deptNom: string
-  region: string
-  phone: string | null
-  hours: string | null
-  rating: number | null
-  lat: number | null
-  lon: number | null
+  id: string; name: string; address: string; ville: string; cp: string
+  dept: string; deptNom: string; region: string; phone: string | null
+  hours: string | null; rating: number | null; lat: number | null; lon: number | null
 }
-
 interface TrackingEntry {
-  statut: "a_contacter" | "contacte" | "interesse" | "client" | "a_rappeler" | "injoignable" | "refuse"
-  notes: string
-  rappel: string
-  contact: string
-  priorite: string
-  updatedAt: string | null
+  statut: "a_contacter"|"contacte"|"interesse"|"client"|"a_rappeler"|"injoignable"|"refuse"
+  notes: string; rappel: string; contact: string; priorite: string; updatedAt: string|null
 }
+type PanelMode = "none"|"lot"|"cochees"
 
-const STATUTS = [
-  { id: "a_contacter", label: "À contacter", color: "#71717a" },
-  { id: "contacte",    label: "Contacté",    color: "#3b82f6" },
-  { id: "a_rappeler",  label: "À rappeler",  color: "#f97316" },
-  { id: "interesse",   label: "Intéressé",   color: "#22c55e" },
-  { id: "client",      label: "Client",      color: "#eab308" },
-  { id: "injoignable", label: "Injoignable", color: "#a1a1aa" },
-  { id: "refuse",      label: "Refusé",      color: "#ef4444" },
-] as const
-
-const PRIORITES = [
-  { id: "basse",   label: "Basse" },
-  { id: "moyenne", label: "Moyenne" },
-  { id: "haute",   label: "Haute" },
-  { id: "urgente", label: "Urgente" },
-]
-
-const PAGE = 40
-const EMPTY: TrackingEntry = {
-  statut: "a_contacter", notes: "", rappel: "", contact: "", priorite: "moyenne", updatedAt: null,
+const SL: Record<string,string> = {
+  a_contacter:"À contacter", contacte:"Contacté", interesse:"Intéressé",
+  client:"Client", a_rappeler:"À rappeler", injoignable:"Injoignable", refuse:"Refusé"
 }
+const SC: Record<string,string> = {
+  a_contacter:"#52525b", contacte:"#3b82f6", interesse:"#22c55e",
+  client:"#eab308", a_rappeler:"#f97316", injoignable:"#71717a", refuse:"#ef4444"
+}
+const PAGE = 50
 
 export default function ProspectionModule({ activeSociety, profile }: { activeSociety: any; profile: any }) {
-  const { settings } = useUserSettings()
-  const ACCENT = settings.accent_color || "#eab308"
-  const societyId = activeSociety?.id
-
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
-  const [tracking, setTracking] = useState<Record<string, TrackingEntry>>({})
-  const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [statusMsg, setStatusMsg] = useState("") // "Enregistré" | erreur
-
-  const [search, setSearch] = useState("")
-  const [fRegion, setFRegion] = useState("")
-  const [fDept, setFDept] = useState("")
-  const [fVille, setFVille] = useState("")
-  const [fStatut, setFStatut] = useState("all")
-  const [fPriorite, setFPriorite] = useState("all")
-  const [fPhone, setFPhone] = useState(false)
-  const [fRappel, setFRappel] = useState(false)
-  const [page, setPage] = useState(1)
-
-  const [selected, setSelected] = useState<Pharmacy | null>(null)
-  const [checked, setChecked] = useState<Set<string>>(new Set())
-  const [showLot, setShowLot] = useState(false)
-
-  const [lotDept, setLotDept] = useState("")
-  const [lotRegion, setLotRegion] = useState("")
-  const [lotVille, setLotVille] = useState("")
-  const [lotPhone, setLotPhone] = useState(true)
-  const [lotQty, setLotQty] = useState(30)
+  const [tracking, setTracking]     = useState<Record<string, TrackingEntry>>({})
+  const [loading, setLoading]       = useState(true)
+  const [syncing, setSyncing]       = useState(false)
+  const [syncMsg, setSyncMsg]       = useState("")
+  const [search, setSearch]         = useState("")
+  const [fDept, setFDept]           = useState("")
+  const [fRegion, setFRegion]       = useState("")
+  const [fStatut, setFStatut]       = useState("all")
+  const [fPhone, setFPhone]         = useState(false)
+  const [sortBy, setSortBy]         = useState<"nom"|"rappel"|"contact_date"|"statut">("nom")
+  const [sortDir, setSortDir]       = useState<"asc"|"desc">("asc")
+  const [fDateFrom, setFDateFrom]   = useState("")
+  const [fDateTo, setFDateTo]       = useState("")
+  const [fRappelOnly, setFRappelOnly] = useState(false)
+  const [page, setPage]             = useState(1)
+  const [panel, setPanel]           = useState<PanelMode>("none")
+  const [vcFilter, setVcFilter]     = useState("all")
+  const [vcSearch, setVcSearch]     = useState("")
+  const [lotDept, setLotDept]       = useState("")
+  const [lotRegion, setLotRegion]   = useState("")
+  const [lotVille, setLotVille]     = useState("")
+  const [lotNom, setLotNom]         = useState("")
+  const [lotPhone, setLotPhone]     = useState(true)
+  const [lotQty, setLotQty]         = useState(30)
   const [lotResults, setLotResults] = useState<Pharmacy[]>([])
-  const [lotMode, setLotMode] = useState<"idle" | "preview" | "picked">("idle")
+  const [lotMode, setLotMode]       = useState<"idle"|"preview"|"picked">("idle")
   const [lotLoading, setLotLoading] = useState(false)
+  const saveTimer = useRef<NodeJS.Timeout | null>(null)
 
-  const notesTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-
-  const flash = (msg: string, ms = 2000) => {
-    setStatusMsg(msg)
-    setTimeout(() => setStatusMsg(""), ms)
-  }
-
+  // Chargement données pharmacies
   useEffect(() => {
-    fetch("/pharmacies_data.json")
-      .then(r => r.json())
-      .then((data) => {
-        // normalise les ids en string
-        setPharmacies((data || []).map((p: any) => ({ ...p, id: String(p.id) })))
-      })
-      .catch(console.error)
+    fetch("/pharmacies_data.json").then(r => r.json()).then(setPharmacies).catch(console.error)
   }, [])
 
+  // Chargement tracking Supabase
   const loadTracking = useCallback(async () => {
-    if (!societyId) return
+    if (!activeSociety?.id) return
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("prospection_finess_state")
         .select("pharmacy_id,statut,notes,rappel,contact,priorite,updated_at")
-        .eq("society_id", societyId)
-      if (error) {
-        console.error("loadTracking", error)
-        flash("Erreur chargement: " + error.message, 4000)
-      }
+        .eq("society_id", activeSociety.id)
       if (data) {
         const map: Record<string, TrackingEntry> = {}
         data.forEach((r: any) => {
-          map[String(r.pharmacy_id)] = {
-            statut: r.statut || "a_contacter",
-            notes: r.notes || "",
-            rappel: r.rappel || "",
-            contact: r.contact || "",
-            priorite: r.priorite || "moyenne",
-            updatedAt: r.updated_at,
-          }
+          map[r.pharmacy_id] = { statut: r.statut, notes: r.notes||"", rappel: r.rappel||"", contact: r.contact||"", priorite: r.priorite||"moyenne", updatedAt: r.updated_at }
         })
         setTracking(map)
       }
-    } finally {
-      setLoading(false)
-    }
-  }, [societyId])
+    } finally { setLoading(false) }
+  }, [activeSociety])
 
-  useEffect(() => {
-    if (pharmacies.length > 0) loadTracking()
-  }, [pharmacies.length, loadTracking])
+  useEffect(() => { if (pharmacies.length > 0) loadTracking() }, [pharmacies])
 
-  /**
-   * SAUVEGARDE ROBUSTE : update si existe, sinon insert
-   * (évite les problèmes d'onConflict / contrainte unique)
-   */
-  const saveOne = useCallback(async (pharmacyId: string, entry: TrackingEntry): Promise<boolean> => {
-    if (!societyId) {
-      flash("Pas de société active", 3000)
-      return false
-    }
-    const pid = String(pharmacyId)
-    const row = {
-      society_id: societyId,
-      pharmacy_id: pid,
-      statut: entry.statut,
-      notes: entry.notes || null,
-      rappel: entry.rappel || null,
-      contact: entry.contact || null,
-      priorite: entry.priorite || "moyenne",
-      updated_at: entry.updatedAt || new Date().toISOString(),
-    }
+  // Sauvegarde Supabase
+  const saveTracking = useCallback(async (t: Record<string, TrackingEntry>) => {
+    if (!activeSociety?.id) return
+    const rows = Object.entries(t)
+      .filter(([, v]) => v.statut !== "a_contacter" || v.notes || v.rappel || v.contact)
+      .map(([pharmacy_id, v]) => ({
+        society_id: activeSociety.id, pharmacy_id,
+        statut: v.statut, notes: v.notes||null, rappel: v.rappel||null,
+        contact: v.contact||null, priorite: v.priorite||"moyenne",
+        updated_at: v.updatedAt || new Date().toISOString()
+      }))
+    if (rows.length > 0)
+      await supabase.from("prospection_finess_state").upsert(rows, { onConflict: "society_id,pharmacy_id" })
+  }, [activeSociety])
 
-    // 1) existe déjà ?
-    const { data: existing, error: selErr } = await supabase
-      .from("prospection_finess_state")
-      .select("pharmacy_id")
-      .eq("society_id", societyId)
-      .eq("pharmacy_id", pid)
-      .maybeSingle()
-
-    if (selErr) {
-      console.error("select", selErr)
-      flash("Erreur: " + selErr.message, 4000)
-      return false
-    }
-
-    if (existing) {
-      const { error } = await supabase
-        .from("prospection_finess_state")
-        .update({
-          statut: row.statut,
-          notes: row.notes,
-          rappel: row.rappel,
-          contact: row.contact,
-          priorite: row.priorite,
-          updated_at: row.updated_at,
-        })
-        .eq("society_id", societyId)
-        .eq("pharmacy_id", pid)
-      if (error) {
-        console.error("update", error)
-        flash("Erreur save: " + error.message, 4000)
-        return false
-      }
-    } else {
-      const { error } = await supabase
-        .from("prospection_finess_state")
-        .insert(row)
-      if (error) {
-        // fallback upsert au cas où
-        const { error: upErr } = await supabase
-          .from("prospection_finess_state")
-          .upsert(row, { onConflict: "society_id,pharmacy_id" })
-        if (upErr) {
-          console.error("insert/upsert", error, upErr)
-          flash("Erreur save: " + (upErr.message || error.message), 4000)
-          return false
-        }
-      }
-    }
-    flash("✓ Enregistré")
-    return true
-  }, [societyId])
-
-  const saveMany = useCallback(async (entries: Record<string, TrackingEntry>) => {
-    let ok = 0
-    for (const [id, entry] of Object.entries(entries)) {
-      if (await saveOne(id, entry)) ok++
-    }
-    if (ok > 1) flash(`✓ ${ok} enregistrées`)
-  }, [saveOne])
-
-  /** Applique un patch en local + sauvegarde immédiate (sauf notes → debounce) */
-  const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>, debounceNotes = false) => {
-    const pid = String(id)
+  const updateEntry = useCallback((id: string, patch: Partial<TrackingEntry>) => {
     setTracking(prev => {
-      const base = prev[pid] || { ...EMPTY }
-      const nextEntry: TrackingEntry = {
-        ...base,
-        ...patch,
+      const existing = prev[id]
+      const base: TrackingEntry = {
+        statut: existing?.statut || "a_contacter",
+        notes: existing?.notes || "",
+        rappel: existing?.rappel || "",
+        contact: existing?.contact || "",
+        priorite: existing?.priorite || "moyenne",
         updatedAt: new Date().toISOString(),
       }
-      const next = { ...prev, [pid]: nextEntry }
-
-      if (debounceNotes && "notes" in patch && Object.keys(patch).length === 1) {
-        if (notesTimers.current[pid]) clearTimeout(notesTimers.current[pid])
-        notesTimers.current[pid] = setTimeout(() => { saveOne(pid, nextEntry) }, 600)
-      } else {
-        // statut, priorité, rappel, contact → save immédiat
-        saveOne(pid, nextEntry)
-      }
+      const next: Record<string, TrackingEntry> = { ...prev, [id]: { ...base, ...patch, updatedAt: new Date().toISOString() } }
+      if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+      saveTimer.current = setTimeout(() => saveTracking(next), 800)
       return next
     })
-  }, [saveOne])
+  }, [saveTracking])
 
-  const bulkUpdate = useCallback(async (ids: string[], patch: Partial<TrackingEntry>) => {
-    if (!ids.length) return
-    const now = new Date().toISOString()
-    const toSave: Record<string, TrackingEntry> = {}
-    setTracking(prev => {
-      const next = { ...prev }
-      ids.forEach(id => {
-        const pid = String(id)
-        const entry = { ...(prev[pid] || EMPTY), ...patch, updatedAt: now }
-        next[pid] = entry
-        toSave[pid] = entry
-      })
-      return next
-    })
-    await saveMany(toSave)
-  }, [saveMany])
-
-  const bulkReset = useCallback(async (ids: string[]) => {
-    if (!ids.length || !societyId) return
-    if (!confirm(`Réinitialiser le suivi de ${ids.length} pharmacie(s) ?`)) return
-    setTracking(prev => {
-      const next = { ...prev }
-      ids.forEach(id => { delete next[String(id)] })
-      return next
-    })
-    const { error } = await supabase
-      .from("prospection_finess_state")
-      .delete()
-      .eq("society_id", societyId)
-      .in("pharmacy_id", ids.map(String))
-    if (error) flash("Erreur: " + error.message, 4000)
-    else flash("✓ Réinitialisé")
-    setChecked(new Set())
-  }, [societyId])
-
+  // Sync équipe
   const syncTeam = useCallback(async () => {
-    if (!societyId) return
-    setSyncing(true)
+    if (!activeSociety?.id) return
+    setSyncing(true); setSyncMsg("")
     try {
-      await loadTracking()
-      flash("✓ Synchronisé")
-    } finally {
-      setSyncing(false)
-    }
-  }, [societyId, loadTracking])
+      const { data } = await supabase.from("prospection_finess_state")
+        .select("pharmacy_id,statut,notes,rappel,contact,priorite,updated_at")
+        .eq("society_id", activeSociety.id)
+      if (data) {
+        setTracking(prev => {
+          const next = { ...prev }
+          data.forEach((r: any) => {
+            const local = prev[r.pharmacy_id]
+            const rd = new Date(r.updated_at||0).getTime()
+            const ld = new Date(local?.updatedAt||0).getTime()
+            if (!local || rd > ld) next[r.pharmacy_id] = { statut:r.statut, notes:r.notes||"", rappel:r.rappel||"", contact:r.contact||"", priorite:r.priorite||"moyenne", updatedAt:r.updated_at }
+          })
+          return next
+        })
+        setSyncMsg(`✅ ${data.length} synchronisées`)
+      }
+    } catch { setSyncMsg("❌ Erreur") }
+    finally { setSyncing(false); setTimeout(() => setSyncMsg(""), 3000) }
+  }, [activeSociety])
 
+  // Données dérivées
+  const depts   = useMemo(() => [...new Set(pharmacies.map(p => p.dept).filter(Boolean))].sort(), [pharmacies])
   const regions = useMemo(() => [...new Set(pharmacies.map(p => p.region).filter(Boolean))].sort(), [pharmacies])
-  const depts = useMemo(() => {
-    const list = pharmacies.filter(p => !fRegion || p.region === fRegion)
-    return [...new Set(list.map(p => p.dept).filter(Boolean))].sort()
-  }, [pharmacies, fRegion])
-  const villes = useMemo(() => {
-    const list = pharmacies.filter(p => {
-      if (fRegion && p.region !== fRegion) return false
-      if (fDept && p.dept !== fDept) return false
-      return true
-    })
-    return [...new Set(list.map(p => p.ville).filter(Boolean))].sort().slice(0, 400)
-  }, [pharmacies, fRegion, fDept])
-
-  const today = new Date().toISOString().slice(0, 10)
-  const getTrack = useCallback((id: string) => tracking[String(id)] || EMPTY, [tracking])
 
   const stats = useMemo(() => {
-    const s: Record<string, number> = {}
-    STATUTS.forEach(st => { s[st.id] = 0 })
-    pharmacies.forEach(p => {
-      const st = tracking[String(p.id)]?.statut || "a_contacter"
-      s[st] = (s[st] || 0) + 1
-    })
-    const rappelDue = Object.values(tracking).filter(t => t.rappel && t.rappel <= today && t.statut === "a_rappeler").length
-    return { ...s, rappelDue, total: pharmacies.length }
-  }, [pharmacies, tracking, today])
+    const s: Record<string,number> = { total: pharmacies.length }
+    Object.keys(SL).forEach(k => { s[k] = 0 })
+    Object.values(tracking).forEach(t => { s[t.statut] = (s[t.statut]||0) + 1 })
+    return s
+  }, [pharmacies, tracking])
+
+  const todayStr = new Date().toISOString().slice(0,10)
 
   const filtered = useMemo(() => {
-    return pharmacies.filter(p => {
-      const t = getTrack(p.id)
-      if (fRegion && p.region !== fRegion) return false
+    let list = pharmacies.filter(p => {
       if (fDept && p.dept !== fDept) return false
-      if (fVille && p.ville !== fVille) return false
+      if (fRegion && p.region !== fRegion) return false
       if (fPhone && !p.phone) return false
-      if (fStatut !== "all" && t.statut !== fStatut) return false
-      if (fPriorite !== "all" && t.priorite !== fPriorite) return false
-      if (fRappel && !(t.rappel && t.rappel <= today)) return false
+      if (fStatut !== "all" && (tracking[p.id]?.statut || "a_contacter") !== fStatut) return false
       if (search) {
         const q = search.toLowerCase()
-        const blob = `${p.name} ${p.ville} ${p.cp} ${p.phone || ""} ${t.notes || ""} ${t.contact || ""}`.toLowerCase()
-        if (!blob.includes(q)) return false
+        if (!((p.name+p.ville+(p.phone||"")).toLowerCase().includes(q))) return false
       }
+      // Filtre date de rappel
+      const rappel = tracking[p.id]?.rappel || ""
+      if (fRappelOnly && !rappel) return false
+      if (fDateFrom && rappel && rappel < fDateFrom) return false
+      if (fDateTo   && rappel && rappel > fDateTo)   return false
       return true
     })
-  }, [pharmacies, getTrack, fRegion, fDept, fVille, fPhone, fStatut, fPriorite, fRappel, search, today])
+
+    // Tri
+    list = [...list].sort((a, b) => {
+      let va = "", vb = ""
+      if (sortBy === "nom") { va = a.name; vb = b.name }
+      else if (sortBy === "statut") { va = tracking[a.id]?.statut||"a_contacter"; vb = tracking[b.id]?.statut||"a_contacter" }
+      else if (sortBy === "rappel") { va = tracking[a.id]?.rappel||"9999"; vb = tracking[b.id]?.rappel||"9999" }
+      else if (sortBy === "contact_date") { va = tracking[a.id]?.updatedAt||""; vb = tracking[b.id]?.updatedAt||"" }
+      const cmp = va.localeCompare(vb)
+      return sortDir === "asc" ? cmp : -cmp
+    })
+
+    return list
+  }, [pharmacies, tracking, fDept, fRegion, fPhone, fStatut, search, fDateFrom, fDateTo, fRappelOnly, sortBy, sortDir])
 
   const paginated = useMemo(() => filtered.slice(0, page * PAGE), [filtered, page])
-  const checkedArr = useMemo(() => Array.from(checked), [checked])
 
-  const toggleCheck = (id: string) => {
-    const pid = String(id)
-    setChecked(prev => {
-      const next = new Set(prev)
-      if (next.has(pid)) next.delete(pid)
-      else next.add(pid)
-      return next
-    })
-  }
+  const cochees = useMemo(() => pharmacies.filter(p => {
+    const t = tracking[p.id]
+    if (!t || t.statut === "a_contacter") return false
+    if (vcFilter !== "all" && t.statut !== vcFilter) return false
+    if (vcSearch) {
+      const q = vcSearch.toLowerCase()
+      if (!((p.name+p.ville+(p.phone||"")+(t.notes||"")+(t.contact||"")).toLowerCase().includes(q))) return false
+    }
+    return true
+  }), [pharmacies, tracking, vcFilter, vcSearch])
 
-  const toggleCheckAllVisible = () => {
-    const ids = paginated.map(p => String(p.id))
-    const all = ids.every(id => checked.has(id))
-    setChecked(prev => {
-      const next = new Set(prev)
-      if (all) ids.forEach(id => next.delete(id))
-      else ids.forEach(id => next.add(id))
-      return next
-    })
-  }
+  // Lot de 30
+  const getLot = useCallback(() => pharmacies.filter(p => {
+    if (lotDept && p.dept !== lotDept) return false
+    if (lotRegion && p.region !== lotRegion) return false
+    if (lotVille && !(p.ville||"").toLowerCase().includes(lotVille.toLowerCase())) return false
+    if (lotNom && !p.name.toLowerCase().includes(lotNom.toLowerCase())) return false
+    if (lotPhone && !p.phone) return false
+    const t = tracking[p.id]; return !t || t.statut === "a_contacter"
+  }).slice(0, lotQty), [pharmacies, tracking, lotDept, lotRegion, lotVille, lotNom, lotPhone, lotQty])
 
-  const getLot = useCallback(() => {
-    return pharmacies.filter(p => {
-      if (lotDept && p.dept !== lotDept) return false
-      if (lotRegion && p.region !== lotRegion) return false
-      if (lotVille && !(p.ville || "").toLowerCase().includes(lotVille.toLowerCase())) return false
-      if (lotPhone && !p.phone) return false
-      const t = tracking[String(p.id)]
-      return !t || t.statut === "a_contacter"
-    }).slice(0, lotQty)
-  }, [pharmacies, tracking, lotDept, lotRegion, lotVille, lotPhone, lotQty])
-
-  const previewLot = () => { setLotResults(getLot()); setLotMode("preview") }
-
-  const confirmLot = async () => {
+  const doPick = useCallback(async () => {
     setLotLoading(true)
-    const picked = lotMode === "preview" ? lotResults : getLot()
-    if (!picked.length) { setLotMode("idle"); setLotLoading(false); return }
+    const picked = getLot()
+    if (!picked.length) { setLotResults([]); setLotMode("idle"); setLotLoading(false); return }
+    const now = new Date().toISOString()
     const who = [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.email || ""
-    await bulkUpdate(picked.map(p => String(p.id)), { statut: "contacte", contact: who })
-    setLotResults(picked)
-    setLotMode("picked")
-    setLotLoading(false)
-  }
-
-  const exportCSV = () => {
-    const rows = [["Nom", "Ville", "CP", "Dept", "Région", "Téléphone", "Statut", "Priorité", "Contact", "Rappel", "Notes"]]
-    filtered.forEach(p => {
-      const t = getTrack(p.id)
-      rows.push([
-        p.name, p.ville, p.cp, p.dept, p.region, p.phone || "",
-        STATUTS.find(s => s.id === t.statut)?.label || t.statut,
-        t.priorite, t.contact, t.rappel, (t.notes || "").replace(/\n/g, " "),
-      ])
+    setTracking(prev => {
+      const next = { ...prev }
+      picked.forEach(p => {
+        const ex = prev[p.id]
+        next[p.id] = {
+          statut: "contacte" as const,
+          notes: ex?.notes || "",
+          rappel: ex?.rappel || "",
+          contact: ex?.contact || who,
+          priorite: ex?.priorite || "moyenne",
+          updatedAt: now,
+        }
+      })
+      saveTracking(next)
+      return next
     })
-    const a = document.createElement("a")
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(rows.map(r => r.join(";")).join("\n"))
-    a.download = `prospection_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-  }
+    setLotResults(picked); setLotMode("picked"); setLotLoading(false)
+  }, [getLot, profile, saveTracking])
 
-  const resetFilters = () => {
-    setSearch(""); setFRegion(""); setFDept(""); setFVille("")
-    setFStatut("all"); setFPriorite("all"); setFPhone(false); setFRappel(false); setPage(1)
-  }
+  // Export
+  const doExport = useCallback(() => {
+    const now = new Date().toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long", year:"numeric" })
+    const rows = cochees.map((p, i) => {
+      const t = tracking[p.id] || {} as TrackingEntry
+      const s = t.statut || "contacte"; const col = SC[s]||"#888"
+      const ds = t.updatedAt ? new Date(t.updatedAt).toLocaleDateString("fr-FR") : ""
+      return `<tr>
+        <td style="text-align:center;color:#888">${i+1}</td>
+        <td><strong>${p.name}</strong><br><span style="color:#999;font-size:10px">${p.address||""}</span></td>
+        <td>${p.ville||""}<br><span style="color:#999;font-size:10px">${p.dept||""} – ${p.deptNom||""}</span></td>
+        <td style="color:#0284c7">${p.phone||""}</td>
+        <td><span style="padding:2px 8px;border-radius:99px;background:${col}22;color:${col};border:1px solid ${col}55;font-size:10px;font-weight:700">${SL[s]||s}</span></td>
+        <td style="color:#666;font-size:11px">${t.contact||""}</td>
+        <td style="color:#666;font-size:11px">${ds}</td>
+        <td style="color:#666;font-size:11px">${t.notes||""}</td>
+        <td style="min-width:120px">&nbsp;</td><td style="min-width:120px">&nbsp;</td>
+      </tr>`
+    }).join("")
+    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Prospection</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;padding:16px}
+h1{font-size:18px;font-weight:700;margin-bottom:8px;color:#0284c7}
+table{width:100%;border-collapse:collapse}
+th{background:#0284c7;color:#fff;padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase}
+td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+tr:nth-child(even) td{background:#f9fafb}
+.btn{background:#0284c7;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px}
+@media print{.btn{display:none}@page{margin:12mm;size:A4 landscape}}</style>
+</head><body>
+<button class="btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
+<h1>💊 Prospection Pharmacies — Butt Premium</h1>
+<p style="color:#666;font-size:11px;margin-bottom:12px">${now} — ${cochees.length} pharmacies</p>
+<table><thead><tr><th>#</th><th>Pharmacie</th><th>Ville/Dépt</th><th>Téléphone</th><th>Statut</th><th>Contacté par</th><th>Date</th><th>Notes</th><th>Compte-rendu</th><th>Suite</th></tr></thead>
+<tbody>${rows}</tbody></table></body></html>`
+    const w = window.open("","_blank","width=1100,height=700,scrollbars=yes")
+    if (w) { w.document.write(html); w.document.close() }
+  }, [cochees, tracking])
 
-  const selTrack = selected ? getTrack(selected.id) : null
+  const inp = "bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-zinc-600 w-full"
+  const sel = "bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
 
   return (
-    <div className="h-full flex bg-[#0a0a0a] overflow-hidden">
-      <div className={`flex-1 flex flex-col min-w-0 ${selected ? "hidden lg:flex" : ""}`}>
-        <div className="shrink-0 border-b border-zinc-800/70 px-5 py-4 space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h1 className="text-xl font-bold text-white">Prospection</h1>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {filtered.length.toLocaleString("fr-FR")} pharmacie{filtered.length > 1 ? "s" : ""}
-                {!societyId && <span className="text-rose-400 ml-2">· Pas de société !</span>}
-                {statusMsg && (
-                  <span className={`ml-2 ${statusMsg.startsWith("Erreur") || statusMsg.startsWith("Pas") ? "text-rose-400" : "text-emerald-400"}`}>
-                    · {statusMsg}
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={syncTeam} disabled={syncing}
-                className="h-8 px-3 rounded-lg text-xs text-zinc-400 border border-zinc-800 hover:text-white hover:bg-zinc-800 disabled:opacity-40">
-                {syncing ? "…" : "↻ Sync"}
-              </button>
-              <button onClick={exportCSV}
-                className="h-8 px-3 rounded-lg text-xs text-zinc-400 border border-zinc-800 hover:text-white hover:bg-zinc-800">↓ CSV</button>
-              <button onClick={() => setShowLot(true)}
-                className="h-8 px-3 rounded-lg text-xs font-semibold text-black" style={{ background: ACCENT }}>Lot</button>
-            </div>
-          </div>
+    <div className="flex-1 overflow-hidden flex flex-col bg-[#0a0a0a]">
 
-          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-            {STATUTS.map(st => (
-              <button key={st.id}
-                onClick={() => { setFStatut(fStatut === st.id ? "all" : st.id); setPage(1) }}
-                className={`rounded-xl border p-2 text-left transition ${fStatut === st.id ? "ring-1 ring-white/20" : "border-zinc-800/80 bg-zinc-900/50"}`}
-                style={fStatut === st.id ? { background: st.color + "22", borderColor: st.color + "55" } : {}}>
-                <p className="text-[10px] text-zinc-500 truncate">{st.label}</p>
-                <p className="text-sm font-bold" style={{ color: st.color }}>{(stats as any)[st.id] || 0}</p>
-              </button>
-            ))}
+      {/* Header */}
+      <div className="border-b border-zinc-900 px-5 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h1 className="text-white font-bold text-xl">💊 Prospection Pharmacies</h1>
+            <p className="text-zinc-500 text-xs mt-0.5">Base nationale FINESS — {pharmacies.length.toLocaleString("fr-FR")} pharmacies</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[140px] max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">⌕</span>
-              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Nom, ville, tél…"
-                className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none" />
-            </div>
-            <select value={fRegion} onChange={e => { setFRegion(e.target.value); setFDept(""); setFVille(""); setPage(1) }}
-              className="h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-2 text-xs text-zinc-300 max-w-[130px]">
-              <option value="">Région</option>
-              {regions.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <select value={fDept} onChange={e => { setFDept(e.target.value); setFVille(""); setPage(1) }}
-              className="h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-2 text-xs text-zinc-300 max-w-[90px]">
-              <option value="">Dépt</option>
-              {depts.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <select value={fVille} onChange={e => { setFVille(e.target.value); setPage(1) }}
-              className="h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-2 text-xs text-zinc-300 max-w-[120px]">
-              <option value="">Ville</option>
-              {villes.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-            <select value={fPriorite} onChange={e => { setFPriorite(e.target.value); setPage(1) }}
-              className="h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-2 text-xs text-zinc-300">
-              <option value="all">Priorité</option>
-              {PRIORITES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-            <button onClick={() => { setFPhone(p => !p); setPage(1) }}
-              className={`h-9 px-2.5 rounded-lg text-xs border ${fPhone ? "text-black border-transparent" : "text-zinc-500 border-zinc-800"}`}
-              style={fPhone ? { background: ACCENT } : {}}>📞 Tél</button>
-            <button onClick={() => { setFRappel(p => !p); setPage(1) }}
-              className={`h-9 px-2.5 rounded-lg text-xs border ${fRappel ? "bg-orange-500/20 text-orange-400 border-orange-500/40" : "text-zinc-500 border-zinc-800"}`}>
-              🔔 Rappels {stats.rappelDue > 0 ? `(${stats.rappelDue})` : ""}
+          <div className="flex items-center gap-2 flex-wrap">
+            {syncMsg && <span className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300">{syncMsg}</span>}
+            <button onClick={syncTeam} disabled={syncing}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              style={{ background:"rgba(139,92,246,0.1)", borderColor:"rgba(139,92,246,0.3)", color:"#a78bfa" }}>
+              <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Sync..." : "Sync équipe"}
             </button>
-            {(search || fRegion || fDept || fVille || fStatut !== "all" || fPriorite !== "all" || fPhone || fRappel) && (
-              <button onClick={resetFilters} className="h-9 px-2 text-xs text-zinc-500 hover:text-white">Reset</button>
-            )}
+            <button onClick={() => setPanel(p => p === "lot" ? "none" : "lot")}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              style={{ background: panel==="lot" ? "rgba(14,165,233,0.2)" : "rgba(14,165,233,0.1)", borderColor:"rgba(14,165,233,0.35)", color:"#38bdf8" }}>
+              <Target size={14} /> Lot de {lotQty}
+            </button>
+            <button onClick={() => setPanel(p => p === "cochees" ? "none" : "cochees")}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              style={{ background: panel==="cochees" ? "rgba(34,197,94,0.2)" : "rgba(34,197,94,0.1)", borderColor:"rgba(34,197,94,0.35)", color:"#4ade80" }}>
+              <CheckCircle size={14} /> Vue cochées
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background:"rgba(34,197,94,0.2)", color:"#4ade80" }}>{cochees.length}</span>
+            </button>
           </div>
         </div>
 
-        {checked.size > 0 && (
-          <div className="shrink-0 px-5 py-2.5 bg-zinc-900/90 border-b border-zinc-800 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-zinc-400 font-medium">{checked.size} sélectionnée{checked.size > 1 ? "s" : ""}</span>
-            <select defaultValue="" onChange={e => { if (e.target.value) { bulkUpdate(checkedArr, { statut: e.target.value as any }); e.target.value = "" } }}
-              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white">
-              <option value="">Statut…</option>
-              {STATUTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-            <select defaultValue="" onChange={e => { if (e.target.value) { bulkUpdate(checkedArr, { priorite: e.target.value }); e.target.value = "" } }}
-              className="h-8 bg-zinc-800 border border-zinc-700 rounded-lg px-2 text-xs text-white">
-              <option value="">Priorité…</option>
-              {PRIORITES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-            <button onClick={() => bulkUpdate(checkedArr, {
-              statut: "contacte",
-              contact: [profile?.prenom, profile?.nom].filter(Boolean).join(" ") || profile?.email || "",
-            })} className="h-8 px-2.5 rounded-lg text-xs font-medium text-black" style={{ background: ACCENT }}>→ Contacté</button>
-            <button onClick={() => bulkReset(checkedArr)}
-              className="h-8 px-2.5 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10">Réinitialiser</button>
-            <button onClick={() => setChecked(new Set())} className="h-8 px-2 text-xs text-zinc-500 hover:text-white ml-auto">Désélectionner</button>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: ACCENT }} />
-            </div>
-          ) : paginated.length === 0 ? (
-            <div className="text-center py-20 text-sm text-zinc-500">Aucune pharmacie trouvée</div>
-          ) : (
-            <>
-              <div className="sticky top-0 z-10 bg-[#0a0a0a]/95 backdrop-blur-sm px-5 py-1.5 border-b border-zinc-800/50 flex items-center gap-3">
-                <input type="checkbox"
-                  checked={paginated.length > 0 && paginated.every(p => checked.has(String(p.id)))}
-                  onChange={toggleCheckAllVisible}
-                  className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer" />
-                <span className="text-[11px] text-zinc-600">Tout sélectionner (page)</span>
-              </div>
-              <div className="divide-y divide-zinc-800/40">
-                {paginated.map(p => {
-                  const t = getTrack(p.id)
-                  const st = STATUTS.find(s => s.id === t.statut) || STATUTS[0]
-                  const active = selected?.id === p.id
-                  const isChecked = checked.has(String(p.id))
-                  const rappelDue = t.rappel && t.rappel <= today
-                  return (
-                    <div key={p.id} className={`flex items-center gap-2.5 px-5 py-2.5 transition ${active ? "bg-zinc-900" : isChecked ? "bg-zinc-900/40" : "hover:bg-zinc-900/50"}`}>
-                      <input type="checkbox" checked={isChecked} onChange={() => toggleCheck(p.id)}
-                        onClick={e => e.stopPropagation()}
-                        className="w-3.5 h-3.5 rounded accent-yellow-500 cursor-pointer shrink-0" />
-                      <button onClick={() => setSelected(p)} className="flex-1 flex items-center gap-3 text-left min-w-0">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: st.color }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                            {rappelDue && <span className="text-[10px] text-orange-400">🔔</span>}
-                            {t.priorite === "urgente" && <span className="text-[10px] text-rose-400 font-bold">!</span>}
-                          </div>
-                          <p className="text-[11px] text-zinc-500 truncate">
-                            {p.ville}{p.cp ? ` (${p.cp})` : ""} · {p.dept}{p.phone ? ` · ${p.phone}` : ""}
-                          </p>
-                        </div>
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0"
-                          style={{ color: st.color, background: st.color + "22" }}>{st.label}</span>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-          {paginated.length < filtered.length && (
-            <div className="p-4 text-center">
-              <button onClick={() => setPage(p => p + 1)}
-                className="h-9 px-5 rounded-xl text-sm text-zinc-400 border border-zinc-800 hover:text-white hover:bg-zinc-800">
-                Charger plus ({filtered.length - paginated.length})
+        {/* Stat chips */}
+        <div className="flex gap-1.5 flex-wrap">
+          {[
+            { key:"all", label:"Toutes", count: stats.total },
+            { key:"contacte", label:"Contacté", count: stats.contacte||0 },
+            { key:"interesse", label:"Intéressé", count: stats.interesse||0 },
+            { key:"client", label:"Client", count: stats.client||0 },
+            { key:"a_rappeler", label:"À rappeler", count: stats.a_rappeler||0 },
+            { key:"injoignable", label:"Injoignable", count: stats.injoignable||0 },
+            { key:"refuse", label:"Refusé", count: stats.refuse||0 },
+          ].map(s => {
+            const col = SC[s.key] || "#52525b"
+            const active = fStatut === s.key
+            return (
+              <button key={s.key} onClick={() => { setFStatut(s.key); setPage(1) }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
+                style={{ background: active ? col+"22" : "rgba(39,39,42,0.4)", borderColor: active ? col+"60" : "rgba(63,63,70,0.4)", color: active ? col : "#52525b" }}>
+                {s.label} <span style={{ color: active ? col : "#3f3f46", fontWeight:700 }}>{s.count}</span>
               </button>
-            </div>
-          )}
+            )
+          })}
         </div>
       </div>
 
-      {selected && selTrack && (
-        <div className="w-full lg:w-[400px] xl:w-[440px] border-l border-zinc-800 bg-[#0c0c0e] flex flex-col shrink-0 h-full">
-          <div className="px-5 py-4 border-b border-zinc-800 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-white leading-snug">{selected.name}</h2>
-              <p className="text-xs text-zinc-500 mt-1">{selected.address && `${selected.address}, `}{selected.cp} {selected.ville}</p>
-            </div>
-            <button onClick={() => setSelected(null)} className="text-zinc-500 hover:text-white shrink-0">✕</button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            <div className="flex flex-wrap gap-2">
-              {selected.phone && (
-                <a href={`tel:${selected.phone}`} className="h-9 px-3 rounded-xl text-xs font-semibold text-black flex items-center gap-1.5" style={{ background: ACCENT }}>
-                  📞 {selected.phone}
-                </a>
-              )}
-              {selected.lat && selected.lon && (
-                <a href={`https://www.google.com/maps?q=${selected.lat},${selected.lon}`} target="_blank" rel="noreferrer"
-                  className="h-9 px-3 rounded-xl text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 hover:text-white flex items-center">🗺️ Maps</a>
-              )}
-            </div>
-            {selected.hours && <p className="text-xs text-zinc-500">🕐 {selected.hours}</p>}
+      <div className="flex flex-1 overflow-hidden">
 
-            <div>
-              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Statut</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {STATUTS.map(st => (
-                  <button key={st.id} onClick={() => updateEntry(selected.id, { statut: st.id })}
-                    className={`h-9 rounded-lg text-xs font-medium border transition ${selTrack.statut === st.id ? "text-black border-transparent" : "text-zinc-400 border-zinc-800 hover:border-zinc-600"}`}
-                    style={selTrack.statut === st.id ? { background: st.color } : {}}>{st.label}</button>
-                ))}
-              </div>
-            </div>
+        {/* ── Liste principale ── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
 
-            <div>
-              <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Priorité</p>
-              <div className="flex gap-1.5">
-                {PRIORITES.map(pr => (
-                  <button key={pr.id} onClick={() => updateEntry(selected.id, { priorite: pr.id })}
-                    className={`flex-1 h-8 rounded-lg text-xs border transition ${selTrack.priorite === pr.id ? "border-zinc-500 bg-zinc-800 text-white" : "border-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>
-                    {pr.label}
-                  </button>
-                ))}
-              </div>
+          {/* Filtres */}
+          <div className="flex gap-2 px-5 py-3 border-b border-zinc-900 shrink-0 flex-wrap">
+            <div className="flex-1 min-w-[180px] relative">
+              <Search size={13} className="absolute left-3 top-2.5 text-zinc-500 pointer-events-none" />
+              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Nom, ville, téléphone..." className={inp + " pl-8"} />
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[11px] text-zinc-500 mb-1">Contacté par</p>
-                <input value={selTrack.contact}
-                  onChange={e => updateEntry(selected.id, { contact: e.target.value })}
-                  placeholder="Nom…" className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none" />
-              </div>
-              <div>
-                <p className="text-[11px] text-zinc-500 mb-1">Rappel le</p>
-                <input type="date" value={selTrack.rappel || ""}
-                  onChange={e => updateEntry(selected.id, { rappel: e.target.value })}
-                  className="w-full h-9 bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-sm text-white focus:outline-none" />
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[11px] text-zinc-500 mb-1">Notes</p>
-              <textarea value={selTrack.notes}
-                onChange={e => updateEntry(selected.id, { notes: e.target.value }, true)}
-                rows={5} placeholder="Compte-rendu d’appel…"
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none resize-none leading-relaxed" />
-            </div>
-
-            {selTrack.updatedAt && (
-              <p className="text-[10px] text-zinc-600">MAJ {new Date(selTrack.updatedAt).toLocaleString("fr-FR")}</p>
+            <select value={fDept} onChange={e => { setFDept(e.target.value); setPage(1) }} className={sel}>
+              <option value="">Tous les départements</option>
+              {depts.map(d => { const ph = pharmacies.find(p => p.dept === d); return <option key={d} value={d}>{d} – {ph?.deptNom||d}</option> })}
+            </select>
+            <select value={fRegion} onChange={e => { setFRegion(e.target.value); setPage(1) }} className={sel}>
+              <option value="">Toutes les régions</option>
+              {regions.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer px-3 py-2 border border-zinc-800 rounded-xl bg-zinc-900">
+              <input type="checkbox" checked={fPhone} onChange={e => { setFPhone(e.target.checked); setPage(1) }} className="accent-blue-500" />
+              Avec tél.
+            </label>
+            {(search||fDept||fRegion||fPhone||fStatut!=="all"||fDateFrom||fDateTo||fRappelOnly) && (
+              <button onClick={() => { setSearch(""); setFDept(""); setFRegion(""); setFPhone(false); setFStatut("all"); setFDateFrom(""); setFDateTo(""); setFRappelOnly(false); setPage(1) }}
+                className="px-3 py-2 rounded-xl text-xs text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-600 transition-colors">
+                ✕ Reset
+              </button>
             )}
-
-            <button onClick={() => { if (confirm("Réinitialiser le suivi ?")) { bulkReset([String(selected.id)]); setSelected(null) } }}
-              className="w-full h-9 rounded-lg text-xs text-rose-400 border border-rose-500/30 hover:bg-rose-500/10">
-              Réinitialiser le suivi
-            </button>
           </div>
-        </div>
-      )}
 
-      {showLot && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#18181b] border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-              <div>
-                <h2 className="text-base font-semibold text-white">Lot de prospection</h2>
-                <p className="text-xs text-zinc-500">Pioche des « À contacter »</p>
-              </div>
-              <button onClick={() => { setShowLot(false); setLotMode("idle"); setLotResults([]) }} className="text-zinc-500 hover:text-white">✕</button>
+          {/* Filtres date + tri */}
+          <div className="flex gap-2 px-5 py-2 border-b border-zinc-900 shrink-0 flex-wrap items-center bg-zinc-950/50">
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Rappel :</span>
+            <input type="date" value={fDateFrom} onChange={e => { setFDateFrom(e.target.value); setPage(1) }}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600"
+              placeholder="Du" />
+            <span className="text-zinc-600 text-xs">→</span>
+            <input type="date" value={fDateTo} onChange={e => { setFDateTo(e.target.value); setPage(1) }}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600"
+              placeholder="Au" />
+            <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer px-2.5 py-1.5 border border-zinc-800 rounded-lg bg-zinc-900 hover:border-zinc-600">
+              <input type="checkbox" checked={fRappelOnly} onChange={e => { setFRappelOnly(e.target.checked); setPage(1) }} className="accent-orange-500" />
+              Avec rappel seulement
+            </label>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Trier :</span>
+              <select value={sortBy} onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1) }}
+                className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600">
+                <option value="nom">Nom</option>
+                <option value="statut">Statut</option>
+                <option value="rappel">Date de rappel</option>
+                <option value="contact_date">Dernier contact</option>
+              </select>
+              <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                className="px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white text-xs font-bold transition-colors">
+                {sortDir === "asc" ? "↑ Croissant" : "↓ Décroissant"}
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {lotMode !== "picked" ? (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] text-zinc-500">Région</label>
-                      <select value={lotRegion} onChange={e => setLotRegion(e.target.value)}
-                        className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2 text-xs text-white">
-                        <option value="">Toutes</option>
-                        {regions.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-500">Département</label>
-                      <select value={lotDept} onChange={e => setLotDept(e.target.value)}
-                        className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2 text-xs text-white">
-                        <option value="">Tous</option>
-                        {[...new Set(pharmacies.filter(p => !lotRegion || p.region === lotRegion).map(p => p.dept))].sort().map(d => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-500">Ville</label>
-                      <input value={lotVille} onChange={e => setLotVille(e.target.value)}
-                        className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-xs text-white" />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-zinc-500">Quantité</label>
-                      <input type="number" min={5} max={100} value={lotQty} onChange={e => setLotQty(Number(e.target.value) || 30)}
-                        className="w-full h-9 mt-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-xs text-white" />
-                    </div>
-                  </div>
-                  <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
-                    <input type="checkbox" checked={lotPhone} onChange={e => setLotPhone(e.target.checked)} className="accent-yellow-500" />
-                    Uniquement avec téléphone
-                  </label>
-                  {lotMode === "preview" && (
-                    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 max-h-48 overflow-y-auto space-y-1">
-                      <p className="text-xs text-zinc-500 mb-2">{lotResults.length} trouvée(s)</p>
-                      {lotResults.map(p => (
-                        <p key={p.id} className="text-xs text-zinc-300 truncate">{p.name} — {p.ville}</p>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-3xl mb-2">✅</p>
-                  <p className="text-sm text-white font-medium">{lotResults.length} passées en « Contacté »</p>
+          </div>
+
+          <div className="text-xs text-zinc-600 px-5 py-2 border-b border-zinc-900 shrink-0">
+            {filtered.length.toLocaleString("fr-FR")} résultat{filtered.length !== 1 ? "s" : ""}
+          </div>
+
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-zinc-500 text-sm">Chargement des données...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-zinc-950 z-10">
+                  <tr>
+                    {["Pharmacie","Ville / Dépt","Téléphone","Statut","Contacté par","Dernier contact","Rappel","Notes"].map(h => (
+                      <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-zinc-600 px-4 py-2.5 border-b border-zinc-900 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(p => {
+                    const t = tracking[p.id]
+                    const s = t?.statut || "a_contacter"
+                    const col = SC[s]
+                    return (
+                      <tr key={p.id} className="border-b border-zinc-900/40 hover:bg-zinc-900/30 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <div className="font-semibold text-white text-[13px] leading-tight">{p.name}</div>
+                          <div className="text-zinc-600 text-[11px] mt-0.5">{p.address}</div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="text-zinc-300 text-[13px]">{p.ville}</div>
+                          <div className="text-zinc-600 text-[11px]">{p.dept} – {p.deptNom}</div>
+                        </td>
+                        <td className="px-4 py-2.5 text-blue-400 text-[12px] whitespace-nowrap">
+                          {p.phone || <span className="text-zinc-700">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <select value={s}
+                            onChange={e => updateEntry(p.id, { statut: e.target.value as TrackingEntry["statut"] })}
+                            className="text-[11px] font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer"
+                            style={{ background: col+"18", borderColor: col+"50", color: col }}>
+                            {Object.entries(SL).map(([k,v]) => (
+                              <option key={k} value={k} style={{ background:"#18181b", color: SC[k] }}>{v}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <input value={t?.contact||""} onChange={e => updateEntry(p.id, { contact: e.target.value })}
+                            placeholder="Qui ?" className="bg-transparent border-b border-zinc-800 text-zinc-300 text-[12px] outline-none w-full focus:border-zinc-500 py-0.5 min-w-[80px]" />
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          {t?.updatedAt ? (
+                            <div>
+                              <div className="text-zinc-300 text-[12px] font-medium">
+                                {new Date(t.updatedAt).toLocaleDateString("fr-FR",{day:"numeric",month:"short",year:"numeric"})}
+                              </div>
+                              <div className="text-zinc-600 text-[10px]">
+                                {new Date(t.updatedAt).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+                              </div>
+                            </div>
+                          ) : <span className="text-zinc-700 text-[11px]">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          <div className="flex flex-col gap-0.5">
+                            <input type="date" value={t?.rappel||""} onChange={e => updateEntry(p.id, { rappel: e.target.value })}
+                              className="bg-transparent text-[11px] outline-none border-b border-zinc-800 focus:border-zinc-500"
+                              style={{ color: t?.rappel ? (t.rappel < todayStr ? "#ef4444" : t.rappel === todayStr ? "#f97316" : "#f97316") : "#3f3f46" }} />
+                            {t?.rappel && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full w-fit"
+                                style={{
+                                  background: t.rappel < todayStr ? "rgba(239,68,68,0.15)" : t.rappel === todayStr ? "rgba(249,115,22,0.15)" : "rgba(249,115,22,0.1)",
+                                  color: t.rappel < todayStr ? "#ef4444" : "#f97316"
+                                }}>
+                                {t.rappel < todayStr ? "⚠ En retard" : t.rappel === todayStr ? "⏰ Aujourd'hui" : `📅 ${new Date(t.rappel+"T00:00:00").toLocaleDateString("fr-FR",{day:"numeric",month:"short"})}`}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <input value={t?.notes||""} onChange={e => updateEntry(p.id, { notes: e.target.value })}
+                            placeholder="Note..." className="bg-transparent border-b border-zinc-800 text-zinc-400 text-[12px] outline-none focus:border-zinc-500 py-0.5 min-w-[120px] w-full" />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {paginated.length < filtered.length && (
+                <div className="p-5 text-center">
+                  <button onClick={() => setPage(p => p + 1)}
+                    className="px-6 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors">
+                    Charger {Math.min(PAGE, filtered.length - paginated.length)} de plus ({(filtered.length - paginated.length).toLocaleString("fr-FR")} restants)
+                  </button>
+                </div>
+              )}
+              {!filtered.length && !loading && (
+                <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                  <p className="text-lg font-bold mb-1">Aucun résultat</p>
+                  <p className="text-sm">Modifiez vos filtres</p>
                 </div>
               )}
             </div>
-            <div className="px-5 py-4 border-t border-zinc-800 flex gap-2">
-              {lotMode === "picked" ? (
-                <button onClick={() => { setShowLot(false); setLotMode("idle"); setLotResults([]); setFStatut("contacte") }}
-                  className="flex-1 h-10 rounded-xl text-sm font-bold text-black" style={{ background: ACCENT }}>Voir les contactées</button>
-              ) : (
-                <>
-                  <button onClick={previewLot} className="flex-1 h-10 rounded-xl text-sm text-zinc-300 bg-zinc-800">Prévisualiser</button>
-                  <button onClick={confirmLot} disabled={lotLoading || (lotMode === "preview" && lotResults.length === 0)}
-                    className="flex-1 h-10 rounded-xl text-sm font-bold text-black disabled:opacity-40" style={{ background: ACCENT }}>
-                    {lotLoading ? "…" : "Prendre le lot"}
-                  </button>
-                </>
+          )}
+        </div>
+
+        {/* ── Panel Lot de 30 ── */}
+        {panel === "lot" && (
+          <div className="w-80 shrink-0 border-l border-zinc-900 flex flex-col bg-[#0d0d0d]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-900">
+              <span className="text-white font-bold text-sm">🎯 Lot de pharmacies</span>
+              <button onClick={() => setPanel("none")} className="text-zinc-600 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 block">Département</label>
+                  <select value={lotDept} onChange={e => setLotDept(e.target.value)} className={sel + " text-xs w-full"}>
+                    <option value="">Tous</option>
+                    {depts.map(d => { const ph = pharmacies.find(p => p.dept === d); return <option key={d} value={d}>{d} – {ph?.deptNom||d}</option> })}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 block">Région</label>
+                  <select value={lotRegion} onChange={e => setLotRegion(e.target.value)} className={sel + " text-xs w-full"}>
+                    <option value="">Toutes</option>
+                    {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 block">Ville</label>
+                <input value={lotVille} onChange={e => setLotVille(e.target.value)} placeholder="Ex: Paris, Lyon..." className={inp + " text-xs"} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 block">Nom</label>
+                <input value={lotNom} onChange={e => setLotNom(e.target.value)} placeholder="Ex: Centrale..." className={inp + " text-xs"} />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer py-1">
+                <input type="checkbox" checked={lotPhone} onChange={e => setLotPhone(e.target.checked)} className="accent-blue-500" />
+                Avec téléphone uniquement
+              </label>
+              <div>
+                <label className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 block">Quantité</label>
+                <select value={lotQty} onChange={e => setLotQty(Number(e.target.value))} className={sel + " text-xs w-full"}>
+                  {[10,20,30,50].map(n => <option key={n} value={n}>{n} pharmacies</option>)}
+                </select>
+              </div>
+              <button onClick={doPick} disabled={lotLoading}
+                className="w-full py-3 rounded-xl text-sm font-black text-white transition-all mt-2"
+                style={{ background: "linear-gradient(135deg,#0ea5e9,#0284c7)", boxShadow:"0 4px 16px rgba(14,165,233,0.3)" }}>
+                {lotLoading ? "..." : `🎯 Obtenir ${lotQty} & cocher`}
+              </button>
+              <button onClick={() => { setLotResults(getLot()); setLotMode("preview") }}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-zinc-400 border border-zinc-800 hover:border-zinc-600 transition-colors">
+                👁 Prévisualiser sans cocher
+              </button>
+
+              {lotMode !== "idle" && (
+                <div className="mt-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider mb-2"
+                    style={{ color: lotMode==="picked" ? "#4ade80" : "#a1a1aa" }}>
+                    {lotMode === "picked" ? `${lotResults.length} pharmacies cochées ✓` : `${lotResults.length} résultats (aperçu)`}
+                  </div>
+                  {lotResults.length === 0 && <p className="text-zinc-600 text-xs text-center py-4">Toutes les pharmacies de ces filtres ont déjà été contactées !</p>}
+                  <div className="space-y-1.5 max-h-96 overflow-y-auto">
+                    {lotResults.map((p, i) => (
+                      <div key={p.id} className="p-2.5 rounded-lg border border-zinc-800 bg-zinc-900/40">
+                        <div className="text-white text-xs font-semibold leading-tight">{i+1}. {p.name}</div>
+                        <div className="text-zinc-600 text-[10px] mt-0.5">{p.ville} ({p.dept})</div>
+                        {p.phone && <div className="text-blue-400 text-[10px]">{p.phone}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Panel Vue Cochées (plein écran) ── */}
+      {panel === "cochees" && (
+        <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-900 shrink-0 flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <span className="text-white font-bold text-base">✅ Pharmacies cochées & suivies</span>
+              <span className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">{cochees.length}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={doExport}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white"
+                style={{ background:"linear-gradient(135deg,#7c3aed,#4f46e5)" }}>
+                <Download size={13} /> Export imprimable
+              </button>
+              <button onClick={() => setPanel("none")} className="text-zinc-600 hover:text-white p-2 rounded-lg hover:bg-zinc-800 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-5 py-2.5 border-b border-zinc-900 shrink-0 flex-wrap">
+            {["all","contacte","interesse","client","a_rappeler","refuse","injoignable"].map(s => {
+              const col = SC[s] || "#52525b"; const on = vcFilter === s
+              return (
+                <button key={s} onClick={() => setVcFilter(s)}
+                  className="px-3 py-1.5 rounded-full text-xs font-bold border transition-all"
+                  style={{ background: on ? col+"22" : "transparent", borderColor: on ? col+"60" : "#3f3f46", color: on ? col : "#71717a" }}>
+                  {s === "all" ? "Tous" : SL[s]}
+                </button>
+              )
+            })}
+            <div className="relative ml-auto">
+              <Search size={12} className="absolute left-2.5 top-2 text-zinc-500 pointer-events-none" />
+              <input value={vcSearch} onChange={e => setVcSearch(e.target.value)}
+                placeholder="Rechercher..." className="bg-zinc-900 border border-zinc-800 rounded-xl pl-7 pr-3 py-1.5 text-xs text-white outline-none w-48 focus:border-zinc-600" />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-sm min-w-[1000px]">
+              <thead className="sticky top-0 bg-zinc-950 z-10">
+                <tr>
+                  {["#","Pharmacie","Ville / Dépt","Téléphone","Statut","Contacté par","Dernier contact","Rappel","Notes"].map(h => (
+                    <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-zinc-600 px-4 py-3 border-b border-zinc-900 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cochees.map((p, i) => {
+                  const t = tracking[p.id] || {} as TrackingEntry
+                  const s = t.statut || "contacte"; const col = SC[s]
+                  const ds = t.updatedAt ? new Date(t.updatedAt).toLocaleDateString("fr-FR", { day:"numeric", month:"short", year:"numeric" }) : "—"
+                  return (
+                    <tr key={p.id} className="border-b border-zinc-900/40 hover:bg-zinc-900/20 transition-colors">
+                      <td className="px-4 py-3 text-zinc-600 text-[11px] w-8">{i+1}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-white text-[13px]">{p.name}</div>
+                        <div className="text-zinc-600 text-[11px]">{p.address}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-zinc-300 text-[13px]">{p.ville||"—"}</div>
+                        <div className="text-zinc-600 text-[11px]">{p.dept} {p.deptNom}</div>
+                      </td>
+                      <td className="px-4 py-3 text-blue-400 text-[12px] whitespace-nowrap">{p.phone||<span className="text-zinc-700">—</span>}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap"
+                          style={{ background:col+"18", borderColor:col+"50", color:col }}>
+                          {SL[s]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <input value={t.contact||""} onChange={e => updateEntry(p.id, { contact: e.target.value })}
+                          placeholder="Qui a contacté ?" className="bg-transparent border-b border-zinc-800 text-zinc-300 text-[12px] outline-none focus:border-zinc-500 py-0.5 min-w-[100px]" />
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500 text-[11px] whitespace-nowrap">{ds}</td>
+                      <td className="px-4 py-3">
+                        <input type="date" value={t.rappel||""} onChange={e => updateEntry(p.id, { rappel: e.target.value })}
+                          className="bg-transparent text-[11px] outline-none border-b border-zinc-800 focus:border-zinc-500"
+                          style={{ color: t.rappel ? "#f97316" : "#3f3f46" }} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <input value={t.notes||""} onChange={e => updateEntry(p.id, { notes: e.target.value })}
+                          placeholder="Note..." className="bg-transparent border-b border-zinc-800 text-zinc-400 text-[12px] outline-none focus:border-zinc-500 py-0.5 min-w-[160px]" />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {!cochees.length && (
+              <div className="flex flex-col items-center justify-center py-24 text-zinc-600">
+                <CheckCircle size={40} className="mb-4 opacity-20" />
+                <p className="text-lg font-bold mb-1">Aucune pharmacie cochée</p>
+                <p className="text-sm">Utilisez le Lot de {lotQty} ou changez les statuts dans la liste principale</p>
+              </div>
+            )}
           </div>
         </div>
       )}
