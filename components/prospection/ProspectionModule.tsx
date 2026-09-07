@@ -145,7 +145,7 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
   const regions = useMemo(() => [...new Set(pharmacies.map(p => p.region).filter(Boolean))].sort(), [pharmacies])
 
   const stats = useMemo(() => {
-    const s: Record<string,number> = { total: pharmacies.length }
+    const s: Record<string,number> = { total: pharmacies.length, a_contacter: 0 }
     Object.keys(SL).forEach(k => { s[k] = 0 })
     Object.values(tracking).forEach(t => { s[t.statut] = (s[t.statut]||0) + 1 })
     return s
@@ -277,125 +277,127 @@ tr:nth-child(even) td{background:#f9fafb}
   return (
     <div className="flex-1 overflow-hidden flex flex-col bg-[#0a0a0a]">
 
-      {/* Header */}
-      <div className="border-b border-zinc-900 px-5 pt-4 pb-3 shrink-0">
+      {/* ── HEADER ── */}
+      <div className="border-b border-zinc-900 px-5 pt-4 pb-0 shrink-0">
+        {/* Titre + actions */}
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
             <h1 className="text-white font-bold text-xl">💊 Prospection Pharmacies</h1>
             <p className="text-zinc-500 text-xs mt-0.5">Base nationale FINESS — {pharmacies.length.toLocaleString("fr-FR")} pharmacies</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             {syncMsg && <span className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300">{syncMsg}</span>}
             <button onClick={syncTeam} disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
               style={{ background:"rgba(139,92,246,0.1)", borderColor:"rgba(139,92,246,0.3)", color:"#a78bfa" }}>
-              <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+              <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
               {syncing ? "Sync..." : "Sync équipe"}
             </button>
             <button onClick={() => setPanel(p => p === "lot" ? "none" : "lot")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
               style={{ background: panel==="lot" ? "rgba(14,165,233,0.2)" : "rgba(14,165,233,0.1)", borderColor:"rgba(14,165,233,0.35)", color:"#38bdf8" }}>
-              <Target size={14} /> Lot de {lotQty}
+              <Target size={12} /> Lot de {lotQty}
             </button>
             <button onClick={() => setPanel(p => p === "cochees" ? "none" : "cochees")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
               style={{ background: panel==="cochees" ? "rgba(34,197,94,0.2)" : "rgba(34,197,94,0.1)", borderColor:"rgba(34,197,94,0.35)", color:"#4ade80" }}>
-              <CheckCircle size={14} /> Vue cochées
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background:"rgba(34,197,94,0.2)", color:"#4ade80" }}>{cochees.length}</span>
+              <CheckCircle size={12} /> Vue cochées
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black" style={{ background:"rgba(34,197,94,0.2)", color:"#4ade80" }}>{cochees.length}</span>
             </button>
           </div>
         </div>
 
-        {/* Stat chips */}
-        <div className="flex gap-1.5 flex-wrap">
+        {/* Filtres statut (chips colorés) */}
+        <div className="flex gap-1.5 flex-wrap pb-3">
           {[
-            { key:"all", label:"Toutes", count: stats.total },
-            { key:"contacte", label:"Contacté", count: stats.contacte||0 },
-            { key:"interesse", label:"Intéressé", count: stats.interesse||0 },
-            { key:"client", label:"Client", count: stats.client||0 },
-            { key:"a_rappeler", label:"À rappeler", count: stats.a_rappeler||0 },
-            { key:"injoignable", label:"Injoignable", count: stats.injoignable||0 },
-            { key:"refuse", label:"Refusé", count: stats.refuse||0 },
+            { key:"all",         label:"Toutes",      count: stats.total,            col:"#71717a" },
+            { key:"a_contacter", label:"À contacter", count: stats.a_contacter||0,   col:"#52525b" },
+            { key:"contacte",    label:"Contacté",    count: stats.contacte||0,       col:"#3b82f6" },
+            { key:"interesse",   label:"Intéressé",   count: stats.interesse||0,      col:"#22c55e" },
+            { key:"client",      label:"Client",      count: stats.client||0,         col:"#eab308" },
+            { key:"a_rappeler",  label:"À rappeler",  count: stats.a_rappeler||0,     col:"#f97316" },
+            { key:"injoignable", label:"Injoignable", count: stats.injoignable||0,    col:"#71717a" },
+            { key:"refuse",      label:"Refusé",      count: stats.refuse||0,         col:"#ef4444" },
           ].map(s => {
-            const col = SC[s.key] || "#52525b"
             const active = fStatut === s.key
             return (
               <button key={s.key} onClick={() => { setFStatut(s.key); setPage(1) }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all"
-                style={{ background: active ? col+"22" : "rgba(39,39,42,0.4)", borderColor: active ? col+"60" : "rgba(63,63,70,0.4)", color: active ? col : "#52525b" }}>
-                {s.label} <span style={{ color: active ? col : "#3f3f46", fontWeight:700 }}>{s.count}</span>
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all"
+                style={{ background: active ? s.col+"25" : "rgba(39,39,42,0.5)", borderColor: active ? s.col+"70" : "rgba(63,63,70,0.4)", color: active ? s.col : "#52525b" }}>
+                {s.label}
+                <span className="font-black" style={{ color: active ? s.col : "#3f3f46" }}>{s.count}</span>
               </button>
             )
           })}
         </div>
+
+        {/* Filtres recherche / dépt / région */}
+        <div className="flex gap-2 pb-2 flex-wrap border-t border-zinc-900/60 pt-2">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search size={12} className="absolute left-3 top-2.5 text-zinc-500 pointer-events-none" />
+            <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Rechercher nom, ville, téléphone..."
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-2 text-sm text-white outline-none focus:border-zinc-600" />
+          </div>
+          <select value={fDept} onChange={e => { setFDept(e.target.value); setPage(1) }}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-zinc-600">
+            <option value="">Département</option>
+            {depts.map(d => { const ph = pharmacies.find(p => p.dept === d); return <option key={d} value={d}>{d} – {ph?.deptNom||d}</option> })}
+          </select>
+          <select value={fRegion} onChange={e => { setFRegion(e.target.value); setPage(1) }}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-zinc-600">
+            <option value="">Région</option>
+            {regions.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer px-3 py-2 border border-zinc-800 rounded-xl bg-zinc-900">
+            <input type="checkbox" checked={fPhone} onChange={e => { setFPhone(e.target.checked); setPage(1) }} className="accent-blue-500" />
+            📞 Avec tél.
+          </label>
+        </div>
+
+        {/* Filtres date + tri */}
+        <div className="flex gap-2 pb-2 flex-wrap items-center border-t border-zinc-900/60 pt-2">
+          <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest shrink-0">📅 Rappel :</span>
+          <input type="date" value={fDateFrom} onChange={e => { setFDateFrom(e.target.value); setPage(1) }}
+            className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500/50" />
+          <span className="text-zinc-600 text-xs">→</span>
+          <input type="date" value={fDateTo} onChange={e => { setFDateTo(e.target.value); setPage(1) }}
+            className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500/50" />
+          <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer px-2.5 py-1.5 border border-zinc-800 rounded-lg bg-zinc-900">
+            <input type="checkbox" checked={fRappelOnly} onChange={e => { setFRappelOnly(e.target.checked); setPage(1) }} className="accent-orange-500" />
+            Avec rappel seulement
+          </label>
+          {(search||fDept||fRegion||fPhone||fStatut!=="all"||fDateFrom||fDateTo||fRappelOnly) && (
+            <button onClick={() => { setSearch(""); setFDept(""); setFRegion(""); setFPhone(false); setFStatut("all"); setFDateFrom(""); setFDateTo(""); setFRappelOnly(false); setPage(1) }}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-400 border border-red-500/30 hover:bg-red-500/10 transition-colors">
+              ✕ Tout réinitialiser
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Trier :</span>
+            <select value={sortBy} onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1) }}
+              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none">
+              <option value="nom">Nom A→Z</option>
+              <option value="statut">Statut</option>
+              <option value="rappel">Date de rappel</option>
+              <option value="contact_date">Dernier contact</option>
+            </select>
+            <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+              className="px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white text-xs font-bold transition-colors w-24">
+              {sortDir === "asc" ? "↑ Croissant" : "↓ Décroissant"}
+            </button>
+          </div>
+        </div>
+
+        {/* Compteur résultats */}
+        <div className="text-xs text-zinc-600 pb-2">
+          {filtered.length.toLocaleString("fr-FR")} résultat{filtered.length !== 1 ? "s" : ""}
+          {filtered.length !== pharmacies.length && ` sur ${pharmacies.length.toLocaleString("fr-FR")}`}
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-
-        {/* ── Liste principale ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
-
-          {/* Filtres */}
-          <div className="flex gap-2 px-5 py-3 border-b border-zinc-900 shrink-0 flex-wrap">
-            <div className="flex-1 min-w-[180px] relative">
-              <Search size={13} className="absolute left-3 top-2.5 text-zinc-500 pointer-events-none" />
-              <input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Nom, ville, téléphone..." className={inp + " pl-8"} />
-            </div>
-            <select value={fDept} onChange={e => { setFDept(e.target.value); setPage(1) }} className={sel}>
-              <option value="">Tous les départements</option>
-              {depts.map(d => { const ph = pharmacies.find(p => p.dept === d); return <option key={d} value={d}>{d} – {ph?.deptNom||d}</option> })}
-            </select>
-            <select value={fRegion} onChange={e => { setFRegion(e.target.value); setPage(1) }} className={sel}>
-              <option value="">Toutes les régions</option>
-              {regions.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer px-3 py-2 border border-zinc-800 rounded-xl bg-zinc-900">
-              <input type="checkbox" checked={fPhone} onChange={e => { setFPhone(e.target.checked); setPage(1) }} className="accent-blue-500" />
-              Avec tél.
-            </label>
-            {(search||fDept||fRegion||fPhone||fStatut!=="all"||fDateFrom||fDateTo||fRappelOnly) && (
-              <button onClick={() => { setSearch(""); setFDept(""); setFRegion(""); setFPhone(false); setFStatut("all"); setFDateFrom(""); setFDateTo(""); setFRappelOnly(false); setPage(1) }}
-                className="px-3 py-2 rounded-xl text-xs text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-600 transition-colors">
-                ✕ Reset
-              </button>
-            )}
-          </div>
-
-          {/* Filtres date + tri */}
-          <div className="flex gap-2 px-5 py-2 border-b border-zinc-900 shrink-0 flex-wrap items-center bg-zinc-950/50">
-            <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Rappel :</span>
-            <input type="date" value={fDateFrom} onChange={e => { setFDateFrom(e.target.value); setPage(1) }}
-              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600"
-              placeholder="Du" />
-            <span className="text-zinc-600 text-xs">→</span>
-            <input type="date" value={fDateTo} onChange={e => { setFDateTo(e.target.value); setPage(1) }}
-              className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600"
-              placeholder="Au" />
-            <label className="flex items-center gap-1.5 text-xs text-zinc-400 cursor-pointer px-2.5 py-1.5 border border-zinc-800 rounded-lg bg-zinc-900 hover:border-zinc-600">
-              <input type="checkbox" checked={fRappelOnly} onChange={e => { setFRappelOnly(e.target.checked); setPage(1) }} className="accent-orange-500" />
-              Avec rappel seulement
-            </label>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Trier :</span>
-              <select value={sortBy} onChange={e => { setSortBy(e.target.value as typeof sortBy); setPage(1) }}
-                className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-zinc-600">
-                <option value="nom">Nom</option>
-                <option value="statut">Statut</option>
-                <option value="rappel">Date de rappel</option>
-                <option value="contact_date">Dernier contact</option>
-              </select>
-              <button onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
-                className="px-2.5 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white text-xs font-bold transition-colors">
-                {sortDir === "asc" ? "↑ Croissant" : "↓ Décroissant"}
-              </button>
-            </div>
-          </div>
-
-          <div className="text-xs text-zinc-600 px-5 py-2 border-b border-zinc-900 shrink-0">
-            {filtered.length.toLocaleString("fr-FR")} résultat{filtered.length !== 1 ? "s" : ""}
-          </div>
-
           {loading ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
@@ -417,7 +419,6 @@ tr:nth-child(even) td{background:#f9fafb}
                   {paginated.map(p => {
                     const t = tracking[p.id]
                     const s = t?.statut || "a_contacter"
-                    const col = SC[s]
                     return (
                       <tr key={p.id} className="border-b border-zinc-900/40 hover:bg-zinc-900/30 transition-colors">
                         <td className="px-4 py-2.5">
@@ -432,14 +433,20 @@ tr:nth-child(even) td{background:#f9fafb}
                           {p.phone || <span className="text-zinc-700">—</span>}
                         </td>
                         <td className="px-4 py-2.5">
-                          <select value={s}
-                            onChange={e => updateEntry(p.id, { statut: e.target.value as TrackingEntry["statut"] })}
-                            className="text-[11px] font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer"
-                            style={{ background: col+"18", borderColor: col+"50", color: col }}>
-                            {Object.entries(SL).map(([k,v]) => (
-                              <option key={k} value={k} style={{ background:"#18181b", color: SC[k] }}>{v}</option>
-                            ))}
-                          </select>
+                          <div className="relative group/statut">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold cursor-pointer select-none"
+                              style={{ background: (SC[s]||"#52525b")+"20", borderColor: (SC[s]||"#52525b")+"50", color: SC[s]||"#a1a1aa", border: `1px solid ${SC[s]||"#52525b"}40` }}>
+                              {SL[s] || "À contacter"} <span className="opacity-60 text-[9px]">▾</span>
+                            </span>
+                            <select value={s}
+                              onChange={e => updateEntry(p.id, { statut: e.target.value as TrackingEntry["statut"] })}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                              style={{ fontSize: "12px" }}>
+                              {Object.entries(SL).map(([k,v]) => (
+                                <option key={k} value={k}>{v}</option>
+                              ))}
+                            </select>
+                          </div>
                         </td>
                         <td className="px-4 py-2.5">
                           <input value={t?.contact||""} onChange={e => updateEntry(p.id, { contact: e.target.value })}
