@@ -435,6 +435,11 @@ ${sections}
           </div>
           <div className="flex items-center gap-2">
             {syncMsg && <span className="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300">{syncMsg}</span>}
+            <button onClick={doExport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
+              style={{ background:"rgba(234,179,8,0.1)", borderColor:"rgba(234,179,8,0.35)", color:"#eab308" }}>
+              <Download size={12} /> Export PDF
+            </button>
             <button onClick={syncTeam} disabled={syncing}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all"
               style={{ background:"rgba(139,92,246,0.1)", borderColor:"rgba(139,92,246,0.3)", color:"#a78bfa" }}>
