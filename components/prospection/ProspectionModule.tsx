@@ -233,41 +233,189 @@ export default function ProspectionModule({ activeSociety, profile }: { activeSo
     setLotResults(picked); setLotMode("picked"); setLotLoading(false)
   }, [getLot, profile, saveTracking])
 
-  // Export
+  // Export PDF propre par catégorie
   const doExport = useCallback(() => {
-    const now = new Date().toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long", year:"numeric" })
-    const rows = cochees.map((p, i) => {
-      const t = tracking[p.id] || {} as TrackingEntry
-      const s = t.statut || "contacte"; const col = SC[s]||"#888"
-      const ds = t.updatedAt ? new Date(t.updatedAt).toLocaleDateString("fr-FR") : ""
-      return `<tr>
-        <td style="text-align:center;color:#888">${i+1}</td>
-        <td><strong>${p.name}</strong><br><span style="color:#999;font-size:10px">${p.address||""}</span></td>
-        <td>${p.ville||""}<br><span style="color:#999;font-size:10px">${p.dept||""} – ${p.deptNom||""}</span></td>
-        <td style="color:#0284c7">${p.phone||""}</td>
-        <td><span style="padding:2px 8px;border-radius:99px;background:${col}22;color:${col};border:1px solid ${col}55;font-size:10px;font-weight:700">${SL[s]||s}</span></td>
-        <td style="color:#666;font-size:11px">${t.contact||""}</td>
-        <td style="color:#666;font-size:11px">${ds}</td>
-        <td style="color:#666;font-size:11px">${t.notes||""}</td>
-        <td style="min-width:120px">&nbsp;</td><td style="min-width:120px">&nbsp;</td>
-      </tr>`
-    }).join("")
-    const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Prospection</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;padding:16px}
-h1{font-size:18px;font-weight:700;margin-bottom:8px;color:#0284c7}
-table{width:100%;border-collapse:collapse}
-th{background:#0284c7;color:#fff;padding:7px 8px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase}
-td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
-tr:nth-child(even) td{background:#f9fafb}
-.btn{background:#0284c7;color:#fff;border:none;padding:8px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:12px}
-@media print{.btn{display:none}@page{margin:12mm;size:A4 landscape}}</style>
-</head><body>
-<button class="btn" onclick="window.print()">🖨️ Imprimer / PDF</button>
-<h1>💊 Prospection Pharmacies — Butt Premium</h1>
-<p style="color:#666;font-size:11px;margin-bottom:12px">${now} — ${cochees.length} pharmacies</p>
-<table><thead><tr><th>#</th><th>Pharmacie</th><th>Ville/Dépt</th><th>Téléphone</th><th>Statut</th><th>Contacté par</th><th>Date</th><th>Notes</th><th>Compte-rendu</th><th>Suite</th></tr></thead>
-<tbody>${rows}</tbody></table></body></html>`
-    const w = window.open("","_blank","width=1100,height=700,scrollbars=yes")
+    const dateNow = new Date().toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long", year:"numeric" })
+    const timeNow = new Date().toLocaleTimeString("fr-FR", { hour:"2-digit", minute:"2-digit" })
+
+    // Grouper par statut dans l'ordre
+    const ORDER = ["contacte","interesse","client","a_rappeler","injoignable","refuse","a_contacter"]
+    const groups: Record<string, typeof cochees> = {}
+    ORDER.forEach(s => { groups[s] = [] })
+    cochees.forEach(p => {
+      const s = tracking[p.id]?.statut || "a_contacter"
+      if (!groups[s]) groups[s] = []
+      groups[s].push(p)
+    })
+
+    const COLORS: Record<string,string> = {
+      contacte:"#2563eb", interesse:"#16a34a", client:"#ca8a04",
+      a_rappeler:"#ea580c", injoignable:"#6b7280", refuse:"#dc2626", a_contacter:"#374151"
+    }
+    const BG: Record<string,string> = {
+      contacte:"#eff6ff", interesse:"#f0fdf4", client:"#fefce8",
+      a_rappeler:"#fff7ed", injoignable:"#f9fafb", refuse:"#fef2f2", a_contacter:"#f9fafb"
+    }
+
+    let sections = ""
+    let totalExporte = 0
+
+    ORDER.forEach(statut => {
+      const items = groups[statut]
+      if (!items || items.length === 0) return
+      totalExporte += items.length
+
+      const col = COLORS[statut] || "#374151"
+      const bg  = BG[statut]    || "#f9fafb"
+      const label = SL[statut]  || statut
+
+      const lignes = items.map((p, i) => {
+        const t = tracking[p.id] || {} as TrackingEntry
+        const ds = t.updatedAt
+          ? new Date(t.updatedAt).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"})
+          : "—"
+        const rappel = t.rappel
+          ? new Date(t.rappel+"T00:00:00").toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"})
+          : "—"
+        const retard = t.rappel && t.rappel < new Date().toISOString().slice(0,10)
+        return `<tr>
+          <td class="num">${i+1}</td>
+          <td class="name"><strong>${p.name}</strong><div class="addr">${p.address||""}</div></td>
+          <td>${p.ville||"—"}<div class="sub">${p.dept||""} – ${p.deptNom||""}</div></td>
+          <td class="phone">${p.phone||"—"}</td>
+          <td class="contact">${t.contact||"—"}</td>
+          <td class="date">${ds}</td>
+          <td class="date${retard?" retard":""}">${rappel}</td>
+          <td class="notes">${t.notes||""}</td>
+        </tr>`
+      }).join("")
+
+      sections += `
+        <div class="section">
+          <div class="section-header" style="border-left:4px solid ${col};background:${bg}">
+            <div class="section-title" style="color:${col}">${label}</div>
+            <div class="section-count">${items.length} pharmacie${items.length>1?"s":""}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30px">#</th>
+                <th>Pharmacie</th>
+                <th>Ville / Dépt</th>
+                <th>Téléphone</th>
+                <th>Contacté par</th>
+                <th>Dernier contact</th>
+                <th>Rappel</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>${lignes}</tbody>
+          </table>
+        </div>`
+    })
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Prospection Pharmacies — Butt Premium</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; padding: 24px; }
+
+  /* En-tête */
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; padding-bottom:14px; border-bottom:2px solid #1a1a1a; }
+  .header-left h1 { font-size:20px; font-weight:800; letter-spacing:-0.5px; color:#0c0c0c; }
+  .header-left p  { color:#666; font-size:11px; margin-top:4px; }
+  .header-right   { text-align:right; }
+  .header-right .badge { display:inline-flex; align-items:center; gap:6px; background:#f0f4ff; border:1px solid #c7d2fe; border-radius:99px; padding:4px 12px; font-size:11px; font-weight:700; color:#3730a3; margin-bottom:6px; }
+  .header-right .meta { color:#999; font-size:10px; }
+
+  /* Résumé */
+  .summary { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .summary-card { flex:1; min-width:90px; border:1px solid #e5e7eb; border-radius:8px; padding:10px 14px; text-align:center; }
+  .summary-card .val { font-size:22px; font-weight:900; }
+  .summary-card .lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#888; margin-top:2px; }
+
+  /* Sections */
+  .section { margin-bottom:24px; page-break-inside:avoid; }
+  .section-header { display:flex; justify-content:space-between; align-items:center; padding:8px 14px; border-radius:6px 6px 0 0; margin-bottom:0; }
+  .section-title  { font-size:13px; font-weight:800; }
+  .section-count  { font-size:10px; font-weight:700; color:#555; background:rgba(0,0,0,0.07); padding:2px 8px; border-radius:99px; }
+
+  /* Tableau */
+  table { width:100%; border-collapse:collapse; font-size:10.5px; }
+  thead th { background:#1a1a1a; color:#fff; padding:7px 10px; text-align:left; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+  tbody tr:nth-child(even) td { background:#fafafa; }
+  tbody tr:hover td { background:#f0f4ff; }
+  td { padding:7px 10px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+  td.num    { text-align:center; color:#aaa; font-size:10px; width:30px; }
+  td.name strong { font-weight:700; font-size:11px; }
+  td.addr, .sub { color:#999; font-size:9.5px; margin-top:1px; }
+  td.phone  { color:#2563eb; font-weight:600; white-space:nowrap; }
+  td.contact{ color:#374151; }
+  td.date   { color:#374151; white-space:nowrap; font-size:10px; }
+  td.retard { color:#dc2626; font-weight:700; }
+  td.notes  { color:#6b7280; font-style:italic; max-width:200px; }
+
+  /* Pied */
+  .footer { margin-top:24px; padding-top:12px; border-top:1px solid #e5e7eb; display:flex; justify-content:space-between; color:#aaa; font-size:9px; }
+
+  /* Bouton impression */
+  .no-print { margin-bottom:16px; }
+  .btn-print { background:#1a1a1a; color:#fff; border:none; padding:10px 24px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; margin-right:8px; }
+  .btn-print:hover { background:#333; }
+
+  @media print {
+    .no-print { display:none !important; }
+    body { padding: 0; }
+    @page { margin:12mm 10mm; size:A4 landscape; }
+    .section { page-break-inside:avoid; }
+    thead { display:table-header-group; }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>
+  <button class="btn-print" style="background:#2563eb" onclick="window.close()">✕ Fermer</button>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>💊 Prospection Pharmacies</h1>
+    <p>Butt Premium — Base nationale FINESS</p>
+  </div>
+  <div class="header-right">
+    <div class="badge">📋 ${totalExporte} pharmacie${totalExporte>1?"s":""} exportée${totalExporte>1?"s":""}</div>
+    <div class="meta">${dateNow} à ${timeNow}</div>
+  </div>
+</div>
+
+<div class="summary">
+  ${ORDER.map(s => {
+    const n = groups[s]?.length || 0
+    if (!n) return ""
+    const col = COLORS[s] || "#374151"
+    return `<div class="summary-card" style="border-color:${col}30">
+      <div class="val" style="color:${col}">${n}</div>
+      <div class="lbl">${SL[s]||s}</div>
+    </div>`
+  }).filter(Boolean).join("")}
+</div>
+
+${sections}
+
+<div class="footer">
+  <span>Butt Premium CRM — Exporté le ${dateNow} à ${timeNow}</span>
+  <span>${totalExporte} pharmacie${totalExporte>1?"s":""} · Base FINESS</span>
+</div>
+
+</body>
+</html>`
+
+    const w = window.open("", "_blank", "width=1200,height=800,scrollbars=yes")
     if (w) { w.document.write(html); w.document.close() }
   }, [cochees, tracking])
 
